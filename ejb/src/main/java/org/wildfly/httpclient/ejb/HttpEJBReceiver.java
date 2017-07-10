@@ -213,7 +213,7 @@ class HttpEJBReceiver extends EJBReceiver {
 
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
-    protected StatefulEJBLocator<?> createSession(final EJBReceiverSessionCreationContext receiverContext) throws Exception {
+    protected SessionID createSession(final EJBReceiverSessionCreationContext receiverContext) throws Exception {
         final EJBLocator<?> locator = receiverContext.getClientInvocationContext().getLocator();
         URI uri = receiverContext.getClientInvocationContext().getDestination();
         SSLContext sslContext = receiverContext.getSSLContext();
@@ -269,7 +269,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 })
                 , result::completeExceptionally, EjbHeaders.EJB_RESPONSE_NEW_SESSION, null);
 
-        return result.get();
+        return result.get().getSessionId();
     }
 
     @Override
