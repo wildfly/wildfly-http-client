@@ -59,7 +59,8 @@ public class EjbHttpService {
         PathHandler pathHandler = new PathHandler();
         pathHandler.addPrefixPath("/v1/invoke", new AllowedMethodsHandler(new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.POST))
                 .addPrefixPath("/v1/open", new AllowedMethodsHandler(new HttpSessionOpenHandler(association, executorService, localTransactionContext), Methods.POST))
-                .addPrefixPath("/v1/cancel", new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE));
+                .addPrefixPath("/v1/cancel", new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
+                .addPrefixPath("/v1/discover", new AllowedMethodsHandler(new HttpDiscoveryHandler(executorService, association), Methods.GET));
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
         requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);

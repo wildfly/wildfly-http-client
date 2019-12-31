@@ -24,6 +24,8 @@ import javax.ejb.EJBException;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.logging.BasicLogger;
 import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
 import org.jboss.logging.annotations.Message;
 import org.jboss.logging.annotations.MessageLogger;
 
@@ -63,4 +65,8 @@ interface EjbHttpClientMessages extends BasicLogger {
 
     @Message(id = 11, value = "Invalid transaction type %s")
     IOException invalidTransactionType(int type);
+
+    @LogMessage(level = Logger.Level.ERROR)
+    @Message(id = 12, value = "Unable to perform EJB discovery")
+    void unableToPerformEjbDiscovery(@Cause Throwable e);
 }
