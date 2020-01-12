@@ -60,7 +60,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
 
     private static final AuthenticationContextConfigurationClient AUTH_CONFIGURATION_CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
-    private final AtomicInteger outstandingCount = new AtomicInteger(0);
+    private final AtomicInteger outstandingCount = new AtomicInteger(1);
 
     public DiscoveryRequest discover(final ServiceType serviceType, final FilterSpec filterSpec, final DiscoveryResult discoveryResult) {
         final EJBClientContext ejbClientContext = getCurrent();
@@ -74,6 +74,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
             outstandingCount.incrementAndGet();
             connectAndDiscover(connection, filterSpec, discoveryResult);
         }
+        countDown(discoveryResult);
         return DiscoveryRequest.NULL;
     }
 
