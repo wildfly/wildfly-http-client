@@ -67,6 +67,8 @@
         <version.org.wildfly.naming.client>1.0.6.Final</version.org.wildfly.naming.client>
         <version.org.wildfly.elytron>1.1.3.Final</version.org.wildfly.elytron>
         <version.org.wildfly.transaction.client>1.0.2.Final</version.org.wildfly.transaction.client>
+        <version.org.kohsuke.metainf-services>1.7</version.org.kohsuke.metainf-services>
+
     </properties>
 
     <modules>
@@ -189,6 +191,11 @@
                 <groupId>org.wildfly.security</groupId>
                 <artifactId>wildfly-elytron</artifactId>
                 <version>${version.org.wildfly.elytron}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.kohsuke.metainf-services</groupId>
+                <artifactId>metainf-services</artifactId>
+                <version>${version.org.kohsuke.metainf-services}</version>
             </dependency>
             <dependency>
                 <groupId>junit</groupId>
