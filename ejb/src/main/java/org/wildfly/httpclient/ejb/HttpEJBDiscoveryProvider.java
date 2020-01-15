@@ -60,11 +60,10 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
 
     private static final AuthenticationContextConfigurationClient AUTH_CONFIGURATION_CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
-    private final AtomicInteger outstandingCount = new AtomicInteger(1);
-
     public DiscoveryRequest discover(final ServiceType serviceType, final FilterSpec filterSpec, final DiscoveryResult discoveryResult) {
         final EJBClientContext ejbClientContext = getCurrent();
         final List<EJBClientConnection> configuredConnections = ejbClientContext.getConfiguredConnections();
+        final AtomicInteger outstandingCount = new AtomicInteger(1);
 
         for(EJBClientConnection connection: configuredConnections){
             final String scheme = connection.getDestination().getScheme();
@@ -72,9 +71,9 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                 continue;
             }
             outstandingCount.incrementAndGet();
-            connectAndDiscover(connection, filterSpec, discoveryResult);
+            connectAndDiscover(connection, filterSpec, outstandingCount, discoveryResult);
         }
-        countDown(discoveryResult);
+        countDown(outstandingCount, discoveryResult);
         return DiscoveryRequest.NULL;
     }
 
@@ -87,7 +86,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         return false;
     }
 
-    private void connectAndDiscover(final EJBClientConnection connection, final FilterSpec filterSpec, final DiscoveryResult discoveryResult) {
+    private void connectAndDiscover(final EJBClientConnection connection, final FilterSpec filterSpec, final AtomicInteger outstandingCount, final DiscoveryResult discoveryResult) {
         final URI newUri = connection.getDestination();
 
         HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(newUri);
@@ -127,13 +126,13 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                     } catch (Exception e) {
                         EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
                     } finally {
-                        countDown(discoveryResult);
+                        countDown(outstandingCount, discoveryResult);
                         IoUtils.safeClose(closeable);
                     }
                 }),
                 (e) -> {
                     EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
-                    countDown(discoveryResult);
+                    countDown(outstandingCount, discoveryResult);
                 },
                 EjbHeaders.EJB_DISCOVERY_RESPONSE_VERSION_ONE, null);
     }
@@ -170,7 +169,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         return builder.create();
     }
 
-    private void countDown(final DiscoveryResult discoveryResult) {
+    private void countDown(final AtomicInteger outstandingCount, final DiscoveryResult discoveryResult) {
         if (outstandingCount.decrementAndGet() == 0) {
             discoveryResult.complete();
         }
