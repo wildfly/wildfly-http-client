@@ -59,4 +59,9 @@ public class HttpClientProvider implements EJBTransportProvider {
         }
         throw EjbHttpClientMessages.MESSAGES.couldNotCreateHttpEjbReceiverFor(s);
     }
+
+    @Override
+    public void close(EJBReceiverContext receiverContext) throws Exception {
+
+    }
 }

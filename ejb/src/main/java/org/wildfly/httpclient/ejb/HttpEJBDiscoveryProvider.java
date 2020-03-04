@@ -43,8 +43,12 @@ import org.xnio.IoUtils;
 import javax.net.ssl.SSLContext;
 import java.net.URI;
 import java.security.GeneralSecurityException;
+import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.security.AccessController.doPrivileged;
 import static org.jboss.ejb.client.EJBClientContext.getCurrent;
@@ -60,20 +64,21 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
 
     private static final AuthenticationContextConfigurationClient AUTH_CONFIGURATION_CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
+    private Set<ServiceURL> serviceURLCache = new HashSet<>();
+    private AtomicBoolean shouldRefreshCache = new AtomicBoolean(true);
+
+    HttpEJBDiscoveryProvider() {
+    }
+
     public DiscoveryRequest discover(final ServiceType serviceType, final FilterSpec filterSpec, final DiscoveryResult discoveryResult) {
         final EJBClientContext ejbClientContext = getCurrent();
-        final List<EJBClientConnection> configuredConnections = ejbClientContext.getConfiguredConnections();
-        final AtomicInteger outstandingCount = new AtomicInteger(1);
 
-        for(EJBClientConnection connection: configuredConnections){
-            final String scheme = connection.getDestination().getScheme();
-            if (!supportsScheme(scheme)) {
-                continue;
-            }
-            outstandingCount.incrementAndGet();
-            connectAndDiscover(connection, filterSpec, outstandingCount, discoveryResult);
+        if (shouldRefreshCache.get()) {
+            refreshCache(ejbClientContext);
         }
-        countDown(outstandingCount, discoveryResult);
+
+        searchCache(discoveryResult, filterSpec);
+
         return DiscoveryRequest.NULL;
     }
 
@@ -86,7 +91,34 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         return false;
     }
 
-    private void connectAndDiscover(final EJBClientConnection connection, final FilterSpec filterSpec, final AtomicInteger outstandingCount, final DiscoveryResult discoveryResult) {
+    private void searchCache(final DiscoveryResult discoveryResult, final FilterSpec filterSpec) {
+        for (ServiceURL serviceURL : serviceURLCache) {
+            if (serviceURL.satisfies(filterSpec)) {
+                discoveryResult.addMatch(serviceURL.getLocationURI());
+            }
+        }
+        discoveryResult.complete();
+    }
+
+    private void refreshCache(final EJBClientContext ejbClientContext){
+        serviceURLCache.clear();
+        final List<EJBClientConnection> httpConnections = ejbClientContext.getConfiguredConnections().stream().filter(
+                (connection) -> supportsScheme(connection.getDestination().getScheme())
+        ).collect(Collectors.toList());
+        final CountDownLatch outstandingLatch = new CountDownLatch(httpConnections.size());
+        for (EJBClientConnection connection : httpConnections) {
+            disoverFromConnection(connection, outstandingLatch);
+        }
+        try {
+            outstandingLatch.await();
+            shouldRefreshCache.set(false);
+        } catch(InterruptedException e){
+            EjbHttpClientMessages.MESSAGES.httpDiscoveryInterrupted(e);
+        }
+        shouldRefreshCache.set(false);
+    }
+
+    private void disoverFromConnection(final EJBClientConnection connection, final CountDownLatch outstandingLatch) {
         final URI newUri = connection.getDestination();
 
         HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(newUri);
@@ -119,20 +151,18 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                         for (int i = 0; i < size; i++) {
                             EJBModuleIdentifier ejbModuleIdentifier = (EJBModuleIdentifier) unmarshaller.readObject();
                             ServiceURL url = createServiceURL(newUri, ejbModuleIdentifier);
-                            if (url.satisfies(filterSpec)) {
-                                discoveryResult.addMatch(newUri);
-                            }
+                            serviceURLCache.add(url);
                         }
                     } catch (Exception e) {
                         EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
                     } finally {
-                        countDown(outstandingCount, discoveryResult);
+                        outstandingLatch.countDown();
                         IoUtils.safeClose(closeable);
                     }
                 }),
                 (e) -> {
                     EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
-                    countDown(outstandingCount, discoveryResult);
+                    outstandingLatch.countDown();
                 },
                 EjbHeaders.EJB_DISCOVERY_RESPONSE_VERSION_ONE, null);
     }
@@ -169,10 +199,9 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         return builder.create();
     }
 
-    private void countDown(final AtomicInteger outstandingCount, final DiscoveryResult discoveryResult) {
-        if (outstandingCount.decrementAndGet() == 0) {
-            discoveryResult.complete();
-        }
+    @Override
+    public void processMissingTarget(URI location, Exception cause) {
+        shouldRefreshCache.set(true);
     }
 }
 

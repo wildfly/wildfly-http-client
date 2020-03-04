@@ -69,4 +69,8 @@ interface EjbHttpClientMessages extends BasicLogger {
     @LogMessage(level = Logger.Level.ERROR)
     @Message(id = 12, value = "Unable to perform EJB discovery")
     void unableToPerformEjbDiscovery(@Cause Throwable e);
+
+    @LogMessage(level = Logger.Level.INFO)
+    @Message(id = 13, value = "HTTP discovery has been interrupted")
+    void httpDiscoveryInterrupted(@Cause InterruptedException e);
 }

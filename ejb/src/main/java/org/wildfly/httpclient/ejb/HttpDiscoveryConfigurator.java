@@ -32,9 +32,9 @@ import org.wildfly.discovery.spi.RegistryProvider;
 @MetaInfServices
 public final class HttpDiscoveryConfigurator implements ExternalDiscoveryConfigurator {
 
-    private final HttpEJBDiscoveryProvider discoveryProvider =new HttpEJBDiscoveryProvider();
+    private static final HttpEJBDiscoveryProvider discoveryProvider = new HttpEJBDiscoveryProvider();
 
     public void configure(final Consumer<DiscoveryProvider> discoveryProviderConsumer, final Consumer<RegistryProvider> registryProviderConsumer) {
-        discoveryProviderConsumer.accept((serviceType, filterSpec, result) -> discoveryProvider.discover(serviceType, filterSpec, result));
+        discoveryProviderConsumer.accept(discoveryProvider);
     }
 }
