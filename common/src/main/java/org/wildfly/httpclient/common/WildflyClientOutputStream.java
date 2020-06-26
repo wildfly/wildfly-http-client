@@ -169,9 +169,6 @@ class WildflyClientOutputStream extends OutputStream implements ByteOutput {
                     runWriteTask();
                 } else {
                     buffer.put(b, currentOff, currentLen);
-                    if (buffer.remaining() == 0) {
-                        runWriteTask();
-                    }
                     return;
                 }
             }
