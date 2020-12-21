@@ -163,7 +163,7 @@ public class HttpConnectionPool implements Closeable {
                     activeInvocationCount.decrementAndGet();
                     next.errorListener.error(e);
                 }
-            }, new URI(hostPoolAddress.getURI().getScheme(), hostPoolAddress.getURI().getUserInfo(), address.getHostAddress(), hostPoolAddress.getURI().getPort(), "/", null, null), worker, ssl, byteBufferPool, options);
+            }, new URI(hostPoolAddress.getURI().getScheme(), hostPoolAddress.getURI().getUserInfo(), address.getHostName(), hostPoolAddress.getURI().getPort(), "/", null, null), worker, ssl, byteBufferPool, options);
         } catch (URISyntaxException e) {
             next.errorListener.error(e);
         }
