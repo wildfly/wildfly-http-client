@@ -49,7 +49,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.source>1.8</maven.compiler.source>
         <!-- Versions -->
-        <version.io.undertow>2.1.1.Final</version.io.undertow>
+        <version.io.undertow>2.2.3.Final</version.io.undertow>
         <version.org.jboss.logging>3.4.1.Final</version.org.jboss.logging>
         <version.org.jboss.logging-tools>2.2.1.Final</version.org.jboss.logging-tools>
         <version.org.junit>4.13.1</version.org.junit>
@@ -65,7 +65,7 @@
         <version.org.wildfly.client-config>1.0.1.Final</version.org.wildfly.client-config>
         <version.org.wildfly.common>1.5.4.Final</version.org.wildfly.common>
         <version.org.wildfly.naming.client>1.0.12.Final</version.org.wildfly.naming.client>
-        <version.org.wildfly.elytron>1.12.1.Final</version.org.wildfly.elytron>
+        <version.org.wildfly.elytron>1.14.1.Final</version.org.wildfly.elytron>
         <version.org.wildfly.transaction.client>1.1.11.Final</version.org.wildfly.transaction.client>
         <version.org.jboss.threads>2.3.3.Final</version.org.jboss.threads>
         <version.org.kohsuke.metainf-services>1.7</version.org.kohsuke.metainf-services>
