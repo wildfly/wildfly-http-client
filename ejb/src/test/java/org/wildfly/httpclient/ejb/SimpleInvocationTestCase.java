@@ -98,7 +98,7 @@ public class SimpleInvocationTestCase {
      * @throws Exception
      * @see <a href="https://issues.jboss.org/browse/WFLY-9788">WFLY-9788</a> for more details
      */
-    @Test @Ignore // FIXME WEJBHTTP-36
+    @Test
     public void testSimpleInvocationWithURLNeedingEncoding() throws Exception {
         EJBTestServer.setHandler((invocation, affinity, out, methodLocator, handle, attachments) -> {
             // check the invoked method and make sure it maps correctly to the view interface's method

@@ -20,7 +20,6 @@ package org.wildfly.httpclient.common;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.MessageDigest;
@@ -158,22 +157,20 @@ class PoolAuthenticationContext {
                 return false;
             }
             String cnonce = cnonceGenerator.createSessionId();
-            String digestUri = null;
-            try {
-                String path;
-                String query;
-                int pos = request.getPath().indexOf("?");
-                if (pos > 0) {
-                    path = request.getPath().substring(0, pos);
-                    query = request.getPath().substring(pos + 1);
-                } else {
-                    path = request.getPath();
-                    query = null;
-                }
-                digestUri = new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), uri.getPort(), path, query, null).toString();
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
+            StringBuilder digestURISB = new StringBuilder();
+            String uriStr = uri.toString();
+            String uriPath = uri.getPath();
+            if (uriPath != null) {
+                digestURISB.append(uriStr, 0, uriStr.length() - uriPath.length());
+            } else {
+                digestURISB.append(uriStr);
             }
+            if (!request.getPath().startsWith("/")) {
+                digestURISB.append("/");
+            }
+            digestURISB.append(request.getPath());
+            String digestUri = digestURISB.toString();
+
             request.putAttachment(DIGEST, current);
             StringBuilder sb = new StringBuilder("Digest username=\"");
             sb.append(principal.getName());
