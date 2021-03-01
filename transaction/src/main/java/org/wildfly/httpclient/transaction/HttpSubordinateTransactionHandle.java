@@ -18,14 +18,18 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static java.security.AccessController.doPrivileged;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_V1_XA_BC;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_V1_XA_PREP;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_V1_XA_ROLLBACK;
 
+import java.net.URI;
+import java.security.GeneralSecurityException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import javax.net.ssl.SSLContext;
+import javax.transaction.SystemException;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
@@ -34,6 +38,8 @@ import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
+import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
 import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
 import org.xnio.IoUtils;
 
@@ -46,6 +52,7 @@ import io.undertow.util.Methods;
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 class HttpSubordinateTransactionHandle implements SubordinateTransactionControl {
+    private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
     private final HttpTargetContext targetContext;
     private final Xid id;
@@ -109,6 +116,15 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
                 .setPath(targetContext.getUri().getPath() + operationPath);
         cr.getRequestHeaders().put(Headers.ACCEPT, TransactionConstants.EXCEPTION);
         cr.getRequestHeaders().put(Headers.CONTENT_TYPE, TransactionConstants.XID_VERSION_1);
+
+        final AuthenticationConfiguration authenticationConfiguration = getAuthenticationConfiguration(targetContext.getUri());
+        final SSLContext sslContext;
+        try {
+            sslContext = getSslContext(targetContext.getUri());
+        } catch (GeneralSecurityException e) {
+            throw new XAException(e.getMessage());
+        }
+
         targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
             Marshaller marshaller = targetContext.createMarshaller(HttpRemoteTransactionPeer.createMarshallingConf());
             marshaller.start(Marshalling.createByteOutput(output));
@@ -146,6 +162,23 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
                 xaException.initCause(ex);
                 throw xaException;
             }
+        }
+    }
+
+    private AuthenticationConfiguration getAuthenticationConfiguration(URI location) {
+        if (authenticationConfiguration == null) {
+            return CLIENT.getAuthenticationConfiguration(location, AuthenticationContext.captureCurrent(), -1, "jta", "jboss");
+        } else {
+            return authenticationConfiguration;
+        }
+    }
+
+    private SSLContext getSslContext(URI location) throws GeneralSecurityException {
+        if (sslContext == null) {
+            AuthenticationContext context = AuthenticationContext.captureCurrent();
+            return CLIENT.getSSLContext(location, context);
+        } else {
+            return sslContext;
         }
     }
 
