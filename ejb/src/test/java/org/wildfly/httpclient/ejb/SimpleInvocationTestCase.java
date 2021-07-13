@@ -165,6 +165,7 @@ public class SimpleInvocationTestCase {
     }
 
     @Test
+    @Ignore("https://issues.redhat.com/browse/WEJBHTTP-55")
     public void testSimpleSSLInvocationViaURLAffinity() throws Exception {
         for (int i = 0; i < RETRIES; ++i) {
             clearSessionId();
