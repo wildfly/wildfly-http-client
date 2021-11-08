@@ -26,7 +26,7 @@
         <groupId>org.wildfly.wildfly-http-client</groupId>
         <artifactId>wildfly-http-client-parent</artifactId>
         <version>1.1.9.Final-SNAPSHOT</version>
-        <relativePath>../</relativePath>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>wildfly-http-transaction-client</artifactId>
@@ -63,6 +63,11 @@
         </dependency>
 
         <dependency>
+            <groupId>org.jboss.spec.javax.transaction</groupId>
+            <artifactId>jboss-transaction-api_1.3_spec</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.wildfly.transaction</groupId>
             <artifactId>wildfly-transaction-client</artifactId>
         </dependency>
@@ -79,11 +84,6 @@
             <groupId>org.jboss.xnio</groupId>
             <artifactId>xnio-nio</artifactId>
             <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.jboss.spec.javax.transaction</groupId>
-            <artifactId>jboss-transaction-api_1.3_spec</artifactId>
         </dependency>
 
         <dependency>
@@ -118,42 +118,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-
-    <build>
-
-        <testResources>
-            <testResource>
-                <directory>src/test/resources</directory>
-            </testResource>
-            <testResource>
-                <directory>src/test/java</directory>
-                <excludes>
-                    <exclude>**/*.java</exclude>
-                </excludes>
-            </testResource>
-        </testResources>
-
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-surefire-plugin</artifactId>
-                    <configuration>
-                        <enableAssertions>true</enableAssertions>
-                        <runOrder>reversealphabetical</runOrder>
-                        <redirectTestOutputToFile>true</redirectTestOutputToFile>
-                        <systemPropertyVariables>
-                            <default.server.address>localhost</default.server.address>
-                            <default.server.port>7777</default.server.port>
-                            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                            <test.level>${test.level}</test.level>
-                            <java.net.preferIPv6Addresses>${test.ipv6}</java.net.preferIPv6Addresses>
-                            <sun.net.useExclusiveBind>false</sun.net.useExclusiveBind>
-                        </systemPropertyVariables>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
-    </build>
 </project>
