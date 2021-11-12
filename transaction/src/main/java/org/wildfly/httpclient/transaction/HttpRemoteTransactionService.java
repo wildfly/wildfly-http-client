@@ -18,6 +18,22 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_BEGIN_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -66,15 +82,15 @@ public class HttpRemoteTransactionService {
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
-        routingHandler.add(Methods.POST, TransactionConstants.V1_UT_BEGIN, new BeginHandler());
-        routingHandler.add(Methods.POST, TransactionConstants.V1_UT_ROLLBACK, new UTRollbackHandler());
-        routingHandler.add(Methods.POST, TransactionConstants.V1_UT_COMMIT, new UTCommitHandler());
-        routingHandler.add(Methods.POST, TransactionConstants.V1_XA_BC, new XABeforeCompletionHandler());
-        routingHandler.add(Methods.POST, TransactionConstants.V1_XA_COMMIT, new XACommitHandler());
-        routingHandler.add(Methods.POST, TransactionConstants.V1_XA_FORGET, new XAForgetHandler());
-        routingHandler.add(Methods.POST, TransactionConstants.V1_XA_PREP, new XAPrepHandler());
-        routingHandler.add(Methods.POST, TransactionConstants.V1_XA_ROLLBACK, new XARollbackHandler());
-        routingHandler.add(Methods.GET, TransactionConstants.V1_XA_RECOVER, new XARecoveryHandler());
+        routingHandler.add(Methods.POST, UT_BEGIN_PATH, new BeginHandler());
+        routingHandler.add(Methods.POST, UT_ROLLBACK_PATH, new UTRollbackHandler());
+        routingHandler.add(Methods.POST, UT_COMMIT_PATH, new UTCommitHandler());
+        routingHandler.add(Methods.POST, XA_BC_PATH, new XABeforeCompletionHandler());
+        routingHandler.add(Methods.POST, XA_COMMIT_PATH, new XACommitHandler());
+        routingHandler.add(Methods.POST, XA_FORGET_PATH, new XAForgetHandler());
+        routingHandler.add(Methods.POST, XA_PREP_PATH, new XAPrepHandler());
+        routingHandler.add(Methods.POST, XA_ROLLBACK_PATH, new XARollbackHandler());
+        routingHandler.add(Methods.GET, XA_RECOVER_PATH, new XARecoveryHandler());
         return new BlockingHandler(new ElytronIdentityHandler(routingHandler));
     }
 
@@ -83,7 +99,7 @@ public class HttpRemoteTransactionService {
         @Override
         public final void handleRequest(HttpServerExchange exchange) throws Exception {
             ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
-            if (contentType == null || contentType.getVersion() != 1 || !contentType.getType().equals(TransactionConstants.XID)) {
+            if (contentType == null || contentType.getVersion() != 1 || !contentType.getType().equals(XID.getType())) {
                 exchange.setStatusCode(StatusCodes.BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s has incorrect or missing content type", exchange);
                 return;
@@ -120,14 +136,14 @@ public class HttpRemoteTransactionService {
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
             try {
-                String timeoutString = exchange.getRequestHeaders().getFirst(TransactionConstants.TIMEOUT);
+                String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
                 if (timeoutString == null) {
                     exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TransactionConstants.TIMEOUT);
+                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TIMEOUT);
                     return;
                 }
                 final Integer timeout = Integer.parseInt(timeoutString);
-                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, TransactionConstants.NEW_TRANSACTION.toString());
+                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, NEW_TRANSACTION.toString());
                 final LocalTransaction transaction = transactionContext.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -151,17 +167,17 @@ public class HttpRemoteTransactionService {
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
             try {
-                String flagsStringString = exchange.getRequestHeaders().getFirst(TransactionConstants.RECOVERY_FLAGS);
+                String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
                 if (flagsStringString == null) {
                     exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TransactionConstants.RECOVERY_FLAGS);
+                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_FLAGS);
                     return;
                 }
                 final int flags = Integer.parseInt(flagsStringString);
-                String parentName = exchange.getRequestHeaders().getFirst(TransactionConstants.RECOVERY_PARENT_NAME);
+                String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
                 if (parentName == null) {
                     exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TransactionConstants.RECOVERY_PARENT_NAME);
+                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_PARENT_NAME);
                     return;
                 }
 
@@ -257,7 +273,7 @@ public class HttpRemoteTransactionService {
     public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
         try {
             exchange.setStatusCode(status);
-            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
+            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EXCEPTION.toString());
 
             final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
             marshallingConfiguration.setVersion(2);

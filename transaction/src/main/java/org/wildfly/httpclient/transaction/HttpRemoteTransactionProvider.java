@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.transaction.TransactionConstants.HTTP_SCHEME;
+import static org.wildfly.httpclient.transaction.TransactionConstants.HTTPS_SCHEME;
+
 import java.net.URI;
 
 import javax.net.ssl.SSLContext;
@@ -41,8 +44,8 @@ public class HttpRemoteTransactionProvider implements RemoteTransactionProvider 
     @Override
     public boolean supportsScheme(String s) {
         switch (s) {
-            case "http":
-            case "https":
+            case HTTP_SCHEME:
+            case HTTPS_SCHEME:
                 return true;
         }
         return false;
