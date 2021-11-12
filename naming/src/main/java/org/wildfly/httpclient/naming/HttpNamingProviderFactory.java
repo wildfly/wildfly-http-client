@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.naming;
 
+import static org.wildfly.httpclient.naming.NamingConstants.HTTP_SCHEME;
+import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
+
 import javax.naming.NamingException;
 
 import org.wildfly.naming.client.NamingProvider;
@@ -38,8 +41,8 @@ public class HttpNamingProviderFactory implements NamingProviderFactory {
     @Override
     public boolean supportsUriScheme(String providerScheme, FastHashtable<String, Object> env) {
         switch (providerScheme) {
-            case "http":
-            case "https":
+            case HTTP_SCHEME:
+            case HTTPS_SCHEME:
                 return true;
         }
         return false;

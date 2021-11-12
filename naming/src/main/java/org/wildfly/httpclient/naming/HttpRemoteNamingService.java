@@ -18,6 +18,21 @@
 
 package org.wildfly.httpclient.naming;
 
+import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.NAME_PATH_PARAMETER;
+import static org.wildfly.httpclient.naming.NamingConstants.NEW_QUERY_PARAMETER;
+import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidClassException;
@@ -58,18 +73,6 @@ import io.undertow.util.StatusCodes;
  */
 public class HttpRemoteNamingService {
 
-    private static final String UTF_8 = "UTF-8";
-    private static final String LOOKUP = "/v1/lookup/{name}";
-    private static final String LOOKUPLINK = "/v1/lookuplink/{name}";
-    private static final String BIND = "/v1/bind/{name}";
-    private static final String REBIND = "/v1/rebind/{name}";
-    private static final String UNBIND = "/v1/unbind/{name}";
-    private static final String DESTROY_SUBCONTEXT = "/v1/dest-subctx/{name}";
-    private static final String LIST = "/v1/list/{name}";
-    private static final String LIST_BINDINGS = "/v1/list-bindings/{name}";
-    private static final String RENAME = "/v1/rename/{name}";
-    private static final String CREATE_SUBCONTEXT = "/v1/create-subcontext/{name}";
-
     private static final MarshallerFactory MARSHALLER_FACTORY = new RiverMarshallerFactory();
 
     private final Context localContext;
@@ -87,16 +90,17 @@ public class HttpRemoteNamingService {
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
-        routingHandler.add(Methods.POST, LOOKUP, new LookupHandler());
-        routingHandler.add(Methods.GET, LOOKUPLINK, new LookupLinkHandler());
-        routingHandler.add(Methods.PUT, BIND, new BindHandler());
-        routingHandler.add(Methods.PATCH, REBIND, new RebindHandler());
-        routingHandler.add(Methods.DELETE, UNBIND, new UnbindHandler());
-        routingHandler.add(Methods.DELETE, DESTROY_SUBCONTEXT, new DestroySubcontextHandler());
-        routingHandler.add(Methods.GET, LIST, new ListHandler());
-        routingHandler.add(Methods.GET, LIST_BINDINGS, new ListBindingsHandler());
-        routingHandler.add(Methods.PATCH, RENAME, new RenameHandler());
-        routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT, new CreateSubContextHandler());
+        final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
+        routingHandler.add(Methods.POST, LOOKUP_PATH + nameParamPathSuffix, new LookupHandler());
+        routingHandler.add(Methods.GET, LOOKUP_LINK_PATH + nameParamPathSuffix, new LookupLinkHandler());
+        routingHandler.add(Methods.PUT, BIND_PATH + nameParamPathSuffix, new BindHandler());
+        routingHandler.add(Methods.PATCH, REBIND_PATH + nameParamPathSuffix, new RebindHandler());
+        routingHandler.add(Methods.DELETE, UNBIND_PATH + nameParamPathSuffix, new UnbindHandler());
+        routingHandler.add(Methods.DELETE, DESTROY_SUBCONTEXT_PATH + nameParamPathSuffix, new DestroySubcontextHandler());
+        routingHandler.add(Methods.GET, LIST_PATH + nameParamPathSuffix, new ListHandler());
+        routingHandler.add(Methods.GET, LIST_BINDINGS_PATH + nameParamPathSuffix, new ListBindingsHandler());
+        routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler());
+        routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler());
         return new BlockingHandler(new ElytronIdentityHandler(routingHandler));
     }
 
@@ -106,7 +110,7 @@ public class HttpRemoteNamingService {
         @Override
         public final void handleRequest(HttpServerExchange exchange) throws Exception {
             PathTemplateMatch params = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY);
-            String name = URLDecoder.decode(params.getParameters().get("name"), UTF_8);
+            String name = URLDecoder.decode(params.getParameters().get(NAME_PATH_PARAMETER), UTF_8.name());
             try {
                 Object result = doOperation(exchange, name);
                 if (exchange.isComplete()) {
@@ -169,14 +173,14 @@ public class HttpRemoteNamingService {
     private class RenameHandler extends NameHandler {
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            Deque<String> newName = exchange.getQueryParameters().get("new");
+            Deque<String> newName = exchange.getQueryParameters().get(NEW_QUERY_PARAMETER);
             if (newName == null || newName.isEmpty()) {
                 exchange.setStatusCode(StatusCodes.BAD_REQUEST);
                 exchange.endExchange();
                 return null;
             }
             try {
-                String nn = URLDecoder.decode(newName.getFirst(), UTF_8);
+                String nn = URLDecoder.decode(newName.getFirst(), UTF_8.name());
                 localContext.rename(name, nn);
                 return null;
             } catch (UnsupportedEncodingException e) {
@@ -213,7 +217,7 @@ public class HttpRemoteNamingService {
         @Override
         protected final Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
-            if (contentType == null || !contentType.getType().equals("application/x-wf-jndi-jbmar-value") || contentType.getVersion() != 1) {
+            if (contentType == null || !contentType.getType().equals(VALUE.getType()) || contentType.getVersion() != 1) {
                 exchange.setStatusCode(StatusCodes.BAD_REQUEST);
                 exchange.endExchange();
                 return null;
@@ -246,7 +250,7 @@ public class HttpRemoteNamingService {
     }
 
     private static void doMarshall(HttpServerExchange exchange, Object result) throws IOException {
-        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/x-wf-jndi-jbmar-value;version=1");
+        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
         final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
         marshallingConfiguration.setVersion(2);
         Marshaller marshaller = MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);

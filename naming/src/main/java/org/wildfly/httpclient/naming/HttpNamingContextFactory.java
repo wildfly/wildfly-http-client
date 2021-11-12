@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.naming;
 
+import static org.wildfly.httpclient.naming.NamingConstants.JAVA_SCHEME;
+
 import javax.naming.Context;
 import javax.naming.NamingException;
 
@@ -32,7 +34,7 @@ import org.wildfly.naming.client.util.FastHashtable;
 public class HttpNamingContextFactory implements NamingContextFactory {
     @Override
     public boolean supportsUriScheme(NamingProvider namingProvider, String nameScheme) {
-        return namingProvider instanceof HttpNamingProvider && (nameScheme == null || nameScheme.equals("java"));
+        return namingProvider instanceof HttpNamingProvider && (nameScheme == null || nameScheme.equals(JAVA_SCHEME));
     }
 
     @Override
