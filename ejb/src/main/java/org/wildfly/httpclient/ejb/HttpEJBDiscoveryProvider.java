@@ -17,6 +17,12 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
+import static org.wildfly.httpclient.ejb.EjbConstants.DISCOVERY_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_SCHEME;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
+
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
@@ -61,9 +67,6 @@ import static org.jboss.ejb.client.EJBClientContext.getCurrent;
 
 public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
 
-    private static final String DISCOVERY_PATH =  "/ejb/v1/discover";
-    private static final String DISCOVERY_ACCEPT = "application/x-wf-ejb-jbmar-discovery-response;version=1,application/x-wf-jbmar-exception;version=1";
-
     private static final AuthenticationContextConfigurationClient AUTH_CONFIGURATION_CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
     private static final long CACHE_REFRESH_TIMEOUT = TimeUnit.MILLISECONDS.toNanos(Long.parseLong(
@@ -97,8 +100,8 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
 
     private boolean supportsScheme(String s) {
         switch (s) {
-            case "http":
-            case "https":
+            case HTTP_SCHEME:
+            case HTTPS_SCHEME:
                 return true;
         }
         return false;
@@ -161,7 +164,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         ClientRequest request = new ClientRequest()
                 .setPath(targetContext.getUri().getPath() + DISCOVERY_PATH)
                 .setMethod(Methods.GET);
-        request.getRequestHeaders().add(Headers.ACCEPT, DISCOVERY_ACCEPT);
+        request.getRequestHeaders().add(Headers.ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
 
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
                 ((result, response, closeable) -> {
@@ -188,7 +191,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                     EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
                     outstandingLatch.countDown();
                 },
-                EjbHeaders.EJB_DISCOVERY_RESPONSE_VERSION_ONE, null);
+                EjbConstants.EJB_DISCOVERY_RESPONSE, null);
     }
 
     private MarshallingConfiguration createMarshallingConfig() {

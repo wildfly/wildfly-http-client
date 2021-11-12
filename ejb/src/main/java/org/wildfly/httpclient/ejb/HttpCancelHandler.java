@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
+
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
@@ -73,7 +75,7 @@ class HttpCancelHandler extends RemoteHTTPHandler {
         final String bean = parts[3];
         String invocationId = parts[4];
         boolean cancelIdRunning = Boolean.parseBoolean(parts[5]);
-        Cookie cookie = exchange.getRequestCookies().get(EjbHttpService.JSESSIONID);
+        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
         final InvocationIdentifier identifier;
         if (invocationId != null && sessionAffinity != null) {

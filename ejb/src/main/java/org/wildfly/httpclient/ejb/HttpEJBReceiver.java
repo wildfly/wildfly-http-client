@@ -18,6 +18,10 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_PORT;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_PORT;
+
 import static java.security.AccessController.doPrivileged;
 
 import java.io.DataOutput;
@@ -173,7 +177,7 @@ class HttpEJBReceiver extends EJBReceiver {
         }
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
-        final int defaultPort = uri.getScheme().equals("https") ? 443 : 80;
+        final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, (output -> {
@@ -243,7 +247,7 @@ class HttpEJBReceiver extends EJBReceiver {
                             }
                         });
                 }),
-                (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), EjbHeaders.EJB_RESPONSE_VERSION_ONE, null);
+                (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), EjbConstants.EJB_RESPONSE, null);
     }
 
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
@@ -253,7 +257,7 @@ class HttpEJBReceiver extends EJBReceiver {
         URI uri = receiverContext.getClientInvocationContext().getDestination();
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
-        final int defaultPort = uri.getScheme().equals("https") ? 443 : 80;
+        final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
         WildflyHttpContext current = WildflyHttpContext.getCurrent();
@@ -289,7 +293,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 },
                 ((unmarshaller, response, c) -> {
                     try {
-                        String sessionId = response.getResponseHeaders().getFirst(EjbHeaders.EJB_SESSION_ID);
+                        String sessionId = response.getResponseHeaders().getFirst(EjbConstants.EJB_SESSION_ID);
                         if (sessionId == null) {
                             result.completeExceptionally(EjbHttpClientMessages.MESSAGES.noSessionIdInResponse());
                         } else {
@@ -300,7 +304,7 @@ class HttpEJBReceiver extends EJBReceiver {
                         IoUtils.safeClose(c);
                     }
                 })
-                , result::completeExceptionally, EjbHeaders.EJB_RESPONSE_NEW_SESSION, null);
+                , result::completeExceptionally, EjbConstants.EJB_RESPONSE_NEW_SESSION, null);
 
         return result.get();
     }
@@ -315,7 +319,7 @@ class HttpEJBReceiver extends EJBReceiver {
         URI uri = clientInvocationContext.getDestination();
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
-        final int defaultPort = uri.getScheme().equals("https") ? 443 : 80;
+        final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext;
         try {

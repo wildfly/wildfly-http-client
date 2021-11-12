@@ -18,6 +18,15 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
+import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
+
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
@@ -34,9 +43,6 @@ import java.nio.charset.StandardCharsets;
  * @author Stuart Douglas
  */
 class HttpEJBInvocationBuilder {
-
-    private static final String INVOCATION_ACCEPT = "application/x-wf-ejb-response;version=1,application/x-wf-jbmar-exception;version=1";
-    private static final String STATEFUL_CREATE_ACCEPT = "application/x-wf-jbmar-exception;version=1";
 
     private String appName;
     private String moduleName;
@@ -253,20 +259,20 @@ class HttpEJBInvocationBuilder {
         ClientRequest clientRequest = new ClientRequest();
         if (invocationType == InvocationType.METHOD_INVOCATION) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT);
+            clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             if (invocationId != null) {
-                clientRequest.getRequestHeaders().put(EjbHeaders.INVOCATION_ID, invocationId);
+                clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
             }
-            clientRequest.setPath(buildPath(mountPoint, "invoke", appName, moduleName, distinctName, beanName, beanId, view, method));
-            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, EjbHeaders.INVOCATION_VERSION_ONE);
+            clientRequest.setPath(buildPath(mountPoint, EJB_INVOKE_PATH, appName, moduleName, distinctName, beanName, beanId, view, method));
+            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, EjbHeaders.SESSION_OPEN_VERSION_ONE);
-            clientRequest.setPath(buildPath(mountPoint,"open", appName, moduleName, distinctName, beanName));
-            clientRequest.getRequestHeaders().add(Headers.ACCEPT, STATEFUL_CREATE_ACCEPT);
+            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
+            clientRequest.setPath(buildPath(mountPoint, EJB_OPEN_PATH, appName, moduleName, distinctName, beanName));
+            clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
         } else if(invocationType == InvocationType.CANCEL) {
             clientRequest.setMethod(Methods.DELETE);
-            clientRequest.setPath(buildPath(mountPoint,"cancel", appName, moduleName, distinctName, beanName, invocationId, cancelIfRunning));
+            clientRequest.setPath(buildPath(mountPoint, EJB_CANCEL_PATH, appName, moduleName, distinctName, beanName, invocationId, cancelIfRunning));
         }
         return clientRequest;
     }

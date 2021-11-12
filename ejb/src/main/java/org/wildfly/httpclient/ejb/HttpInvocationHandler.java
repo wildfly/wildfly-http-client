@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
+import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidClassException;
@@ -92,7 +95,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
-        if (contentType == null || contentType.getVersion() != 1 || !EjbHeaders.INVOCATION.equals(contentType.getType())) {
+        if (contentType == null || contentType.getVersion() != 1 || !INVOCATION.getType().equals(contentType.getType())) {
             exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             EjbHttpClientMessages.MESSAGES.debugf("Bad content type %s", ct);
             return;
@@ -119,11 +122,11 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
         String method = parts[6];
         String[] parameterTypeNames = new String[parts.length - 7];
         System.arraycopy(parts, 7, parameterTypeNames, 0, parameterTypeNames.length);
-        Cookie cookie = exchange.getRequestCookies().get(EjbHttpService.JSESSIONID);
+        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
 
-        final String cancellationId = exchange.getRequestHeaders().getFirst(EjbHeaders.INVOCATION_ID);
+        final String cancellationId = exchange.getRequestHeaders().getFirst(EjbConstants.INVOCATION_ID);
         final InvocationIdentifier identifier;
         if(cancellationId != null && sessionAffinity != null) {
             identifier = new InvocationIdentifier(cancellationId, sessionAffinity);
@@ -372,7 +375,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                 cancellationFlags.remove(identifier);
             }
             try {
-                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbHeaders.EJB_RESPONSE_VERSION_ONE.toString());
+                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE.toString());
 //                                    if (output.getSessionAffinity() != null) {
 //                                        exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
 //                                    }

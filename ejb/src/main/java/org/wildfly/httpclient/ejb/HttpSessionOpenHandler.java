@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
+import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+
 import java.io.InputStream;
 import java.net.SocketAddress;
 import java.util.Base64;
@@ -73,7 +76,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
-        if (contentType == null || contentType.getVersion() != 1 || !EjbHeaders.SESSION_OPEN.equals(contentType.getType())) {
+        if (contentType == null || contentType.getVersion() != 1 || !SESSION_OPEN.getType().equals(contentType.getType())) {
             exchange.setStatusCode(StatusCodes.BAD_REQUEST);
             EjbHttpClientMessages.MESSAGES.debugf("Bad content type %s", ct);
             return;
@@ -92,7 +95,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
         final String distinct = handleDash(parts[2]);
         final String bean = parts[3];
 
-        Cookie cookie = exchange.getRequestCookies().get(EjbHttpService.JSESSIONID);
+        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
         String sessionAffinity = null;
         if (cookie != null) {
             sessionAffinity = cookie.getValue();
@@ -209,7 +212,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                     marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
                     marshallingConfiguration.setVersion(2);
 
-                    Cookie sessionCookie = exchange.getRequestCookies().get(EjbHttpService.JSESSIONID);
+                    Cookie sessionCookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
                     if (sessionCookie == null) {
                         String rootPath = exchange.getResolvedPath();
                         int ejbIndex = rootPath.lastIndexOf("/ejb");
@@ -217,11 +220,11 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                             rootPath = rootPath.substring(0, ejbIndex);
                         }
 
-                        exchange.getResponseCookies().put(EjbHttpService.JSESSIONID, new CookieImpl(EjbHttpService.JSESSIONID, sessionIdGenerator.createSessionId()).setPath(rootPath));
+                        exchange.getResponseCookies().put(JSESSIONID_COOKIE_NAME, new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
                     }
 
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbHeaders.EJB_RESPONSE_NEW_SESSION.toString());
-                    exchange.getResponseHeaders().put(EjbHeaders.EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
+                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE_NEW_SESSION.toString());
+                    exchange.getResponseHeaders().put(EjbConstants.EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
 
                     exchange.setStatusCode(StatusCodes.NO_CONTENT);
                     exchange.endExchange();
