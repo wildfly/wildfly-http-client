@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
+
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import org.jboss.ejb.client.EJBModuleIdentifier;
@@ -26,7 +29,6 @@ import org.jboss.ejb.server.ModuleAvailabilityListener;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.MarshallingConfiguration;
-import org.jboss.marshalling.river.RiverMarshallerFactory;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
 
 import java.io.ByteArrayOutputStream;
@@ -63,7 +65,7 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_DISCOVERY_RESPONSE.toString());
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Marshaller marshaller = new RiverMarshallerFactory().createMarshaller(createMarshallingConfig());
+        Marshaller marshaller = newMarshaller(createMarshallingConfig());
         marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
         marshaller.writeInt(availableModules.size());
         for (EJBModuleIdentifier ejbModuleIdentifier : availableModules) {
@@ -75,9 +77,8 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
     }
 
     private MarshallingConfiguration createMarshallingConfig() {
-        final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
+        final MarshallingConfiguration marshallingConfiguration = newConfig();
         marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-        marshallingConfiguration.setVersion(2);
         return marshallingConfiguration;
     }
 }

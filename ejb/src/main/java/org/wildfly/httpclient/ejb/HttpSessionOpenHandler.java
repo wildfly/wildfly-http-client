@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
 import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
 import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
 
@@ -106,10 +108,9 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
         exchange.dispatch(executorService, () -> {
             final ReceivedTransaction txConfig;
             try {
-                final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
+                final MarshallingConfiguration marshallingConfiguration = newConfig();
                 marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-                marshallingConfiguration.setVersion(2);
-                Unmarshaller unmarshaller = HttpServerHelper.RIVER_MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
+                Unmarshaller unmarshaller = newUnmarshaller(marshallingConfiguration);
 
                 try (InputStream inputStream = exchange.getInputStream()) {
                     unmarshaller.start(new InputStreamByteInput(inputStream));
@@ -208,9 +209,8 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                 public void convertToStateful(@NotNull SessionID sessionId) throws IllegalArgumentException, IllegalStateException {
 
 
-                    final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
+                    final MarshallingConfiguration marshallingConfiguration = newConfig();
                     marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-                    marshallingConfiguration.setVersion(2);
 
                     Cookie sessionCookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
                     if (sessionCookie == null) {

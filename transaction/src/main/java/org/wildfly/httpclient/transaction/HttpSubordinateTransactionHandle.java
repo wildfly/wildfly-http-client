@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.READ_ONLY;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
@@ -116,7 +117,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
         cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
         targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-            Marshaller marshaller = targetContext.createMarshaller(HttpRemoteTransactionPeer.createMarshallingConf());
+            Marshaller marshaller = targetContext.createMarshaller(newConfig());
             marshaller.start(Marshalling.createByteOutput(output));
             marshaller.writeInt(id.getFormatId());
             final byte[] gtid = id.getGlobalTransactionId();

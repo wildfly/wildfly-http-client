@@ -18,6 +18,10 @@
 
 package org.wildfly.httpclient.common;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
+import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,11 +41,9 @@ import javax.net.ssl.SSLContext;
 
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.MarshallerFactory;
 import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.SimpleClassResolver;
 import org.jboss.marshalling.Unmarshaller;
-import org.jboss.marshalling.river.RiverMarshallerFactory;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
@@ -77,7 +79,6 @@ public class HttpTargetContext extends AbstractAttachable {
     private static final String EXCEPTION_TYPE = "application/x-wf-jbmar-exception";
 
     private static final String JSESSIONID = "JSESSIONID";
-    static final MarshallerFactory MARSHALLER_FACTORY = new RiverMarshallerFactory();
 
     private final HttpConnectionPool connectionPool;
     private final boolean eagerlyAcquireAffinity;
@@ -141,11 +142,11 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public Unmarshaller createUnmarshaller(MarshallingConfiguration marshallingConfiguration) throws IOException {
-        return MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
+        return newUnmarshaller(marshallingConfiguration);
     }
 
     public Marshaller createMarshaller(MarshallingConfiguration marshallingConfiguration) throws IOException {
-        return MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);
+        return newMarshaller(marshallingConfiguration);
     }
 
     public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
@@ -257,7 +258,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
                                     if (isException) {
                                         final MarshallingConfiguration marshallingConfiguration = createExceptionMarshallingConfig(classLoader);
-                                        final Unmarshaller unmarshaller = MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
+                                        final Unmarshaller unmarshaller = newUnmarshaller(marshallingConfiguration);
                                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
                                             InputStream in = inputStream;
                                             String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
@@ -409,12 +410,7 @@ public class HttpTargetContext extends AbstractAttachable {
      * @return
      */
     MarshallingConfiguration createExceptionMarshallingConfig(final ClassLoader cl) {
-        final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-        marshallingConfiguration.setVersion(2);
-        if (cl != null) {
-            marshallingConfiguration.setClassResolver(new SimpleClassResolver(cl));
-        }
-        return marshallingConfiguration;
+        return newConfig(cl != null ? new SimpleClassResolver(cl) : null);
     }
 
     private static Map<String, Object> readAttachments(final ObjectInput input) throws IOException, ClassNotFoundException {

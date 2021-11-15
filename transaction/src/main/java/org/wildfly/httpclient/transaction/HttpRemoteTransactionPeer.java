@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
@@ -38,7 +39,6 @@ import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
 
 import org.jboss.marshalling.InputStreamByteInput;
-import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
@@ -108,7 +108,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         targetContext.sendRequest(cr,  sslContext, authenticationConfiguration,null, (result, response, closeable) -> {
             try {
-                Unmarshaller unmarshaller = targetContext.createUnmarshaller(createMarshallingConf());
+                Unmarshaller unmarshaller = targetContext.createUnmarshaller(newConfig());
                 unmarshaller.start(new InputStreamByteInput(result));
                 int length = unmarshaller.readInt();
                 Xid[] ret = new Xid[length];
@@ -166,7 +166,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         targetContext.sendRequest(cr, sslContext, authenticationConfiguration, null, (result, response, closeable) -> {
             try {
-                Unmarshaller unmarshaller = targetContext.createUnmarshaller(createMarshallingConf());
+                Unmarshaller unmarshaller = targetContext.createUnmarshaller(newConfig());
                 unmarshaller.start(new InputStreamByteInput(result));
                 int formatId = unmarshaller.readInt();
                 int len = unmarshaller.readInt();
@@ -211,11 +211,5 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         } else {
             return sslContext;
         }
-    }
-
-    static MarshallingConfiguration createMarshallingConf() {
-        MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-        marshallingConfiguration.setVersion(2);
-        return marshallingConfiguration;
     }
 }

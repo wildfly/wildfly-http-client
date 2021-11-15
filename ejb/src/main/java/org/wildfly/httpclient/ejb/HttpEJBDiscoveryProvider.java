@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
 import static org.wildfly.httpclient.ejb.EjbConstants.DISCOVERY_PATH;
@@ -195,9 +196,8 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
     }
 
     private MarshallingConfiguration createMarshallingConfig() {
-        final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
+        final MarshallingConfiguration marshallingConfiguration = newConfig();
         marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-        marshallingConfiguration.setVersion(2);
         return marshallingConfiguration;
     }
 

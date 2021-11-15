@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
 import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_PORT;
 import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_PORT;
@@ -366,10 +367,9 @@ class HttpEJBReceiver extends EJBReceiver {
     }
 
     private MarshallingConfiguration createMarshallingConfig(URI uri) {
-        final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
+        final MarshallingConfiguration marshallingConfiguration = newConfig();
         marshallingConfiguration.setObjectResolver(new HttpProtocolV1ObjectResolver(uri));
         marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-        marshallingConfiguration.setVersion(2);
         return marshallingConfiguration;
     }
 

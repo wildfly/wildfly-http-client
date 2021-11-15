@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
+import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
 import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
@@ -44,11 +47,8 @@ import javax.transaction.xa.Xid;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.MarshallerFactory;
 import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.Unmarshaller;
-import org.jboss.marshalling.river.RiverMarshallerFactory;
 import org.wildfly.common.function.ExceptionBiFunction;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
@@ -72,8 +72,6 @@ public class HttpRemoteTransactionService {
 
     private final LocalTransactionContext transactionContext;
     private final Function<LocalTransaction, Xid> xidResolver;
-
-    private static final MarshallerFactory MARSHALLER_FACTORY = new RiverMarshallerFactory();
 
     public HttpRemoteTransactionService(LocalTransactionContext transactionContext, Function<LocalTransaction, Xid> xidResolver) {
         this.transactionContext = transactionContext;
@@ -106,7 +104,7 @@ public class HttpRemoteTransactionService {
             }
 
             try {
-                Unmarshaller unmarshaller = MARSHALLER_FACTORY.createUnmarshaller(createMarshallingConf());
+                Unmarshaller unmarshaller = newUnmarshaller(newConfig());
                 unmarshaller.start(new InputStreamByteInput(exchange.getInputStream()));
                 int formatId = unmarshaller.readInt();
                 int len = unmarshaller.readInt();
@@ -147,7 +145,7 @@ public class HttpRemoteTransactionService {
                 final LocalTransaction transaction = transactionContext.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                Marshaller marshaller = MARSHALLER_FACTORY.createMarshaller(createMarshallingConf());
+                Marshaller marshaller = newMarshaller(newConfig());
                 marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
                 marshaller.writeInt(xid.getFormatId());
                 marshaller.writeInt(xid.getGlobalTransactionId().length);
@@ -183,7 +181,7 @@ public class HttpRemoteTransactionService {
 
                 final Xid[] recoveryList = transactionContext.getRecoveryInterface().recover(flags, parentName);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                Marshaller marshaller = MARSHALLER_FACTORY.createMarshaller(createMarshallingConf());
+                Marshaller marshaller = newMarshaller(newConfig());
                 marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
                 marshaller.writeInt(recoveryList.length);
                 for (int i = 0; i < recoveryList.length; ++i) {
@@ -263,21 +261,12 @@ public class HttpRemoteTransactionService {
         }
     }
 
-    static MarshallingConfiguration createMarshallingConf() {
-        MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-        marshallingConfiguration.setVersion(2);
-        return marshallingConfiguration;
-    }
-
-
     public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
         try {
             exchange.setStatusCode(status);
             exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EXCEPTION.toString());
 
-            final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-            marshallingConfiguration.setVersion(2);
-            final Marshaller marshaller = MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);
+            final Marshaller marshaller = newMarshaller(newConfig());
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
             // start the marshaller

@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.naming;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
 import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
@@ -181,8 +182,7 @@ public class HttpRootContext extends AbstractContext {
     }
 
     private static MarshallingConfiguration createMarshallingConfig(URI uri) {
-        final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-        marshallingConfiguration.setVersion(2);
+        final MarshallingConfiguration marshallingConfiguration = newConfig();
         if (helper != null) {
             marshallingConfiguration.setObjectResolver(helper.getObjectResolver(uri));
         }

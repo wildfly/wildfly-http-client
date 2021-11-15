@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.naming;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
+import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
 import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
@@ -47,14 +50,13 @@ import javax.naming.NameClassPair;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
+import org.jboss.marshalling.ClassResolver;
 import org.jboss.marshalling.ContextClassResolver;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.MarshallerFactory;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.Unmarshaller;
-import org.jboss.marshalling.river.RiverMarshallerFactory;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpServerHelper;
@@ -72,8 +74,6 @@ import io.undertow.util.StatusCodes;
  * @author Stuart Douglas
  */
 public class HttpRemoteNamingService {
-
-    private static final MarshallerFactory MARSHALLER_FACTORY = new RiverMarshallerFactory();
 
     private final Context localContext;
     private final Function<String, Boolean> classResolverFilter;
@@ -222,13 +222,10 @@ public class HttpRemoteNamingService {
                 exchange.endExchange();
                 return null;
             }
-            final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-            marshallingConfiguration.setVersion(2);
-            if (classResolverFilter != null) {
-                marshallingConfiguration.setClassResolver(new FilterClassResolver(classResolverFilter));
-            }
+            final ClassResolver resolver = classResolverFilter != null ? new FilterClassResolver(classResolverFilter) : null;
+            final MarshallingConfiguration marshallingConfiguration = newConfig(resolver);
             try (InputStream inputStream = exchange.getInputStream()) {
-                Unmarshaller unmarshaller = MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
+                Unmarshaller unmarshaller = newUnmarshaller(marshallingConfiguration);
                 unmarshaller.start(new InputStreamByteInput(inputStream));
                 Object object = unmarshaller.readObject();
                 unmarshaller.finish();
@@ -251,9 +248,7 @@ public class HttpRemoteNamingService {
 
     private static void doMarshall(HttpServerExchange exchange, Object result) throws IOException {
         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
-        final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-        marshallingConfiguration.setVersion(2);
-        Marshaller marshaller = MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);
+        Marshaller marshaller = newMarshaller(newConfig());
         marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream())));
         marshaller.writeObject(result);
         marshaller.finish();
