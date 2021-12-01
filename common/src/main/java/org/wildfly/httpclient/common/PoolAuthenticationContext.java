@@ -20,7 +20,6 @@ package org.wildfly.httpclient.common;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.MessageDigest;
@@ -158,22 +157,48 @@ class PoolAuthenticationContext {
                 return false;
             }
             String cnonce = cnonceGenerator.createSessionId();
-            String digestUri = null;
-            try {
-                String path;
-                String query;
-                int pos = request.getPath().indexOf("?");
-                if (pos > 0) {
-                    path = request.getPath().substring(0, pos);
-                    query = request.getPath().substring(pos + 1);
-                } else {
-                    path = request.getPath();
-                    query = null;
-                }
-                digestUri = new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), uri.getPort(), path, query, null).toString();
-            } catch (URISyntaxException e) {
-                throw new RuntimeException(e);
+            String path;
+            String query;
+            int pos = request.getPath().indexOf("?");
+            if (pos > 0) {
+                path = request.getPath().substring(0, pos);
+                query = request.getPath().substring(pos + 1);
+            } else {
+                path = request.getPath();
+                query = null;
             }
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            int port = uri.getPort();
+            StringBuilder uriBuilder = new StringBuilder();
+            if (scheme != null) {
+                uriBuilder.append(scheme);
+                uriBuilder.append(':');
+            }
+            if (host != null) {
+                uriBuilder.append("//");
+                boolean needBrackets = ((host.indexOf(':') >= 0)
+                        && ! host.startsWith("[")
+                        && ! host.endsWith("]"));
+                if (needBrackets) {
+                    uriBuilder.append('[');
+                }
+                uriBuilder.append(host);
+                if (needBrackets) {
+                    uriBuilder.append(']');
+                }
+            }
+            if (! (("http".equals(scheme) && port == 80) || ("https".equals(scheme) && port == 443))) {
+                uriBuilder.append(':');
+                uriBuilder.append(port);
+            }
+            uriBuilder.append(path);
+            if (query != null && ! query.isEmpty()) {
+                uriBuilder.append("?");
+                uriBuilder.append(query);
+            }
+            String digestUri = uriBuilder.toString();
+
             request.putAttachment(DIGEST, current);
             StringBuilder sb = new StringBuilder("Digest username=\"");
             sb.append(principal.getName());
