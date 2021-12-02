@@ -69,7 +69,7 @@
         <version.org.wildfly.common>1.5.4.Final</version.org.wildfly.common>
         <version.org.wildfly.naming.client>1.0.12.Final</version.org.wildfly.naming.client>
         <version.org.wildfly.elytron>1.15.1.Final</version.org.wildfly.elytron>
-        <version.org.wildfly.elytron.web>1.9.0.Final</version.org.wildfly.elytron.web>
+        <version.org.wildfly.elytron.web>1.9.2.Final</version.org.wildfly.elytron.web>
         <version.org.wildfly.transaction.client>2.0.0.Final</version.org.wildfly.transaction.client>
         <version.org.jboss.threads>2.3.3.Final</version.org.jboss.threads>
         <version.org.kohsuke.metainf-services>1.7</version.org.kohsuke.metainf-services>
