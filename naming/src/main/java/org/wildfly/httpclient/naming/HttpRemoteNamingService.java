@@ -23,9 +23,13 @@ import java.io.InputStream;
 import java.io.InvalidClassException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.function.Function;
+import javax.naming.Binding;
 import javax.naming.Context;
+import javax.naming.NameClassPair;
+import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
 import org.jboss.marshalling.ContextClassResolver;
@@ -157,7 +161,8 @@ public class HttpRemoteNamingService {
     private class ListBindingsHandler extends NameHandler {
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            return localContext.listBindings(name);
+            final NamingEnumeration<Binding> namingEnumeration = localContext.listBindings(name);
+            return Collections.list(namingEnumeration);
         }
     }
 
@@ -191,7 +196,8 @@ public class HttpRemoteNamingService {
     private class ListHandler extends NameHandler {
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            return localContext.list(name);
+            final NamingEnumeration<NameClassPair> namingEnumeration = localContext.list(name);
+            return Collections.list(namingEnumeration);
         }
     }
 
