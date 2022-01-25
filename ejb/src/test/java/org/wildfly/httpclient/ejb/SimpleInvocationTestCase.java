@@ -334,6 +334,24 @@ public class SimpleInvocationTestCase {
 
     }
 
+    /*
+    * This test is blocked forever when WildflyClientInputStream's patch is reverted
+    */
+    @Test @Ignore
+    public void testSSLReadLoop() throws Exception {
+        System.setProperty("io.undertow.ssl.max-read-listener-invocations", "2");
+        EJBTestServer.setHandler((invocation, affinity, out, method, handle, attachments) -> {
+            return largeMessage;
+    	});
+    	final StatelessEJBLocator<EchoRemote> statelessEJBLocator = new StatelessEJBLocator<>(EchoRemote.class, APP, MODULE, "CalculatorBean", "");
+    	final EchoRemote proxy = EJBClient.createProxy(statelessEJBLocator);
+    	EJBClient.setStrongAffinity(proxy, URIAffinity.forUri(new URI(EJBTestServer.getDefaultSSLServerURL())));
+
+        for (int i = 0; i < 300; ++i) {
+              proxy.message();
+        }
+    }
+
     private void clearSessionId() throws URISyntaxException {
         WildflyHttpContext.getCurrent().getTargetContext(new URI(EJBTestServer.getDefaultServerURL())).clearSessionId();
     }
