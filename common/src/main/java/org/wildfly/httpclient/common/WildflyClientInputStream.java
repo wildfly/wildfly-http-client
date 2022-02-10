@@ -148,6 +148,9 @@ class WildflyClientInputStream extends InputStream {
                 } catch (InterruptedException e) {
                     throw new InterruptedIOException(e.getMessage());
                 }
+                if (ioException != null) {
+                    throw new IOException(ioException);
+                }
             }
             int toRead = Math.min(pooledByteBuffer.getBuffer().remaining(), len);
             pooledByteBuffer.getBuffer().get(b, off, toRead);
@@ -194,6 +197,9 @@ class WildflyClientInputStream extends InputStream {
                 }
                 IoUtils.safeClose(pooledByteBuffer);
                 pooledByteBuffer = null;
+            }
+            if (ioException != null) {
+                throw new IOException(ioException);
             }
         }
     }
