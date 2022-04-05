@@ -163,7 +163,7 @@ class WildflyClientInputStream extends InputStream {
     private void runReadTask() {
         Assert.assertTrue(pooledByteBuffer == null);
         channel.getReadSetter().set(channelListener);
-        channel.wakeupReads(); //should just be resume, see UNDERTOW-1192
+        channel.resumeReads();
     }
 
     @Override
