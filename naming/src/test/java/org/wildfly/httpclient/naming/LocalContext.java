@@ -30,6 +30,7 @@ import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.OperationNotSupportedException;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -128,7 +129,28 @@ public class LocalContext implements Context {
 
     @Override
     public NamingEnumeration<NameClassPair> list(String name) throws NamingException {
-        return null;
+        final Iterator<String> iterator = bindings.keySet().iterator();
+        return new NamingEnumeration<NameClassPair>() {
+            public NameClassPair next() {
+                return nextElement();
+            }
+
+            public boolean hasMore() {
+                return hasMoreElements();
+            }
+
+            public void close() {
+            }
+
+            public boolean hasMoreElements() {
+                return iterator.hasNext();
+            }
+
+            public NameClassPair nextElement() {
+                final String name = iterator.next();
+                return new NameClassPair(name, (String)null);
+            }
+        };
     }
 
     @Override
@@ -138,7 +160,28 @@ public class LocalContext implements Context {
 
     @Override
     public NamingEnumeration<Binding> listBindings(String name) throws NamingException {
-        return null;
+        final Iterator<String> iterator = bindings.keySet().iterator();
+        return new NamingEnumeration<Binding>() {
+            public Binding next() {
+                return nextElement();
+            }
+
+            public boolean hasMore() {
+                return hasMoreElements();
+            }
+
+            public void close() {
+            }
+
+            public boolean hasMoreElements() {
+                return iterator.hasNext();
+            }
+
+            public Binding nextElement() {
+                final String name = iterator.next();
+                return new Binding(name, bindings.get(name));
+            }
+        };
     }
 
     @Override

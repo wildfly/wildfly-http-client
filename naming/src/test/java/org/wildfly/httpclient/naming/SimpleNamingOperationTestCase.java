@@ -20,9 +20,12 @@ package org.wildfly.httpclient.naming;
 
 import java.util.Hashtable;
 import java.util.function.Function;
+import javax.naming.Binding;
 import javax.naming.Context;
 import javax.naming.InitialContext;
+import javax.naming.NameClassPair;
 import javax.naming.NameNotFoundException;
+import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
 import org.junit.Assert;
@@ -174,4 +177,17 @@ public class SimpleNamingOperationTestCase {
         Assert.assertEquals("test value", ic.lookup("testB").toString());
     }
 
+    @Test   // WEJBHTTP-69
+    public void testListCanBeSerialized() throws Exception {
+        InitialContext ic = createContext();
+        NamingEnumeration<NameClassPair> list = ic.list("test");
+        Assert.assertNotNull(list);
+    }
+
+    @Test   // WEJBHTTP-69
+    public void testListBindingsCanBeSerialized() throws Exception {
+        InitialContext ic = createContext();
+        NamingEnumeration<Binding> list = ic.listBindings("test");
+        Assert.assertNotNull(list);
+    }
 }
