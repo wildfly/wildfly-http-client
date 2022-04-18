@@ -37,6 +37,6 @@ interface HttpNamingClientMessages extends BasicLogger {
     @Message(id = 2, value = "At least one URI must be provided")
     NamingException atLeastOneUri();
 
-    @Message(id = 3, value = "Exception resolving class %s for unmarshalling; it has either been blacklisted or not whitelisted")
+    @Message(id = 3, value = "Exception resolving class %s for unmarshalling; it has either been blocklisted or not allowlisted")
     InvalidClassException cannotResolveFilteredClass(String clazz);
 }

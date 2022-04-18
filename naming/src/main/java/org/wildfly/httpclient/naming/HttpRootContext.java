@@ -186,7 +186,7 @@ public class HttpRootContext extends AbstractContext {
         for (int notFound = 0; ; ) {
             try {
                 R result = function.apply(context, name, param);
-                environment.dropFromBlacklist(context.currentDestination());
+                environment.dropFromBlocklist(context.currentDestination());
                 return result;
             } catch (NameNotFoundException e) {
                 if (notFound++ > MAX_NOT_FOUND_RETRY) {
@@ -204,11 +204,11 @@ public class HttpRootContext extends AbstractContext {
             } catch (CommunicationException t) {
                 URI location = context.currentDestination();
                 Messages.log.tracef(t, "Communication error while contacting %s", location);
-                updateBlackList(environment, context, t);
+                updateBlocklist(environment, context, t);
                 context.addFailure(injectDestination(t, location));
             } catch (NamingException e) {
                 // All other naming exceptions are legit errors
-                environment.dropFromBlacklist(context.currentDestination());
+                environment.dropFromBlocklist(context.currentDestination());
                 throw e;
             } catch (Throwable t) {
                 // Don't black-list generic throwables since it may indicate a client bug
@@ -228,10 +228,10 @@ public class HttpRootContext extends AbstractContext {
         return t;
     }
 
-    private void updateBlackList(ProviderEnvironment environment, RetryContext context, Throwable t) {
+    private void updateBlocklist(ProviderEnvironment environment, RetryContext context, Throwable t) {
         URI location = context.currentDestination();
-        Messages.log.tracef(t, "Provider (%s) failed, blacklisting and retrying", location);
-        environment.updateBlacklist(location);
+        Messages.log.tracef(t, "Provider (%s) failed, blocklisting and retrying", location);
+        environment.updateBlocklist(location);
     }
 
     private Object processInvocation(Name name, HttpString method, String pathSegment) throws NamingException {
