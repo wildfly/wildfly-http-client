@@ -75,6 +75,6 @@ interface EjbHttpClientMessages extends BasicLogger {
     @Message(id = 13, value = "HTTP discovery has been interrupted")
     void httpDiscoveryInterrupted(@Cause InterruptedException e);
 
-    @Message(id = 14, value = "Exception resolving class %s for unmarshalling; it has either been blacklisted or not whitelisted")
+    @Message(id = 14, value = "Exception resolving class %s for unmarshalling; it has either been blocklisted or not allowlisted")
     InvalidClassException cannotResolveFilteredClass(String clazz);
 }
