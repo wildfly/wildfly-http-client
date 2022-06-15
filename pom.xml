@@ -30,7 +30,7 @@
 
     <groupId>org.wildfly.wildfly-http-client</groupId>
     <artifactId>wildfly-http-client-parent</artifactId>
-    <version>1.1.12.Final</version>
+    <version>1.1.13.Final-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Wildfly HTTP Client parent</name>
