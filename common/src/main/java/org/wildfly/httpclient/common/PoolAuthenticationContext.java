@@ -119,6 +119,50 @@ class PoolAuthenticationContext {
         return false;
     }
 
+    static String createTargetUri(URI uri, ClientRequest request) {
+        String path;
+        String query;
+        int pos = request.getPath().indexOf("?");
+        if (pos > 0) {
+            path = request.getPath().substring(0, pos);
+            query = request.getPath().substring(pos + 1);
+        } else {
+            path = request.getPath();
+            query = null;
+        }
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        int port = uri.getPort();
+        StringBuilder uriBuilder = new StringBuilder();
+        if (scheme != null) {
+            uriBuilder.append(scheme);
+            uriBuilder.append(':');
+        }
+        if (host != null) {
+            uriBuilder.append("//");
+            boolean needBrackets = ((host.indexOf(':') >= 0)
+                    && !host.startsWith("[")
+                    && !host.endsWith("]"));
+            if (needBrackets) {
+                uriBuilder.append('[');
+            }
+            uriBuilder.append(host);
+            if (needBrackets) {
+                uriBuilder.append(']');
+            }
+        }
+        if (port != -1 && !(("http".equals(scheme) && port == 80) || ("https".equals(scheme) && port == 443))) {
+            uriBuilder.append(':');
+            uriBuilder.append(port);
+        }
+        uriBuilder.append(path);
+        if (query != null && !query.isEmpty()) {
+            uriBuilder.append("?");
+            uriBuilder.append(query);
+        }
+        return uriBuilder.toString();
+    }
+
     boolean prepareRequest(URI uri, ClientRequest request, AuthenticationConfiguration authenticationConfiguration) {
         if (current == Type.NONE) {
             return false;
@@ -157,48 +201,7 @@ class PoolAuthenticationContext {
                 return false;
             }
             String cnonce = cnonceGenerator.createSessionId();
-            String path;
-            String query;
-            int pos = request.getPath().indexOf("?");
-            if (pos > 0) {
-                path = request.getPath().substring(0, pos);
-                query = request.getPath().substring(pos + 1);
-            } else {
-                path = request.getPath();
-                query = null;
-            }
-            String scheme = uri.getScheme();
-            String host = uri.getHost();
-            int port = uri.getPort();
-            StringBuilder uriBuilder = new StringBuilder();
-            if (scheme != null) {
-                uriBuilder.append(scheme);
-                uriBuilder.append(':');
-            }
-            if (host != null) {
-                uriBuilder.append("//");
-                boolean needBrackets = ((host.indexOf(':') >= 0)
-                        && ! host.startsWith("[")
-                        && ! host.endsWith("]"));
-                if (needBrackets) {
-                    uriBuilder.append('[');
-                }
-                uriBuilder.append(host);
-                if (needBrackets) {
-                    uriBuilder.append(']');
-                }
-            }
-            if (! (("http".equals(scheme) && port == 80) || ("https".equals(scheme) && port == 443))) {
-                uriBuilder.append(':');
-                uriBuilder.append(port);
-            }
-            uriBuilder.append(path);
-            if (query != null && ! query.isEmpty()) {
-                uriBuilder.append("?");
-                uriBuilder.append(query);
-            }
-            String digestUri = uriBuilder.toString();
-
+            String digestUri = createTargetUri(uri, request);
             request.putAttachment(DIGEST, current);
             StringBuilder sb = new StringBuilder("Digest username=\"");
             sb.append(principal.getName());
