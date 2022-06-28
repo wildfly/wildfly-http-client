@@ -57,6 +57,7 @@ public final class MarshallingHelper {
         if (JAKARTAEE_ENV_DETECTED && BC_MODE) {
             // for BC we need to translate classes from JavaEE to Jakarta API and vice versa
             config.setClassNameTransformer(ClassNameTransformer.JAVAEE_TO_JAKARTAEE);
+            HttpClientMessages.MESSAGES.javaeeToJakartaeeBackwardCompatibilityLayerInstalled();
         }
         return config;
     }
