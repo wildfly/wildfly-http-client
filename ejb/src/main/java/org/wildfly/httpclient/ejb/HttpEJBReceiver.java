@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.ejb;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.Headers;
@@ -180,7 +181,8 @@ class HttpEJBReceiver extends EJBReceiver {
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, (output -> {
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration,
+                (output -> {
                     OutputStream data = output;
                     if (compressRequest) {
                         data = new GZIPOutputStream(data);
@@ -191,7 +193,7 @@ class HttpEJBReceiver extends EJBReceiver {
                         IoUtils.safeClose(data);
                     }
                 }),
-
+                new InvocationStickinessHandler(receiverContext),
                 ((input, response, closeable) -> {
                         if (response.getResponseCode() == StatusCodes.ACCEPTED && clientInvocationContext.getInvokedMethod().getReturnType() == void.class) {
                             ejbData.asyncMethods.add(clientInvocationContext.getInvokedMethod());
@@ -252,7 +254,8 @@ class HttpEJBReceiver extends EJBReceiver {
                             }
                         });
                 }),
-                (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), EjbConstants.EJB_RESPONSE, null);
+                (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)),
+                EjbConstants.EJB_RESPONSE, null);
     }
 
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
@@ -290,12 +293,14 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setBeanName(locator.getBeanName());
         builder.setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration,
+                output -> {
                     Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
                     marshaller.start(Marshalling.createByteOutput(output));
                     writeTransaction(ContextTransactionManager.getInstance().getTransaction(), marshaller, targetContext.getUri());
                     marshaller.finish();
                 },
+                new SessionCreationStickinessHandler(receiverContext),
                 ((unmarshaller, response, c) -> {
                     try {
                         String sessionId = response.getResponseHeaders().getFirst(EjbConstants.EJB_SESSION_ID);
@@ -308,8 +313,9 @@ class HttpEJBReceiver extends EJBReceiver {
                     } finally {
                         IoUtils.safeClose(c);
                     }
-                })
-                , result::completeExceptionally, EjbConstants.EJB_RESPONSE_NEW_SESSION, null);
+                }),
+                result::completeExceptionally,
+                EjbConstants.EJB_RESPONSE_NEW_SESSION, null);
 
         return result.get();
     }
@@ -355,15 +361,19 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID))
                 .setBeanName(locator.getBeanName());
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
-        builder.setVersion(targetContext.getProtocolVersion());
-        targetContext.sendRequest(builder.createRequest(targetContext.getUri().getPath()), sslContext, authenticationConfiguration, null, (stream, response, closeable) -> {
-            try {
-                result.complete(true);
-                IoUtils.safeClose(stream);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, throwable -> result.complete(false), null, null);
+        targetContext.sendRequest(builder.createRequest(targetContext.getUri().getPath()), sslContext, authenticationConfiguration,
+                null,
+                null,
+                (stream, response, closeable) -> {
+                    try {
+                        result.complete(true);
+                        IoUtils.safeClose(stream);
+                    } finally {
+                        IoUtils.safeClose(closeable);
+                    }
+                },
+                throwable -> result.complete(false),
+                null, null);
         try {
             return result.get();
         } catch (InterruptedException | ExecutionException e) {
@@ -485,6 +495,49 @@ class HttpEJBReceiver extends EJBReceiver {
 
     private static class EjbContextData {
         final Set<Method> asyncMethods = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    }
 
+    /*
+     * This class manages the relationship between the proxy's strong and weak affinity and
+     * the stickiness requirements of session beans resulting from session creation.
+     */
+    private class SessionCreationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final EJBReceiverSessionCreationContext sessionCreationContext;
+
+        public SessionCreationStickinessHandler(EJBReceiverSessionCreationContext sessionCreationContext) {
+            this.sessionCreationContext = sessionCreationContext;
+        }
+
+        @Override
+        public void prepareRequest(ClientRequest request) {
+
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+
+        }
+    }
+
+    /*
+     * This class manages the relationship between the proxy's strong and weak affinity and
+     * the stickiness requirements of session beans resulting from invocation.
+     */
+    private class InvocationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final EJBReceiverInvocationContext invocationContext;
+
+        public InvocationStickinessHandler(EJBReceiverInvocationContext invocationContext) {
+            this.invocationContext = invocationContext;
+        }
+
+        @Override
+        public void prepareRequest(ClientRequest request) {
+
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+
+        }
     }
 }

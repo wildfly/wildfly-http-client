@@ -104,7 +104,9 @@ public class ClientSNITestCase {
 
         final CompletableFuture<Void> future = new CompletableFuture<>();
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(uri);
-        context.sendRequest(request, sslContext, AuthenticationConfiguration.empty(), null,
+        context.sendRequest(request, sslContext, AuthenticationConfiguration.empty(),
+                null,
+                null,
                 (result, response, doneCallback) -> future.complete(null),
                 throwable -> future.completeExceptionally(throwable),
                 null, null, true);

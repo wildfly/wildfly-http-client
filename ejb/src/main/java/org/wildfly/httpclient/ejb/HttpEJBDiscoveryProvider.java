@@ -167,7 +167,9 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                 .setMethod(Methods.GET);
         request.getRequestHeaders().add(Headers.ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
 
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration,
+                null,
+                null,
                 ((result, response, closeable) -> {
                     try {
                         final Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(request).createUnmarshaller();
