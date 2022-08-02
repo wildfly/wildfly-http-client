@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.transaction;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import io.undertow.util.Headers;
@@ -116,25 +117,29 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
                 .setPath(targetContext.getUri().getPath() + operationPath);
         cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
         cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
-        targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-            Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
-            marshaller.start(Marshalling.createByteOutput(output));
-            marshaller.writeInt(id.getFormatId());
-            final byte[] gtid = id.getGlobalTransactionId();
-            marshaller.writeInt(gtid.length);
-            marshaller.write(gtid);
-            final byte[] bq = id.getBranchQualifier();
-            marshaller.writeInt(bq.length);
-            marshaller.write(bq);
-            marshaller.finish();
-            output.close();
-        }, (input, response, closeable) -> {
-            try {
-                result.complete(resultFunction != null ? resultFunction.apply(response) : null);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, result::completeExceptionally, null, null);
+        targetContext.sendRequest(cr, sslContext, authenticationConfiguration,
+                output -> {
+                    Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
+                    marshaller.start(Marshalling.createByteOutput(output));
+                    marshaller.writeInt(id.getFormatId());
+                    final byte[] gtid = id.getGlobalTransactionId();
+                    marshaller.writeInt(gtid.length);
+                    marshaller.write(gtid);
+                    final byte[] bq = id.getBranchQualifier();
+                    marshaller.writeInt(bq.length);
+                    marshaller.write(bq);
+                    marshaller.finish();
+                    output.close();
+                },
+                new SubordinateTransactionStickinessHandler(),
+                (input, response, closeable) -> {
+                    try {
+                        result.complete(resultFunction != null ? resultFunction.apply(response) : null);
+                    } finally {
+                        IoUtils.safeClose(closeable);
+                    }
+                },
+                result::completeExceptionally, null, null);
 
         try {
             try {
@@ -153,6 +158,23 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
                 xaException.initCause(ex);
                 throw xaException;
             }
+        }
+    }
+
+    /*
+     * This class manages the relationship between a subordinate transaction and
+     * the stickiness requirements of session beans resulting from invocation in local transaction scope.
+     */
+    public static class SubordinateTransactionStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+
+        @Override
+        public void prepareRequest(ClientRequest request) {
+
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+
         }
     }
 

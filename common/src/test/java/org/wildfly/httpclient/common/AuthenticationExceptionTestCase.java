@@ -77,13 +77,16 @@ public class AuthenticationExceptionTestCase {
 
         CompletableFuture<ClientResponse> responseFuture = new CompletableFuture<>();
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(new URI(HTTPTestServer.getDefaultServerURL()));
-        context.sendRequest(request, null, AuthenticationConfiguration.empty(), null,
+        context.sendRequest(request, null, AuthenticationConfiguration.empty(),
+                null,
+                null,
                 new HttpTargetContext.HttpResultHandler() {
                     @Override
                     public void handleResult(InputStream result, ClientResponse response, Closeable doneCallback) {
                         responseFuture.complete(response);
                     }
-                }, new HttpTargetContext.HttpFailureHandler() {
+                },
+                new HttpTargetContext.HttpFailureHandler() {
                     @Override
                     public void handleFailure(Throwable throwable) {
                         responseFuture.completeExceptionally(throwable);
