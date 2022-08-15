@@ -18,14 +18,14 @@
 
 package org.wildfly.httpclient.common;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
+
 import java.io.OutputStream;
 
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.MarshallerFactory;
 import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.MarshallingConfiguration;
-import org.jboss.marshalling.river.RiverMarshallerFactory;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 
@@ -33,8 +33,6 @@ import io.undertow.util.Headers;
  * @author Stuart Douglas
  */
 public class HttpServerHelper {
-
-    public static final MarshallerFactory RIVER_MARSHALLER_FACTORY = new RiverMarshallerFactory();
 
     private HttpServerHelper() {
 
@@ -44,9 +42,7 @@ public class HttpServerHelper {
         try {
             exchange.setStatusCode(status);
             exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
-            final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-            marshallingConfiguration.setVersion(2);
-            final Marshaller marshaller = RIVER_MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);
+            final Marshaller marshaller = newMarshaller(newConfig());
             OutputStream outputStream = exchange.getOutputStream();
             final ByteOutput byteOutput = Marshalling.createByteOutput(outputStream);
             // start the marshaller

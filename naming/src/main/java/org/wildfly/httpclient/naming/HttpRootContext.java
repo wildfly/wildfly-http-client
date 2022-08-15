@@ -18,6 +18,23 @@
 
 package org.wildfly.httpclient.naming;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.EXCEPTION;
+import static org.wildfly.httpclient.naming.NamingConstants.HTTP_PORT;
+import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_PORT;
+import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.naming.NamingConstants.NAMING_CONTEXT;
+import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
 import static java.security.AccessController.doPrivileged;
 
 import java.io.IOException;
@@ -48,7 +65,6 @@ import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.naming.client.AbstractContext;
@@ -84,9 +100,6 @@ public class HttpRootContext extends AbstractContext {
             return Thread.currentThread().getContextClassLoader();
         }
     };
-    private final String ACCEPT_VALUE = "application/x-wf-jndi-jbmar-value;version=1,application/x-wf-jbmar-exception;version=1";
-    private final ContentType VALUE_TYPE = new ContentType("application/x-wf-jndi-jbmar-value", 1);
-
     private final HttpNamingProvider httpNamingProvider;
     private final String scheme;
 
@@ -116,61 +129,60 @@ public class HttpRootContext extends AbstractContext {
 
     @Override
     protected Object lookupNative(Name name) throws NamingException {
-        return processInvocation(name, Methods.POST, "naming/v1/lookup/");
+        return processInvocation(name, Methods.POST, NAMING_CONTEXT + LOOKUP_PATH);
     }
 
     @Override
     protected Object lookupLinkNative(Name name) throws NamingException {
-        return processInvocation(name, Methods.POST, "naming/v1/lookuplink/");
+        return processInvocation(name, Methods.POST, NAMING_CONTEXT + LOOKUP_LINK_PATH);
     }
 
     @Override
     protected CloseableNamingEnumeration<NameClassPair> listNative(Name name) throws NamingException {
-        Collection<NameClassPair> result = (Collection<NameClassPair>) processInvocation(name, Methods.GET, "naming/v1/list/");
+        Collection<NameClassPair> result = (Collection<NameClassPair>) processInvocation(name, Methods.GET, NAMING_CONTEXT + LIST_PATH);
         return CloseableNamingEnumeration.fromIterable(result);
     }
 
     @Override
     protected CloseableNamingEnumeration<Binding> listBindingsNative(Name name) throws NamingException {
-        Collection<Binding> result = (Collection<Binding>) processInvocation(name, Methods.GET, "naming/v1/list-bindings/");
+        Collection<Binding> result = (Collection<Binding>) processInvocation(name, Methods.GET, NAMING_CONTEXT + LIST_BINDINGS_PATH);
         return CloseableNamingEnumeration.fromIterable(result);
     }
 
     @Override
     protected void bindNative(Name name, Object obj) throws NamingException {
-        processInvocation(name, Methods.PUT, obj, "naming/v1/bind/", null);
+        processInvocation(name, Methods.PUT, obj, NAMING_CONTEXT + BIND_PATH, null);
     }
 
     @Override
     protected void rebindNative(Name name, Object obj) throws NamingException {
-        processInvocation(name, Methods.PATCH, obj, "naming/v1/rebind/", null);
+        processInvocation(name, Methods.PATCH, obj, NAMING_CONTEXT + REBIND_PATH, null);
     }
 
     @Override
     protected void unbindNative(Name name) throws NamingException {
-        processInvocation(name, Methods.DELETE, null,"naming/v1/unbind/", null);
+        processInvocation(name, Methods.DELETE, null, NAMING_CONTEXT + UNBIND_PATH, null);
     }
 
     @Override
     protected void renameNative(Name oldName, Name newName) throws NamingException {
         //TODO no result expected
-        processInvocation(oldName, Methods.PATCH, null,"naming/v1/rename/", newName);
+        processInvocation(oldName, Methods.PATCH, null, NAMING_CONTEXT + RENAME_PATH, newName);
     }
 
     @Override
     protected void destroySubcontextNative(Name name) throws NamingException {
-        processInvocation(name, Methods.DELETE, null,"naming/v1/dest-subctx/", null);
+        processInvocation(name, Methods.DELETE, null, NAMING_CONTEXT + DESTROY_SUBCONTEXT_PATH, null);
     }
 
     @Override
     protected Context createSubcontextNative(Name name) throws NamingException {
-        processInvocation(name, Methods.PUT, "naming/v1/create-subcontext/");
+        processInvocation(name, Methods.PUT, NAMING_CONTEXT + CREATE_SUBCONTEXT_PATH);
         return new HttpRemoteContext(this, name.toString());
     }
 
     private static MarshallingConfiguration createMarshallingConfig(URI uri) {
-        final MarshallingConfiguration marshallingConfiguration = new MarshallingConfiguration();
-        marshallingConfiguration.setVersion(2);
+        final MarshallingConfiguration marshallingConfiguration = newConfig();
         if (helper != null) {
             marshallingConfiguration.setObjectResolver(helper.getObjectResolver(uri));
         }
@@ -248,13 +260,12 @@ public class HttpRootContext extends AbstractContext {
                 if (!uriPath.endsWith("/")) {
                     sb.append("/");
                 }
-                sb.append(pathSegment)
-                        .append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
+                sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
 
                 final ClientRequest clientRequest = new ClientRequest()
                         .setPath(sb.toString())
                         .setMethod(method);
-                clientRequest.getRequestHeaders().put(Headers.ACCEPT, ACCEPT_VALUE);
+                clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
 
                 return performOperation(name1, peerIdentity.getUri(), clientRequest);
 
@@ -272,7 +283,7 @@ public class HttpRootContext extends AbstractContext {
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
         AuthenticationContextConfigurationClient client = CLIENT;
-        final int defaultPort = providerUri.getScheme().equals("https") ? 443 : 80;
+        final int defaultPort = providerUri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(providerUri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext;
         try {
@@ -326,7 +337,7 @@ public class HttpRootContext extends AbstractContext {
             } finally {
                 IoUtils.safeClose(closeable);
             }
-        }, result::completeExceptionally, VALUE_TYPE, null, true);
+        }, result::completeExceptionally, VALUE, null, true);
 
         try {
             return result.get();
@@ -364,7 +375,7 @@ public class HttpRootContext extends AbstractContext {
                 if (!uriPath.endsWith("/")) {
                     sb.append("/");
                 }
-                sb.append(pathSegment).append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
+                sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
                 if (newName != null) {
                     sb.append("?new=");
                     sb.append(URLEncoder.encode(newName.toString(), StandardCharsets.UTF_8.name()));
@@ -373,9 +384,9 @@ public class HttpRootContext extends AbstractContext {
                         .setPath(sb.toString())
                         .setMethod(method);
 
-                clientRequest.getRequestHeaders().put(Headers.ACCEPT, ACCEPT_VALUE);
+                clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
                 if (object != null) {
-                    clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, VALUE_TYPE.toString());
+                    clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
                 }
                 performOperation(peerIdentity.getUri(), object, clientRequest);
                 return null;
@@ -399,7 +410,7 @@ public class HttpRootContext extends AbstractContext {
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
         AuthenticationContextConfigurationClient client = CLIENT;
-        final int defaultPort = providerUri.getScheme().equals("https") ? 443 : 80;
+        final int defaultPort = providerUri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(providerUri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext;
         try {

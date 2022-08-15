@@ -18,6 +18,11 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_CANCEL_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_DISCOVER_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_INVOKE_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_OPEN_PATH;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -42,8 +47,6 @@ import io.undertow.util.Methods;
  */
 public class EjbHttpService {
 
-    static final String JSESSIONID = "JSESSIONID";
-
     private final Association association;
     private final ExecutorService executorService;
     private final LocalTransactionContext localTransactionContext;
@@ -65,10 +68,10 @@ public class EjbHttpService {
 
     public HttpHandler createHttpHandler() {
         PathHandler pathHandler = new PathHandler();
-        pathHandler.addPrefixPath("/v1/invoke", new AllowedMethodsHandler(new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter), Methods.POST))
-                .addPrefixPath("/v1/open", new AllowedMethodsHandler(new HttpSessionOpenHandler(association, executorService, localTransactionContext), Methods.POST))
-                .addPrefixPath("/v1/cancel", new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
-                .addPrefixPath("/v1/discover", new AllowedMethodsHandler(new HttpDiscoveryHandler(executorService, association), Methods.GET));
+        pathHandler.addPrefixPath(V1_EJB_INVOKE_PATH, new AllowedMethodsHandler(new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter), Methods.POST))
+                .addPrefixPath(V1_EJB_OPEN_PATH, new AllowedMethodsHandler(new HttpSessionOpenHandler(association, executorService, localTransactionContext), Methods.POST))
+                .addPrefixPath(V1_EJB_CANCEL_PATH, new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
+                .addPrefixPath(V1_EJB_DISCOVER_PATH, new AllowedMethodsHandler(new HttpDiscoveryHandler(executorService, association), Methods.GET));
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
         requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);

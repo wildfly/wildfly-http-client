@@ -18,9 +18,16 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_V1_XA_BC;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_V1_XA_PREP;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_V1_XA_ROLLBACK;
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.READ_ONLY;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -65,13 +72,13 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void commit(boolean onePhase) throws XAException {
-        String operationPath = TransactionConstants.TXN_V1_XA_COMMIT + (onePhase ? "?opc=true" : "");
+        String operationPath = TXN_CONTEXT + XA_COMMIT_PATH + (onePhase ? "?opc=true" : "");
         processOperation(operationPath);
     }
 
     @Override
     public void rollback() throws XAException {
-        processOperation(TXN_V1_XA_ROLLBACK);
+        processOperation(TXN_CONTEXT + XA_ROLLBACK_PATH);
     }
 
     @Override
@@ -81,13 +88,13 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void beforeCompletion() throws XAException {
-        processOperation(TXN_V1_XA_BC);
+        processOperation(TXN_CONTEXT + XA_BC_PATH);
     }
 
     @Override
     public int prepare() throws XAException {
-        boolean readOnly = processOperation(TXN_V1_XA_PREP, (result) -> {
-            String header = result.getResponseHeaders().getFirst(TransactionConstants.READ_ONLY);
+        boolean readOnly = processOperation(TXN_CONTEXT + XA_PREP_PATH, (result) -> {
+            String header = result.getResponseHeaders().getFirst(READ_ONLY);
             return header != null && Boolean.parseBoolean(header);
         });
         return readOnly ? XAResource.XA_RDONLY : XAResource.XA_OK;
@@ -95,7 +102,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void forget() throws XAException {
-        processOperation(TransactionConstants.TXN_V1_XA_FORGET);
+        processOperation(TXN_CONTEXT + XA_FORGET_PATH);
     }
 
     private void processOperation(String operationPath) throws XAException {
@@ -107,10 +114,10 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         ClientRequest cr = new ClientRequest()
                 .setMethod(Methods.POST)
                 .setPath(targetContext.getUri().getPath() + operationPath);
-        cr.getRequestHeaders().put(Headers.ACCEPT, TransactionConstants.EXCEPTION);
-        cr.getRequestHeaders().put(Headers.CONTENT_TYPE, TransactionConstants.XID_VERSION_1);
+        cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
+        cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
         targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-            Marshaller marshaller = targetContext.createMarshaller(HttpRemoteTransactionPeer.createMarshallingConf());
+            Marshaller marshaller = targetContext.createMarshaller(newConfig());
             marshaller.start(Marshalling.createByteOutput(output));
             marshaller.writeInt(id.getFormatId());
             final byte[] gtid = id.getGlobalTransactionId();

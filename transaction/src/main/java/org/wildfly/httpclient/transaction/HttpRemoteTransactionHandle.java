@@ -18,6 +18,13 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -81,11 +88,11 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             statusRef.set(Status.STATUS_COMMITTING);
             ClientRequest cr = new ClientRequest()
                     .setMethod(Methods.POST)
-                    .setPath(targetContext.getUri().getPath() + TransactionConstants.TXN_V1_UT_COMMIT);
-            cr.getRequestHeaders().put(Headers.ACCEPT, TransactionConstants.EXCEPTION);
-            cr.getRequestHeaders().put(Headers.CONTENT_TYPE, TransactionConstants.XID_VERSION_1);
+                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + UT_COMMIT_PATH);
+            cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
+            cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.createMarshaller(HttpRemoteTransactionPeer.createMarshallingConf());
+                Marshaller marshaller = targetContext.createMarshaller(newConfig());
                 marshaller.start(Marshalling.createByteOutput(output));
                 marshaller.writeInt(id.getFormatId());
                 final byte[] gtid = id.getGlobalTransactionId();
@@ -150,11 +157,11 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             statusRef.set(Status.STATUS_COMMITTING);
             ClientRequest cr = new ClientRequest()
                     .setMethod(Methods.POST)
-                    .setPath(targetContext.getUri().getPath() + TransactionConstants.TXN_V1_UT_ROLLBACK);
-            cr.getRequestHeaders().put(Headers.ACCEPT, TransactionConstants.EXCEPTION);
-            cr.getRequestHeaders().put(Headers.CONTENT_TYPE, TransactionConstants.XID_VERSION_1);
+                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + UT_ROLLBACK_PATH);
+            cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
+            cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.createMarshaller(HttpRemoteTransactionPeer.createMarshallingConf());
+                Marshaller marshaller = targetContext.createMarshaller(newConfig());
                 marshaller.start(Marshalling.createByteOutput(output));
                 marshaller.writeInt(id.getFormatId());
                 final byte[] gtid = id.getGlobalTransactionId();
