@@ -81,6 +81,7 @@
         <module>ejb</module>
         <module>naming</module>
         <module>transaction</module>
+        <module>common-jakarta</module>
         <module>ejb-jakarta</module>
         <module>transaction-jakarta</module>
     </modules>
@@ -165,6 +166,11 @@
             </dependency>
             <dependency>
                 <groupId>org.wildfly.wildfly-http-client</groupId>
+                <artifactId>wildfly-http-client-common-jakarta</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.wildfly.wildfly-http-client</groupId>
                 <artifactId>wildfly-http-naming-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -183,6 +189,14 @@
             <dependency>
                 <groupId>org.wildfly.wildfly-http-client</groupId>
                 <artifactId>wildfly-http-client-common</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.wildfly.wildfly-http-client</groupId>
+                <artifactId>wildfly-http-client-common-jakarta</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
                 <scope>test</scope>
