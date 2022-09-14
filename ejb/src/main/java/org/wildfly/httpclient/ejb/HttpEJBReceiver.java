@@ -18,13 +18,43 @@
 
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_PORT;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_PORT;
+import io.undertow.client.ClientRequest;
+import io.undertow.util.AttachmentKey;
+import io.undertow.util.Headers;
+import io.undertow.util.StatusCodes;
+import org.jboss.ejb.client.Affinity;
+import org.jboss.ejb.client.EJBClientInvocationContext;
+import org.jboss.ejb.client.EJBLocator;
+import org.jboss.ejb.client.EJBReceiver;
+import org.jboss.ejb.client.EJBReceiverInvocationContext;
+import org.jboss.ejb.client.EJBReceiverSessionCreationContext;
+import org.jboss.ejb.client.SessionID;
+import org.jboss.ejb.client.StatefulEJBLocator;
+import org.jboss.marshalling.ByteOutput;
+import org.jboss.marshalling.InputStreamByteInput;
+import org.jboss.marshalling.Marshaller;
+import org.jboss.marshalling.Marshalling;
+import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.WildflyHttpContext;
+import org.wildfly.httpclient.transaction.XidProvider;
+import org.wildfly.security.auth.client.AuthenticationConfiguration;
+import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
+import org.wildfly.transaction.client.ContextTransactionManager;
+import org.wildfly.transaction.client.LocalTransaction;
+import org.wildfly.transaction.client.RemoteTransaction;
+import org.wildfly.transaction.client.RemoteTransactionContext;
+import org.wildfly.transaction.client.XAOutflowHandle;
+import org.xnio.IoUtils;
 
-import static java.security.AccessController.doPrivileged;
-
+import javax.ejb.Asynchronous;
+import javax.net.ssl.SSLContext;
+import javax.transaction.RollbackException;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
+import javax.transaction.xa.Xid;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -46,46 +76,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPOutputStream;
 
-import javax.ejb.Asynchronous;
-import javax.net.ssl.SSLContext;
-import javax.transaction.RollbackException;
-import javax.transaction.SystemException;
-import javax.transaction.Transaction;
-import javax.transaction.xa.Xid;
-
-import org.jboss.ejb.client.Affinity;
-import org.jboss.ejb.client.EJBClientInvocationContext;
-import org.jboss.ejb.client.EJBLocator;
-import org.jboss.ejb.client.EJBReceiver;
-import org.jboss.ejb.client.EJBReceiverInvocationContext;
-import org.jboss.ejb.client.EJBReceiverSessionCreationContext;
-import org.jboss.ejb.client.SessionID;
-import org.jboss.ejb.client.StatefulEJBLocator;
-import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
-import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.MarshallingConfiguration;
-import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.httpclient.common.WildflyHttpContext;
-import org.wildfly.httpclient.transaction.XidProvider;
-import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
-import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
-import org.wildfly.transaction.client.ContextTransactionManager;
-import org.wildfly.transaction.client.LocalTransaction;
-import org.wildfly.transaction.client.RemoteTransaction;
-import org.wildfly.transaction.client.RemoteTransactionContext;
-import org.wildfly.transaction.client.XAOutflowHandle;
-import org.xnio.IoUtils;
-
-import io.undertow.client.ClientRequest;
-import io.undertow.util.AttachmentKey;
-import io.undertow.util.Headers;
-import io.undertow.util.StatusCodes;
+import static java.security.AccessController.doPrivileged;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_PORT;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_PORT;
 
 /**
+ * EJB receiver for invocations over HTTP.
+ *
  * @author Stuart Douglas
  */
 class HttpEJBReceiver extends EJBReceiver {
@@ -187,7 +185,7 @@ class HttpEJBReceiver extends EJBReceiver {
                         data = new GZIPOutputStream(data);
                     }
                     try {
-                        marshalEJBRequest(Marshalling.createByteOutput(data), clientInvocationContext, targetContext);
+                        marshalEJBRequest(Marshalling.createByteOutput(data), clientInvocationContext, targetContext, request);
                     } finally {
                         IoUtils.safeClose(data);
                     }
@@ -205,8 +203,7 @@ class HttpEJBReceiver extends EJBReceiver {
                                 Object returned = null;
                                 try {
 
-                                    final MarshallingConfiguration marshallingConfiguration = createMarshallingConfig(targetContext.getUri());
-                                    final Unmarshaller unmarshaller = targetContext.createUnmarshaller(marshallingConfiguration);
+                                    final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
 
                                     unmarshaller.start(new InputStreamByteInput(input));
                                     returned = unmarshaller.readObject();
@@ -292,8 +289,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setBeanName(locator.getBeanName());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
-                    MarshallingConfiguration config = createMarshallingConfig(targetContext.getUri());
-                    Marshaller marshaller = targetContext.createMarshaller(config);
+                    Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
                     marshaller.start(Marshalling.createByteOutput(output));
                     writeTransaction(ContextTransactionManager.getInstance().getTransaction(), marshaller, targetContext.getUri());
                     marshaller.finish();
@@ -372,17 +368,16 @@ class HttpEJBReceiver extends EJBReceiver {
         }
     }
 
-    private MarshallingConfiguration createMarshallingConfig(URI uri) {
-        final MarshallingConfiguration marshallingConfiguration = newConfig();
-        marshallingConfiguration.setObjectResolver(new HttpProtocolV1ObjectResolver(uri));
-        marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-        return marshallingConfiguration;
+    private Marshaller createMarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
+        return httpMarshallerFactory.createMarshaller(new HttpProtocolV1ObjectResolver(uri), HttpProtocolV1ObjectTable.INSTANCE);
     }
 
-    private void marshalEJBRequest(ByteOutput byteOutput, EJBClientInvocationContext clientInvocationContext, HttpTargetContext targetContext) throws IOException, RollbackException, SystemException {
+    private Unmarshaller createUnmarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
+        return httpMarshallerFactory.createUnmarshaller(new HttpProtocolV1ObjectResolver(uri), HttpProtocolV1ObjectTable.INSTANCE);
+    }
 
-        MarshallingConfiguration config = createMarshallingConfig(targetContext.getUri());
-        Marshaller marshaller = targetContext.createMarshaller(config);
+    private void marshalEJBRequest(ByteOutput byteOutput, EJBClientInvocationContext clientInvocationContext, HttpTargetContext targetContext, ClientRequest clientRequest) throws IOException, RollbackException, SystemException {
+        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(clientRequest));
         marshaller.start(byteOutput);
         writeTransaction(clientInvocationContext.getTransaction(), marshaller, targetContext.getUri());
 

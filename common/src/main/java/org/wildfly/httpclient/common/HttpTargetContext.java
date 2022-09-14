@@ -18,10 +18,28 @@
 
 package org.wildfly.httpclient.common;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
-import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
+import io.undertow.client.ClientCallback;
+import io.undertow.client.ClientExchange;
+import io.undertow.client.ClientRequest;
+import io.undertow.client.ClientResponse;
+import io.undertow.server.handlers.Cookie;
+import io.undertow.util.AbstractAttachable;
+import io.undertow.util.Cookies;
+import io.undertow.util.HeaderValues;
+import io.undertow.util.Headers;
+import io.undertow.util.Methods;
+import io.undertow.util.StatusCodes;
+import org.jboss.marshalling.InputStreamByteInput;
+import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.security.auth.client.AuthenticationConfiguration;
+import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
+import org.xnio.ChannelListener;
+import org.xnio.ChannelListeners;
+import org.xnio.IoUtils;
+import org.xnio.channels.StreamSourceChannel;
 
+import javax.net.ssl.SSLContext;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,33 +55,10 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
-import javax.net.ssl.SSLContext;
-
-import org.jboss.marshalling.InputStreamByteInput;
-import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.MarshallingConfiguration;
-import org.jboss.marshalling.SimpleClassResolver;
-import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
-import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
-import org.xnio.ChannelListener;
-import org.xnio.ChannelListeners;
-import org.xnio.IoUtils;
-import org.xnio.channels.StreamSourceChannel;
-import io.undertow.client.ClientCallback;
-import io.undertow.client.ClientExchange;
-import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
-import io.undertow.server.handlers.Cookie;
-import io.undertow.util.AbstractAttachable;
-import io.undertow.util.Cookies;
-import io.undertow.util.HeaderValues;
-import io.undertow.util.Headers;
-import io.undertow.util.Methods;
-import io.undertow.util.StatusCodes;
 
 /**
+ * Http target context used by client side.
+ *
  * @author Stuart Douglas
  */
 public class HttpTargetContext extends AbstractAttachable {
@@ -88,6 +83,7 @@ public class HttpTargetContext extends AbstractAttachable {
     private final AuthenticationContext initAuthenticationContext;
 
     private final AtomicBoolean affinityRequestSent = new AtomicBoolean();
+    private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
 
     private static ClassLoader getContextClassLoader() {
         if(System.getSecurityManager() == null) {
@@ -102,11 +98,12 @@ public class HttpTargetContext extends AbstractAttachable {
         }
     }
 
-    HttpTargetContext(HttpConnectionPool connectionPool, boolean eagerlyAcquireAffinity, URI uri) {
+    HttpTargetContext(HttpConnectionPool connectionPool, boolean eagerlyAcquireAffinity, URI uri, HttpMarshallerFactoryProvider provider) {
         this.connectionPool = connectionPool;
         this.eagerlyAcquireAffinity = eagerlyAcquireAffinity;
         this.uri = uri;
         this.initAuthenticationContext = AuthenticationContext.captureCurrent();
+        this.httpMarshallerFactoryProvider = provider;
     }
 
     void init() {
@@ -139,14 +136,6 @@ public class HttpTargetContext extends AbstractAttachable {
             latch.countDown();
             HttpClientMessages.MESSAGES.failedToAcquireSession(e);
         }, null, latch::countDown);
-    }
-
-    public Unmarshaller createUnmarshaller(MarshallingConfiguration marshallingConfiguration) throws IOException {
-        return newUnmarshaller(marshallingConfiguration);
-    }
-
-    public Marshaller createMarshaller(MarshallingConfiguration marshallingConfiguration) throws IOException {
-        return newMarshaller(marshallingConfiguration);
     }
 
     public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
@@ -186,7 +175,7 @@ public class HttpTargetContext extends AbstractAttachable {
             if (request.getRequestHeaders().contains(Headers.CONTENT_TYPE)) {
                 request.getRequestHeaders().put(Headers.TRANSFER_ENCODING, Headers.CHUNKED.toString());
             }
-            connection.getConnection().sendRequest(request, new ClientCallback<ClientExchange>() {
+            connection.sendRequest(request, new ClientCallback<ClientExchange>() {
                 @Override
                 public void completed(ClientExchange result) {
                     result.setResponseListener(new ClientCallback<ClientExchange>() {
@@ -257,8 +246,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                     handleSessionAffinity(request, response);
 
                                     if (isException) {
-                                        final MarshallingConfiguration marshallingConfiguration = createExceptionMarshallingConfig(classLoader);
-                                        final Unmarshaller unmarshaller = newUnmarshaller(marshallingConfiguration);
+                                        final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
                                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
                                             InputStream in = inputStream;
                                             String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
@@ -404,15 +392,6 @@ public class HttpTargetContext extends AbstractAttachable {
         }
     }
 
-    /**
-     * Exceptions don't use an object/class table, as they are common across protocols
-     *
-     * @return
-     */
-    MarshallingConfiguration createExceptionMarshallingConfig(final ClassLoader cl) {
-        return newConfig(cl != null ? new SimpleClassResolver(cl) : null);
-    }
-
     private static Map<String, Object> readAttachments(final ObjectInput input) throws IOException, ClassNotFoundException {
         final int numAttachments = input.readByte();
         if (numAttachments == 0) {
@@ -427,6 +406,10 @@ public class HttpTargetContext extends AbstractAttachable {
             attachments.put(key, val);
         }
         return attachments;
+    }
+
+    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest clientRequest) {
+        return this.httpMarshallerFactoryProvider.getMarshallerFactory(clientRequest);
     }
 
     public HttpConnectionPool getConnectionPool() {

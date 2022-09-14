@@ -18,29 +18,10 @@
 
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
-import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
-import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InvalidClassException;
-import java.io.OutputStream;
-import java.net.SocketAddress;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.function.Function;
-import javax.ejb.EJBHome;
-import javax.ejb.NoSuchEJBException;
-import javax.transaction.SystemException;
-import javax.transaction.Transaction;
-import javax.transaction.xa.XAException;
-
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.handlers.Cookie;
+import io.undertow.util.Headers;
+import io.undertow.util.StatusCodes;
 import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.EJBHomeLocator;
 import org.jboss.ejb.client.EJBIdentifier;
@@ -56,24 +37,43 @@ import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.SimpleClassResolver;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.common.annotation.NotNull;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
+import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
-import io.undertow.server.HttpServerExchange;
-import io.undertow.server.handlers.Cookie;
-import io.undertow.util.Headers;
-import io.undertow.util.StatusCodes;
+
+import javax.ejb.EJBHome;
+import javax.ejb.NoSuchEJBException;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
+import javax.transaction.xa.XAException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InvalidClassException;
+import java.io.OutputStream;
+import java.net.SocketAddress;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
+
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
+import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
 
 /**
+ * Http handler for EJB invocations.
+ *
  * @author Stuart Douglas
  */
 class HttpInvocationHandler extends RemoteHTTPHandler {
@@ -83,15 +83,18 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     private final LocalTransactionContext localTransactionContext;
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
     private final Function<String, Boolean> classResolverFilter;
+    private final HttpServiceConfig httpServiceConfig;
 
     HttpInvocationHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                          Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter) {
+                          Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter,
+                          HttpServiceConfig httpServiceConfig) {
         super(executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
         this.cancellationFlags = cancellationFlags;
         this.classResolverFilter = classResolverFilter;
+        this.httpServiceConfig = httpServiceConfig;
     }
 
     @Override
@@ -155,9 +158,8 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
 
                     Object[] methodParams = new Object[parameterTypeNames.length];
                     final Class<?> view = Class.forName(viewName, false, classLoader);
-                    final MarshallingConfiguration marshallingConfiguration = newConfig(new FilteringClassResolver(classLoader, classResolverFilter));
-                    marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-                    final Unmarshaller unmarshaller = newUnmarshaller(marshallingConfiguration);
+                    final HttpMarshallerFactory unmarshallingFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
+                    final Unmarshaller unmarshaller = unmarshallingFactory.createUnmarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
 
                     try (InputStream inputStream = exchange.getInputStream()) {
                         unmarshaller.start(new InputStreamByteInput(inputStream));
@@ -179,10 +181,10 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                             methodParams[i] = unmarshaller.readObject();
                         }
                         final Map<String, Object> contextData;
-                        final int attachementCount = PackedInteger.readPackedInteger(unmarshaller);
-                        if (attachementCount > 0) {
+                        final int attachmentCount = PackedInteger.readPackedInteger(unmarshaller);
+                        if (attachmentCount > 0) {
                             contextData = new HashMap<>();
-                            for (int i = 0; i < attachementCount; ++i) {
+                            for (int i = 0; i < attachmentCount; ++i) {
                                 Object o = unmarshaller.readObject();
                                 String key = (String) o;
                                 Object value = unmarshaller.readObject();
@@ -204,7 +206,9 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                             locator = new StatelessEJBLocator<>(view, app, module, bean, distinct, Affinity.LOCAL);
                         }
 
-                        return new ResolvedInvocation(contextData, methodParams, locator, exchange, marshallingConfiguration, sessionAffinity, transaction, identifier);
+                        final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpMarshallerFactory(exchange);
+                        final Marshaller marshaller = marshallerFactory.createMarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
+                        return new ResolvedInvocation(contextData, methodParams, locator, exchange, marshaller, sessionAffinity, transaction, identifier);
                     } catch (IOException | ClassNotFoundException e) {
                         throw e;
                     } catch (Throwable e) {
@@ -222,7 +226,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                     if(identifier != null) {
                         cancellationFlags.remove(identifier);
                     }
-                    HttpServerHelper.sendException(exchange, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.noSuchMethod());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.noSuchMethod());
                 }
 
                 @Override
@@ -230,7 +234,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                     if(identifier != null) {
                         cancellationFlags.remove(identifier);
                     }
-                    HttpServerHelper.sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.sessionNotActive());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.sessionNotActive());
                 }
 
                 @Override
@@ -238,7 +242,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                     if(identifier != null) {
                         cancellationFlags.remove(identifier);
                     }
-                    HttpServerHelper.sendException(exchange, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
                 }
 
                 @Override
@@ -271,7 +275,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                     if(identifier != null) {
                         cancellationFlags.remove(identifier);
                     }
-                    HttpServerHelper.sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, exception);
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
                 }
 
                 @Override
@@ -279,7 +283,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                     if(identifier != null) {
                         cancellationFlags.remove(identifier);
                     }
-                    HttpServerHelper.sendException(exchange, StatusCodes.NOT_FOUND, new NoSuchEJBException());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
                 }
 
                 @Override
@@ -295,7 +299,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                     if(identifier != null) {
                         cancellationFlags.remove(identifier);
                     }
-                    HttpServerHelper.sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
                 }
 
                 @Override
@@ -321,17 +325,17 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
         private final Object[] methodParams;
         private final EJBLocator<?> locator;
         private final HttpServerExchange exchange;
-        private final MarshallingConfiguration marshallingConfiguration;
+        private final Marshaller marshaller;
         private final String sessionAffinity;
         private final Transaction transaction;
         private final InvocationIdentifier identifier;
 
-        public ResolvedInvocation(Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, MarshallingConfiguration marshallingConfiguration, String sessionAffinity, Transaction transaction, final InvocationIdentifier identifier) {
+        public ResolvedInvocation(Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Transaction transaction, final InvocationIdentifier identifier) {
             this.contextData = contextData;
             this.methodParams = methodParams;
             this.locator = locator;
             this.exchange = exchange;
-            this.marshallingConfiguration = marshallingConfiguration;
+            this.marshaller = marshaller;
             this.sessionAffinity = sessionAffinity;
             this.transaction = transaction;
             this.identifier = identifier;
@@ -380,7 +384,6 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
 //                                    if (output.getSessionAffinity() != null) {
 //                                        exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
 //                                    }
-                final Marshaller marshaller = newMarshaller(marshallingConfiguration);
                 OutputStream outputStream = exchange.getOutputStream();
                 final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
                 // start the marshaller
@@ -396,7 +399,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                 marshaller.flush();
                 exchange.endExchange();
             } catch (Exception e) {
-                HttpServerHelper.sendException(exchange, 500, e);
+                HttpServerHelper.sendException(exchange, httpServiceConfig, 500, e);
             }
         }
     }

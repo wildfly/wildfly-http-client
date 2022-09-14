@@ -31,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.net.ssl.SSLContext;
 
+import io.undertow.client.ClientExchange;
+import io.undertow.client.ClientRequest;
 import org.xnio.ChannelListener;
 import org.xnio.IoUtils;
 import org.xnio.OptionMap;
@@ -44,11 +46,9 @@ import io.undertow.protocols.ssl.UndertowXnioSsl;
 
 /**
  * A pool of HTTP connections for a given host pool.
- * <p>
- * <p>
- * This pool is designed to give an
  *
  * @author Stuart Douglas
+ * @author Flavia Rainone
  */
 public class HttpConnectionPool implements Closeable {
 
@@ -196,6 +196,8 @@ public class HttpConnectionPool implements Closeable {
         URI getUri();
 
         PoolAuthenticationContext getAuthenticationContext();
+
+        void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback);
     }
 
 
@@ -292,6 +294,11 @@ public class HttpConnectionPool implements Closeable {
         @Override
         public PoolAuthenticationContext getAuthenticationContext() {
             return poolAuthenticationContext;
+        }
+
+        @Override
+        public void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback) {
+            connection.sendRequest(request, callback);
         }
     }
 

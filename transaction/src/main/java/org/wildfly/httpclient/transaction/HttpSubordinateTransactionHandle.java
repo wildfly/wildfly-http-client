@@ -18,7 +18,25 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
+import io.undertow.client.ClientRequest;
+import io.undertow.client.ClientResponse;
+import io.undertow.util.Headers;
+import io.undertow.util.Methods;
+import org.jboss.marshalling.Marshaller;
+import org.jboss.marshalling.Marshalling;
+import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.security.auth.client.AuthenticationConfiguration;
+import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
+import org.xnio.IoUtils;
+
+import javax.net.ssl.SSLContext;
+import javax.transaction.xa.XAException;
+import javax.transaction.xa.XAResource;
+import javax.transaction.xa.Xid;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
+
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.READ_ONLY;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
@@ -29,27 +47,9 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PA
 import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
-import javax.net.ssl.SSLContext;
-import javax.transaction.xa.XAException;
-import javax.transaction.xa.XAResource;
-import javax.transaction.xa.Xid;
-
-import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
-import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
-import org.xnio.IoUtils;
-
-import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
-import io.undertow.util.Headers;
-import io.undertow.util.Methods;
-
 /**
+ * Represents a remote subordinate transaction that is managed over HTTP protocol.
+ *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 class HttpSubordinateTransactionHandle implements SubordinateTransactionControl {
@@ -117,7 +117,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
         cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
         targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-            Marshaller marshaller = targetContext.createMarshaller(newConfig());
+            Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
             marshaller.start(Marshalling.createByteOutput(output));
             marshaller.writeInt(id.getFormatId());
             final byte[] gtid = id.getGlobalTransactionId();
