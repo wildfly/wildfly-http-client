@@ -35,14 +35,23 @@ public enum HttpServiceConfig {
     /**
      * Default configuration.
      */
-    DEFAULT (Function.identity(), HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider());
+    DEFAULT (Function.identity(), HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider()),
+    /**
+     * Configuration for running the HTTP remoting layer in EE interoperable mode, where this
+     * Java instance can interoperate with Javax EE clients and servers.
+     */
+    EE_INTEROPERABLE_MODE (EEInteroperability::wrap, EEInteroperability.getHttpMarshallerFactoryProvider());
 
     /**
-     * Returns the http service configuration.
+     * Returns the right configuration according to the value of
+     * {@link EEInteroperability#EE_INTEROPERABLE_MODE}.
      *
      * @return the configuration for http services
      */
     public static HttpServiceConfig getInstance() {
+        if (EEInteroperability.EE_INTEROPERABLE_MODE) {
+            return EE_INTEROPERABLE_MODE;
+        }
         return DEFAULT;
     }
 

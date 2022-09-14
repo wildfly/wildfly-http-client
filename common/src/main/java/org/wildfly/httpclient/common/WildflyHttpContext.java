@@ -170,8 +170,15 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             int maxConnections = this.maxConnections > 0 ? this.maxConnections : 10;
             int maxStreamsPerConnection = this.maxStreamsPerConnection > 0 ? this.maxStreamsPerConnection : 10;
 
-            final HttpConnectionPoolFactory httpConnectionPoolFactory = HttpConnectionPoolFactory.getDefault();
-            final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider = HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider();
+            final HttpConnectionPoolFactory httpConnectionPoolFactory;
+            final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
+            if (EEInteroperability.EE_INTEROPERABLE_MODE) {
+                httpConnectionPoolFactory = EEInteroperability.getHttpConnectionPoolFactory();
+                httpMarshallerFactoryProvider = EEInteroperability.getHttpMarshallerFactoryProvider();
+            } else {
+                httpConnectionPoolFactory = HttpConnectionPoolFactory.getDefault();
+                httpMarshallerFactoryProvider = HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider();
+            }
             for (int i = 0; i < this.targets.size(); ++i) {
                 HttpConfigBuilder sb = this.targets.get(i);
                 HostPool hp = new HostPool(sb.getUri());

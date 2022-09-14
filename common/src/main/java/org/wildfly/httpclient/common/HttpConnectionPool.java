@@ -91,6 +91,10 @@ public class HttpConnectionPool implements Closeable {
         runPending();
     }
 
+    protected ClientConnectionHolder createClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
+        return new ClientConnectionHolder(connection, uri, sslContext);
+    }
+
     private void runPending() {
 
         int count;
@@ -152,7 +156,7 @@ public class HttpConnectionPool implements Closeable {
                 @Override
                 public void completed(ClientConnection result) {
                     result.getCloseSetter().set((ChannelListener<ClientConnection>) connections::remove);
-                    ClientConnectionHolder clientConnectionHolder = new ClientConnectionHolder(result, hostPoolAddress.getURI(), context);
+                    ClientConnectionHolder clientConnectionHolder = createClientConnectionHolder(result, hostPoolAddress.getURI(), context);
                     clientConnectionHolder.tryAcquire(); //aways suceeds
                     next.connectionListener.done(clientConnectionHolder);
                 }
@@ -215,7 +219,7 @@ public class HttpConnectionPool implements Closeable {
         }
     }
 
-    private class ClientConnectionHolder implements ConnectionHandle {
+    protected class ClientConnectionHolder implements ConnectionHandle {
 
         //0 = idle
         //1 = in use
@@ -246,7 +250,7 @@ public class HttpConnectionPool implements Closeable {
             }
         };
 
-        private ClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
+        ClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
             this.connection = connection;
             this.uri = uri;
             this.sslContext = sslContext;
