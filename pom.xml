@@ -442,6 +442,24 @@
                             <sun.net.useExclusiveBind>false</sun.net.useExclusiveBind>
                         </systemPropertyVariables>
                     </configuration>
+                    <executions>
+                        <execution>
+                            <id>default</id>
+                            <phase>test</phase>
+                            <goals><goal>test</goal></goals>
+                        </execution>
+                        <execution>
+                            <id>ee-interoperable</id>
+                            <phase>test</phase>
+                            <goals><goal>test</goal></goals>
+                            <configuration>
+                                <systemPropertyVariables>
+                                    <org.wildfly.ee.interoperable>true</org.wildfly.ee.interoperable>
+                                </systemPropertyVariables>
+                                <reportsDirectory>${project.build.directory}/surefire-ee-interoperable-reports</reportsDirectory>
+                            </configuration>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
