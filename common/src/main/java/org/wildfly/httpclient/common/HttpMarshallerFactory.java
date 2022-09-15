@@ -27,6 +27,7 @@ import org.jboss.marshalling.ObjectTable;
 import org.jboss.marshalling.SimpleClassResolver;
 import org.jboss.marshalling.Unmarshaller;
 import org.jboss.marshalling.river.RiverMarshallerFactory;
+import org.wildfly.common.annotation.NotNull;
 
 import java.io.IOException;
 
@@ -74,7 +75,7 @@ public class HttpMarshallerFactory {
      * @return the marshaller
      * @throws IOException if an I/O error occurs during marshaller creation
      */
-    public Marshaller createMarshaller(ObjectResolver resolver) throws IOException {
+    public Marshaller createMarshaller(@NotNull ObjectResolver resolver) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setObjectResolver(resolver);
         return RIVER_MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);
@@ -87,7 +88,7 @@ public class HttpMarshallerFactory {
      * @return the marshaller
      * @throws IOException if an I/O error occurs during marshaller creation
      */
-    public Marshaller createMarshaller(ObjectTable table) throws IOException {
+    public Marshaller createMarshaller(@NotNull ObjectTable table) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setObjectTable(table);
         return RIVER_MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);
@@ -101,7 +102,7 @@ public class HttpMarshallerFactory {
      * @return the marshaller
      * @throws IOException if an I/O error occurs during marshaller creation
      */
-    public Marshaller createMarshaller(ObjectResolver resolver, ObjectTable table) throws IOException {
+    public Marshaller createMarshaller(@NotNull ObjectResolver resolver, @NotNull ObjectTable table) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setObjectResolver(resolver);
         marshallingConfiguration.setObjectTable(table);
@@ -116,7 +117,7 @@ public class HttpMarshallerFactory {
      * @return the marshaller
      * @throws IOException if an I/O error occurs during marshaller creation
      */
-    public Marshaller createMarshaller(ClassResolver resolver, ObjectTable table) throws IOException {
+    public Marshaller createMarshaller(@NotNull ClassResolver resolver, @NotNull ObjectTable table) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setClassResolver(resolver);
         marshallingConfiguration.setObjectTable(table);
@@ -140,7 +141,7 @@ public class HttpMarshallerFactory {
      * @return the unmarshaller
      * @throws IOException if an I/O error occurs during unmarshaller creation
      */
-    public Unmarshaller createUnmarshaller(ObjectResolver resolver) throws IOException {
+    public Unmarshaller createUnmarshaller(@NotNull ObjectResolver resolver) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setObjectResolver(resolver);
         return RIVER_MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
@@ -153,7 +154,7 @@ public class HttpMarshallerFactory {
      * @return the unmarshaller
      * @throws IOException if an I/O error occurs during unmarshaller creation
      */
-    public Unmarshaller createUnmarshaller(ClassResolver resolver) throws IOException {
+    public Unmarshaller createUnmarshaller(@NotNull ClassResolver resolver) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setClassResolver(resolver);
         return RIVER_MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
@@ -166,7 +167,7 @@ public class HttpMarshallerFactory {
      * @return the unmarshaller
      * @throws IOException if an I/O error occurs during unmarshaller creation
      */
-    public Unmarshaller createUnmarshaller(final ClassLoader cl) throws IOException {
+    public Unmarshaller createUnmarshaller(@NotNull final ClassLoader cl) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setClassResolver(new SimpleClassResolver(cl));
         return RIVER_MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
@@ -179,7 +180,7 @@ public class HttpMarshallerFactory {
      * @return the unmarshaller
      * @throws IOException if an I/O error occurs during unmarshaller creation
      */
-    public Unmarshaller createUnmarshaller(ObjectTable table) throws IOException {
+    public Unmarshaller createUnmarshaller(@NotNull ObjectTable table) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setObjectTable(table);
         return RIVER_MARSHALLER_FACTORY.createUnmarshaller(marshallingConfiguration);
@@ -193,7 +194,7 @@ public class HttpMarshallerFactory {
      * @return the unmarshaller
      * @throws IOException if an I/O error occurs during unmarshaller creation
      */
-    public Unmarshaller createUnmarshaller(ObjectResolver resolver, ObjectTable table) throws IOException {
+    public Unmarshaller createUnmarshaller(@NotNull ObjectResolver resolver, @NotNull ObjectTable table) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setObjectResolver(resolver);
         marshallingConfiguration.setObjectTable(table);
@@ -208,7 +209,7 @@ public class HttpMarshallerFactory {
      * @return the unmarshaller
      * @throws IOException if an I/O error occurs during unmarshaller creation
      */
-    public Unmarshaller createUnmarshaller(ClassResolver resolver, ObjectTable table) throws IOException {
+    public Unmarshaller createUnmarshaller(@NotNull ClassResolver resolver, @NotNull ObjectTable table) throws IOException {
         MarshallingConfiguration marshallingConfiguration = createMarshallingConfiguration();
         marshallingConfiguration.setClassResolver(resolver);
         marshallingConfiguration.setObjectTable(table);
