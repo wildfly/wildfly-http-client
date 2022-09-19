@@ -18,26 +18,9 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
-import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_BEGIN_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XID_LIST;
-
-import java.net.URI;
-import java.security.GeneralSecurityException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import javax.net.ssl.SSLContext;
-import javax.transaction.SystemException;
-import javax.transaction.xa.XAException;
-import javax.transaction.xa.Xid;
-
+import io.undertow.client.ClientRequest;
+import io.undertow.util.Headers;
+import io.undertow.util.Methods;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -50,11 +33,25 @@ import org.wildfly.transaction.client.spi.SimpleTransactionControl;
 import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
 import org.xnio.IoUtils;
 
-import io.undertow.client.ClientRequest;
-import io.undertow.util.Headers;
-import io.undertow.util.Methods;
+import javax.net.ssl.SSLContext;
+import javax.transaction.SystemException;
+import javax.transaction.xa.XAException;
+import javax.transaction.xa.Xid;
+import java.net.URI;
+import java.security.GeneralSecurityException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static java.security.AccessController.doPrivileged;
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_BEGIN_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID_LIST;
 
 /**
  * @author Stuart Douglas
@@ -108,7 +105,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         targetContext.sendRequest(cr,  sslContext, authenticationConfiguration,null, (result, response, closeable) -> {
             try {
-                Unmarshaller unmarshaller = targetContext.createUnmarshaller(newConfig());
+                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
                 unmarshaller.start(new InputStreamByteInput(result));
                 int length = unmarshaller.readInt();
                 Xid[] ret = new Xid[length];
@@ -166,7 +163,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         targetContext.sendRequest(cr, sslContext, authenticationConfiguration, null, (result, response, closeable) -> {
             try {
-                Unmarshaller unmarshaller = targetContext.createUnmarshaller(newConfig());
+                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
                 unmarshaller.start(new InputStreamByteInput(result));
                 int formatId = unmarshaller.readInt();
                 int len = unmarshaller.readInt();

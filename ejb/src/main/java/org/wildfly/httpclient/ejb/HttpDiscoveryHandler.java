@@ -18,9 +18,6 @@
 
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
-
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import org.jboss.ejb.client.EJBModuleIdentifier;
@@ -28,7 +25,7 @@ import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.ModuleAvailabilityListener;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.MarshallingConfiguration;
+import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
 
 import java.io.ByteArrayOutputStream;
@@ -39,14 +36,22 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 /**
+ * Http handler for discovery requests.
+ *
  * @author <a href="mailto:tadamski@redhat.com">Tomasz Adamski</a>
  */
 
 public class HttpDiscoveryHandler extends RemoteHTTPHandler {
 
     private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
+    private final HttpServiceConfig httpServiceConfig;
 
+    @Deprecated
     public HttpDiscoveryHandler(ExecutorService executorService, Association association) {
+        this (executorService, association, HttpServiceConfig.DEFAULT);
+    }
+
+    public HttpDiscoveryHandler(ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
         super(executorService);
         association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {
             @Override
@@ -59,13 +64,15 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
                 availableModules.removeAll(modules);
             }
         });
+        this.httpServiceConfig = httpServiceConfig;
     }
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_DISCOVERY_RESPONSE.toString());
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Marshaller marshaller = newMarshaller(createMarshallingConfig());
+        Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange)
+                .createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
         marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
         marshaller.writeInt(availableModules.size());
         for (EJBModuleIdentifier ejbModuleIdentifier : availableModules) {
@@ -74,11 +81,5 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
         marshaller.finish();
         marshaller.flush();
         exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
-    }
-
-    private MarshallingConfiguration createMarshallingConfig() {
-        final MarshallingConfiguration marshallingConfiguration = newConfig();
-        marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-        return marshallingConfiguration;
     }
 }

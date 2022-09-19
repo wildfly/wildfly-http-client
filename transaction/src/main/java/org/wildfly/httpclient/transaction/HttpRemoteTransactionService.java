@@ -18,32 +18,13 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
-import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
-import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
-import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_BEGIN_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Deque;
-import java.util.function.Function;
-import javax.transaction.xa.Xid;
-
+import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpServerExchange;
+import io.undertow.server.RoutingHandler;
+import io.undertow.server.handlers.BlockingHandler;
+import io.undertow.util.Headers;
+import io.undertow.util.Methods;
+import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
@@ -52,18 +33,36 @@ import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.common.function.ExceptionBiFunction;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
 import org.wildfly.transaction.client.SimpleXid;
-import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
-import io.undertow.server.RoutingHandler;
-import io.undertow.server.handlers.BlockingHandler;
-import io.undertow.util.Headers;
-import io.undertow.util.Methods;
-import io.undertow.util.StatusCodes;
+
+import javax.transaction.xa.Xid;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Deque;
+import java.util.function.Function;
+
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_BEGIN_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 /**
  * @author Stuart Douglas
@@ -72,10 +71,16 @@ public class HttpRemoteTransactionService {
 
     private final LocalTransactionContext transactionContext;
     private final Function<LocalTransaction, Xid> xidResolver;
+    private final HttpServiceConfig httpServiceConfig;
 
     public HttpRemoteTransactionService(LocalTransactionContext transactionContext, Function<LocalTransaction, Xid> xidResolver) {
+        this(transactionContext, xidResolver, HttpServiceConfig.getInstance());
+    }
+
+    public HttpRemoteTransactionService(LocalTransactionContext transactionContext, Function<LocalTransaction, Xid> xidResolver, HttpServiceConfig httpServiceConfig) {
         this.transactionContext = transactionContext;
         this.xidResolver = xidResolver;
+        this.httpServiceConfig = httpServiceConfig;
     }
 
     public HttpHandler createHandler() {
@@ -89,7 +94,7 @@ public class HttpRemoteTransactionService {
         routingHandler.add(Methods.POST, XA_PREP_PATH, new XAPrepHandler());
         routingHandler.add(Methods.POST, XA_ROLLBACK_PATH, new XARollbackHandler());
         routingHandler.add(Methods.GET, XA_RECOVER_PATH, new XARecoveryHandler());
-        return new BlockingHandler(new ElytronIdentityHandler(routingHandler));
+        return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
     abstract class AbstractTransactionHandler implements HttpHandler {
@@ -104,7 +109,8 @@ public class HttpRemoteTransactionService {
             }
 
             try {
-                Unmarshaller unmarshaller = newUnmarshaller(newConfig());
+                HttpMarshallerFactory httpMarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
+                Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
                 unmarshaller.start(new InputStreamByteInput(exchange.getInputStream()));
                 int formatId = unmarshaller.readInt();
                 int len = unmarshaller.readInt();
@@ -122,7 +128,7 @@ public class HttpRemoteTransactionService {
                     return null;
                 }, transaction, exchange);
             } catch (Exception e) {
-                sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -145,7 +151,7 @@ public class HttpRemoteTransactionService {
                 final LocalTransaction transaction = transactionContext.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                Marshaller marshaller = newMarshaller(newConfig());
+                Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
                 marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
                 marshaller.writeInt(xid.getFormatId());
                 marshaller.writeInt(xid.getGlobalTransactionId().length);
@@ -155,7 +161,7 @@ public class HttpRemoteTransactionService {
                 marshaller.finish();
                 exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
     }
@@ -181,7 +187,7 @@ public class HttpRemoteTransactionService {
 
                 final Xid[] recoveryList = transactionContext.getRecoveryInterface().recover(flags, parentName);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                Marshaller marshaller = newMarshaller(newConfig());
+                Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
                 marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
                 marshaller.writeInt(recoveryList.length);
                 for (int i = 0; i < recoveryList.length; ++i) {
@@ -195,7 +201,7 @@ public class HttpRemoteTransactionService {
                 marshaller.finish();
                 exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
     }
@@ -261,12 +267,33 @@ public class HttpRemoteTransactionService {
         }
     }
 
+    private void internalSendException(HttpServerExchange exchange, int status, Throwable e) {
+        try {
+            exchange.setStatusCode(status);
+            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EXCEPTION.toString());
+
+            final Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
+            // start the marshaller
+            marshaller.start(byteOutput);
+            marshaller.writeObject(e);
+            marshaller.write(0);
+            marshaller.finish();
+            marshaller.flush();
+            exchange.getResponseSender().send(ByteBuffer.wrap(outputStream.toByteArray()));
+        } catch (IOException e1) {
+            HttpRemoteTransactionMessages.MESSAGES.debugf(e, "Failed to write exception");
+        }
+    }
+
+    @Deprecated
     public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
         try {
             exchange.setStatusCode(status);
             exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EXCEPTION.toString());
 
-            final Marshaller marshaller = newMarshaller(newConfig());
+            final Marshaller marshaller = HttpServiceConfig.getInstance().getHttpMarshallerFactory(exchange).createMarshaller();
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
             // start the marshaller

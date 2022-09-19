@@ -18,6 +18,20 @@
 
 package org.wildfly.httpclient.common;
 
+import io.undertow.client.ClientCallback;
+import io.undertow.client.ClientConnection;
+import io.undertow.client.ClientExchange;
+import io.undertow.client.ClientRequest;
+import io.undertow.client.UndertowClient;
+import io.undertow.connector.ByteBufferPool;
+import io.undertow.protocols.ssl.UndertowXnioSsl;
+import org.xnio.ChannelListener;
+import org.xnio.IoUtils;
+import org.xnio.OptionMap;
+import org.xnio.XnioExecutor;
+import org.xnio.XnioWorker;
+
+import javax.net.ssl.SSLContext;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -29,26 +43,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.net.ssl.SSLContext;
-
-import org.xnio.ChannelListener;
-import org.xnio.IoUtils;
-import org.xnio.OptionMap;
-import org.xnio.XnioExecutor;
-import org.xnio.XnioWorker;
-import io.undertow.client.ClientCallback;
-import io.undertow.client.ClientConnection;
-import io.undertow.client.UndertowClient;
-import io.undertow.connector.ByteBufferPool;
-import io.undertow.protocols.ssl.UndertowXnioSsl;
 
 /**
  * A pool of HTTP connections for a given host pool.
- * <p>
- * <p>
- * This pool is designed to give an
  *
  * @author Stuart Douglas
+ * @author Flavia Rainone
  */
 public class HttpConnectionPool implements Closeable {
 
@@ -89,6 +89,10 @@ public class HttpConnectionPool implements Closeable {
             connections.get(connection.sslContext == null ? NULL_SSL_CONTEXT : connection.sslContext).add(connection);
         }
         runPending();
+    }
+
+    protected ClientConnectionHolder createClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
+        return new ClientConnectionHolder(connection, uri, sslContext);
     }
 
     private void runPending() {
@@ -152,7 +156,7 @@ public class HttpConnectionPool implements Closeable {
                 @Override
                 public void completed(ClientConnection result) {
                     result.getCloseSetter().set((ChannelListener<ClientConnection>) connections::remove);
-                    ClientConnectionHolder clientConnectionHolder = new ClientConnectionHolder(result, hostPoolAddress.getURI(), context);
+                    ClientConnectionHolder clientConnectionHolder = createClientConnectionHolder(result, hostPoolAddress.getURI(), context);
                     clientConnectionHolder.tryAcquire(); //aways suceeds
                     next.connectionListener.done(clientConnectionHolder);
                 }
@@ -196,6 +200,8 @@ public class HttpConnectionPool implements Closeable {
         URI getUri();
 
         PoolAuthenticationContext getAuthenticationContext();
+
+        void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback);
     }
 
 
@@ -213,11 +219,8 @@ public class HttpConnectionPool implements Closeable {
         }
     }
 
-    private class ClientConnectionHolder implements ConnectionHandle {
+    protected class ClientConnectionHolder implements ConnectionHandle {
 
-        //0 = idle
-        //1 = in use
-        //2 - closed
         private volatile AtomicInteger state = new AtomicInteger();
         private final ClientConnection connection;
         private final URI uri;
@@ -225,11 +228,17 @@ public class HttpConnectionPool implements Closeable {
         private long timeout;
         private final SSLContext sslContext;
 
+        // keep track if the connection is in use (!IN_USE = idle)
+        private static final int IN_USE  = 1;
+        // indicate this connection is closed
+        private static final int CLOSED  = 1 << 0x1;
+
+
         private final Runnable timeoutTask = new Runnable() {
             @Override
             public void run() {
                 timeoutKey = null;
-                if (state.get() == 2) {
+                if (hasFlags(CLOSED)) {
                     return;
                 }
                 long time = System.currentTimeMillis();
@@ -244,22 +253,22 @@ public class HttpConnectionPool implements Closeable {
             }
         };
 
-        private ClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
+        ClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
             this.connection = connection;
             this.uri = uri;
             this.sslContext = sslContext;
         }
 
-        boolean tryClose() {
-            if (state.compareAndSet(0, 2)) {
+        final boolean tryClose() {
+            if (setFlagsIfCleared(CLOSED, IN_USE)) {
                 IoUtils.safeClose(connection);
                 return true;
             }
             return false;
         }
 
-        boolean tryAcquire() {
-            return state.compareAndSet(0, 1);
+        final boolean tryAcquire() {
+            return setFlagsIfCleared(IN_USE, CLOSED);
         }
 
         @Override
@@ -269,7 +278,7 @@ public class HttpConnectionPool implements Closeable {
 
         @Override
         public void done(boolean close) {
-            if (!state.compareAndSet(1, 0)) {
+            if (!clearFlags(IN_USE)) {
                 return;
             }
             if (close) {
@@ -292,6 +301,47 @@ public class HttpConnectionPool implements Closeable {
         @Override
         public PoolAuthenticationContext getAuthenticationContext() {
             return poolAuthenticationContext;
+        }
+
+        @Override
+        public void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback) {
+            connection.sendRequest(request, callback);
+        }
+
+        protected final void setFlags(int flags) {
+            int oldState;
+            do {
+                oldState = state.get();
+                if ((oldState & flags) == flags || (oldState & CLOSED) == CLOSED) {
+                    return;
+                }
+            } while (! state.compareAndSet(oldState, oldState | flags));
+        }
+
+        protected final boolean setFlagsIfCleared(int flags, int clearedFlags) {
+            int oldState;
+            do {
+                oldState = state.get();
+                if ((oldState & flags) == flags || (oldState & clearedFlags) == clearedFlags) {
+                    return false;
+                }
+            } while (! state.compareAndSet(oldState, oldState | flags));
+            return true;
+        }
+
+        protected final boolean clearFlags(int flags) {
+            int oldState;
+            do {
+                oldState = state.get();
+                if ((oldState & flags) == 0) {
+                    return false;
+                }
+            } while (! state.compareAndSet(oldState, oldState & ~flags));
+            return true;
+        }
+
+        protected final boolean hasFlags(int flags) {
+            return (state.get() & flags) == flags;
         }
     }
 

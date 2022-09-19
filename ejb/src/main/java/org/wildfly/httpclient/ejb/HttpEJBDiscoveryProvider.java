@@ -17,13 +17,6 @@
  */
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
-import static org.wildfly.httpclient.ejb.EjbConstants.DISCOVERY_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_SCHEME;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
-
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
@@ -31,7 +24,6 @@ import org.jboss.ejb.client.EJBClientConnection;
 import org.jboss.ejb.client.EJBClientContext;
 import org.jboss.ejb.client.EJBModuleIdentifier;
 import org.jboss.marshalling.InputStreamByteInput;
-import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.discovery.AttributeValue;
 import org.wildfly.discovery.FilterSpec;
@@ -61,6 +53,11 @@ import java.util.stream.Collectors;
 
 import static java.security.AccessController.doPrivileged;
 import static org.jboss.ejb.client.EJBClientContext.getCurrent;
+import static org.wildfly.httpclient.ejb.EjbConstants.DISCOVERY_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_SCHEME;
 
 /**
  * @author <a href="mailto:tadamski@redhat.com">Tomasz Adamski</a>
@@ -134,7 +131,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         ).collect(Collectors.toList());
         final CountDownLatch outstandingLatch = new CountDownLatch(httpConnections.size());
         for (EJBClientConnection connection : httpConnections) {
-            disoverFromConnection(connection, outstandingLatch);
+            discoverFromConnection(connection, outstandingLatch);
         }
         try {
             outstandingLatch.await();
@@ -146,7 +143,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         cacheInvalid.set(false);
     }
 
-    private void disoverFromConnection(final EJBClientConnection connection, final CountDownLatch outstandingLatch) {
+    private void discoverFromConnection(final EJBClientConnection connection, final CountDownLatch outstandingLatch) {
         final URI newUri = connection.getDestination();
 
         HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(newUri);
@@ -170,8 +167,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
                 ((result, response, closeable) -> {
                     try {
-                        final MarshallingConfiguration marshallingConfiguration = createMarshallingConfig();
-                        final Unmarshaller unmarshaller = targetContext.createUnmarshaller(marshallingConfiguration);
+                        final Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(request).createUnmarshaller();
 
                         unmarshaller.start(new InputStreamByteInput(result));
                         int size = unmarshaller.readInt();
@@ -193,12 +189,6 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                     outstandingLatch.countDown();
                 },
                 EjbConstants.EJB_DISCOVERY_RESPONSE, null);
-    }
-
-    private MarshallingConfiguration createMarshallingConfig() {
-        final MarshallingConfiguration marshallingConfiguration = newConfig();
-        marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-        return marshallingConfiguration;
     }
 
     private ServiceURL createServiceURL(final URI newUri, final EJBModuleIdentifier moduleIdentifier) {

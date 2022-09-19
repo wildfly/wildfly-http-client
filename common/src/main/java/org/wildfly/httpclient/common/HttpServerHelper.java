@@ -18,16 +18,13 @@
 
 package org.wildfly.httpclient.common;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.common.MarshallingHelper.newMarshaller;
-
-import java.io.OutputStream;
-
+import io.undertow.server.HttpServerExchange;
+import io.undertow.util.Headers;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
-import io.undertow.server.HttpServerExchange;
-import io.undertow.util.Headers;
+
+import java.io.OutputStream;
 
 /**
  * @author Stuart Douglas
@@ -38,11 +35,11 @@ public class HttpServerHelper {
 
     }
 
-    public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
+    public static void sendException(HttpServerExchange exchange, HttpServiceConfig serviceConfig, int status, Throwable e) {
         try {
             exchange.setStatusCode(status);
             exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
-            final Marshaller marshaller = newMarshaller(newConfig());
+            final Marshaller marshaller = serviceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
             OutputStream outputStream = exchange.getOutputStream();
             final ByteOutput byteOutput = Marshalling.createByteOutput(outputStream);
             // start the marshaller
@@ -57,5 +54,10 @@ public class HttpServerHelper {
             HttpClientMessages.MESSAGES.failedToWriteException(ex);
             exchange.endExchange();
         }
+    }
+
+    @Deprecated
+    public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
+        sendException(exchange, HttpServiceConfig.getInstance(), status, e);
     }
 }

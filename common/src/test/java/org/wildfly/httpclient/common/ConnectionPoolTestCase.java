@@ -18,6 +18,19 @@
 
 package org.wildfly.httpclient.common;
 
+import io.undertow.client.ClientCallback;
+import io.undertow.client.ClientExchange;
+import io.undertow.client.ClientRequest;
+import io.undertow.server.ServerConnection;
+import io.undertow.server.handlers.BlockingHandler;
+import io.undertow.util.Headers;
+import io.undertow.util.Methods;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.xnio.OptionMap;
+import org.xnio.channels.Channels;
+
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -28,19 +41,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.xnio.OptionMap;
-import org.xnio.channels.Channels;
-import io.undertow.client.ClientCallback;
-import io.undertow.client.ClientExchange;
-import io.undertow.client.ClientRequest;
-import io.undertow.server.ServerConnection;
-import io.undertow.server.handlers.BlockingHandler;
-import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 
 /**
  * @author Stuart Douglas
@@ -128,7 +128,7 @@ public class ConnectionPoolTestCase {
             ClientRequest request = new ClientRequest().setMethod(Methods.GET).setPath(path);
             ClientAuthUtils.setupBasicAuth(request, connectionHandle.getUri());
             request.getRequestHeaders().add(Headers.HOST, HTTPTestServer.getHostAddress());
-            connectionHandle.getConnection().sendRequest(request, new ClientCallback<ClientExchange>() {
+            connectionHandle.sendRequest(request, new ClientCallback<ClientExchange>() {
                 @Override
                 public void completed(ClientExchange result) {
                     result.setResponseListener(new ClientCallback<ClientExchange>() {

@@ -18,53 +18,16 @@
 
 package org.wildfly.httpclient.naming;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.EXCEPTION;
-import static org.wildfly.httpclient.naming.NamingConstants.HTTP_PORT;
-import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_PORT;
-import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
-import static org.wildfly.httpclient.naming.NamingConstants.NAMING_CONTEXT;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
-import static java.security.AccessController.doPrivileged;
-
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.security.AccessController;
-import java.security.GeneralSecurityException;
-import java.security.PrivilegedAction;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.ServiceLoader;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import javax.naming.Binding;
-import javax.naming.CommunicationException;
-import javax.naming.Context;
-import javax.naming.Name;
-import javax.naming.NameClassPair;
-import javax.naming.NameNotFoundException;
-import javax.naming.NamingException;
-import javax.net.ssl.SSLContext;
-
+import io.undertow.client.ClientRequest;
+import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
+import io.undertow.util.Methods;
+import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.MarshallingConfiguration;
 import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.naming.client.AbstractContext;
@@ -80,13 +43,49 @@ import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
 import org.xnio.IoUtils;
 
-import io.undertow.client.ClientRequest;
-import io.undertow.util.Headers;
-import io.undertow.util.HttpString;
-import io.undertow.util.Methods;
-import io.undertow.util.StatusCodes;
+import javax.naming.Binding;
+import javax.naming.CommunicationException;
+import javax.naming.Context;
+import javax.naming.Name;
+import javax.naming.NameClassPair;
+import javax.naming.NameNotFoundException;
+import javax.naming.NamingException;
+import javax.net.ssl.SSLContext;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.AccessController;
+import java.security.GeneralSecurityException;
+import java.security.PrivilegedAction;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.ServiceLoader;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+
+import static java.security.AccessController.doPrivileged;
+import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.EXCEPTION;
+import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_PORT;
+import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.naming.NamingConstants.HTTP_PORT;
+import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.NAMING_CONTEXT;
+import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
+import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
 
 /**
+ * Root naming context.
+ *
  * @author Stuart Douglas
  */
 public class HttpRootContext extends AbstractContext {
@@ -181,12 +180,18 @@ public class HttpRootContext extends AbstractContext {
         return new HttpRemoteContext(this, name.toString());
     }
 
-    private static MarshallingConfiguration createMarshallingConfig(URI uri) {
-        final MarshallingConfiguration marshallingConfiguration = newConfig();
+    private static Marshaller createMarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
         if (helper != null) {
-            marshallingConfiguration.setObjectResolver(helper.getObjectResolver(uri));
+            httpMarshallerFactory.createMarshaller(helper.getObjectResolver(uri));
         }
-        return marshallingConfiguration;
+        return httpMarshallerFactory.createMarshaller();
+    }
+
+    private static Unmarshaller createUnmarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
+        if (helper != null) {
+            httpMarshallerFactory.createUnmarshaller(helper.getObjectResolver(uri));
+        }
+        return httpMarshallerFactory.createUnmarshaller();
     }
 
     private <T, R> R performWithRetry(NamingOperation<T, R> function, ProviderEnvironment environment, RetryContext context, Name name, T param) throws NamingException {
@@ -308,8 +313,7 @@ public class HttpRootContext extends AbstractContext {
                     Object returned = null;
                     ClassLoader old = setContextClassLoader(tccl);
                     try {
-                        final MarshallingConfiguration marshallingConfiguration = createMarshallingConfig(providerUri);
-                        final Unmarshaller unmarshaller = targetContext.createUnmarshaller(marshallingConfiguration);
+                        final Unmarshaller unmarshaller = createUnmarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
                         unmarshaller.start(new InputStreamByteInput(input));
                         returned = unmarshaller.readObject();
                         // finish unmarshalling
@@ -422,7 +426,7 @@ public class HttpRootContext extends AbstractContext {
         }
         targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, output -> {
             if (object != null) {
-                Marshaller marshaller = targetContext.createMarshaller(createMarshallingConfig(providerUri));
+                Marshaller marshaller = createMarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
                 marshaller.start(Marshalling.createByteOutput(output));
                 marshaller.writeObject(object);
                 marshaller.finish();

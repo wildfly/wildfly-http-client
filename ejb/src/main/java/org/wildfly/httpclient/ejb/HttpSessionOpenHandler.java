@@ -18,36 +18,6 @@
 
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.common.MarshallingHelper.newUnmarshaller;
-import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
-import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
-
-import java.io.InputStream;
-import java.net.SocketAddress;
-import java.util.Base64;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import javax.ejb.NoSuchEJBException;
-import javax.transaction.SystemException;
-import javax.transaction.Transaction;
-import javax.transaction.xa.XAException;
-
-import org.jboss.ejb.client.EJBIdentifier;
-import org.jboss.ejb.client.SessionID;
-import org.jboss.ejb.server.Association;
-import org.jboss.ejb.server.SessionOpenRequest;
-import org.jboss.marshalling.InputStreamByteInput;
-import org.jboss.marshalling.MarshallingConfiguration;
-import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.common.annotation.NotNull;
-import org.wildfly.httpclient.common.ContentType;
-import org.wildfly.httpclient.common.ElytronIdentityHandler;
-import org.wildfly.httpclient.common.HttpServerHelper;
-import org.wildfly.security.auth.server.SecurityIdentity;
-import org.wildfly.transaction.client.ImportResult;
-import org.wildfly.transaction.client.LocalTransaction;
-import org.wildfly.transaction.client.LocalTransactionContext;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.Cookie;
 import io.undertow.server.handlers.CookieImpl;
@@ -55,8 +25,39 @@ import io.undertow.server.session.SecureRandomSessionIdGenerator;
 import io.undertow.server.session.SessionIdGenerator;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
+import org.jboss.ejb.client.EJBIdentifier;
+import org.jboss.ejb.client.SessionID;
+import org.jboss.ejb.server.Association;
+import org.jboss.ejb.server.SessionOpenRequest;
+import org.jboss.marshalling.InputStreamByteInput;
+import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.common.annotation.NotNull;
+import org.wildfly.httpclient.common.ContentType;
+import org.wildfly.httpclient.common.ElytronIdentityHandler;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpServerHelper;
+import org.wildfly.httpclient.common.HttpServiceConfig;
+import org.wildfly.security.auth.server.SecurityIdentity;
+import org.wildfly.transaction.client.ImportResult;
+import org.wildfly.transaction.client.LocalTransaction;
+import org.wildfly.transaction.client.LocalTransactionContext;
+
+import javax.ejb.NoSuchEJBException;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
+import javax.transaction.xa.XAException;
+import java.io.InputStream;
+import java.net.SocketAddress;
+import java.util.Base64;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+
+import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
+import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
 
 /**
+ * Http handler for open session requests.
+ *
  * @author Stuart Douglas
  */
 class HttpSessionOpenHandler extends RemoteHTTPHandler {
@@ -66,12 +67,14 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
     private final ExecutorService executorService;
     private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
     private final LocalTransactionContext localTransactionContext;
+    private final HttpServiceConfig httpServiceConfig;
 
-    HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
+    HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
         super(executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
+        this.httpServiceConfig = httpServiceConfig;
     }
 
     @Override
@@ -108,9 +111,8 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
         exchange.dispatch(executorService, () -> {
             final ReceivedTransaction txConfig;
             try {
-                final MarshallingConfiguration marshallingConfiguration = newConfig();
-                marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
-                Unmarshaller unmarshaller = newUnmarshaller(marshallingConfiguration);
+                final HttpMarshallerFactory httpUnmarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
+                final Unmarshaller unmarshaller = httpUnmarshallerFactory.createUnmarshaller(HttpProtocolV1ObjectTable.INSTANCE);
 
                 try (InputStream inputStream = exchange.getInputStream()) {
                     unmarshaller.start(new InputStreamByteInput(inputStream));
@@ -118,7 +120,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                     unmarshaller.finish();
                 }
             } catch (Exception e) {
-                HttpServerHelper.sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
                 return;
             }
             final Transaction transaction;
@@ -182,17 +184,17 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
                 @Override
                 public void writeException(@NotNull Exception exception) {
-                    HttpServerHelper.sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, exception);
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
                 }
 
                 @Override
                 public void writeNoSuchEJB() {
-                    HttpServerHelper.sendException(exchange, StatusCodes.NOT_FOUND, new NoSuchEJBException());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
                 }
 
                 @Override
                 public void writeWrongViewType() {
-                    HttpServerHelper.sendException(exchange, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
                 }
 
                 @Override
@@ -202,15 +204,11 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
                 @Override
                 public void writeNotStateful() {
-                    HttpServerHelper.sendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
+                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
                 }
 
                 @Override
                 public void convertToStateful(@NotNull SessionID sessionId) throws IllegalArgumentException, IllegalStateException {
-
-
-                    final MarshallingConfiguration marshallingConfiguration = newConfig();
-                    marshallingConfiguration.setObjectTable(HttpProtocolV1ObjectTable.INSTANCE);
 
                     Cookie sessionCookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
                     if (sessionCookie == null) {

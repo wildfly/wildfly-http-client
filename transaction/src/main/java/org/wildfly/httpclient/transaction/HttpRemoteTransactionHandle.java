@@ -18,24 +18,9 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.common.MarshallingHelper.newConfig;
-import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
-import javax.net.ssl.SSLContext;
-import javax.transaction.HeuristicMixedException;
-import javax.transaction.HeuristicRollbackException;
-import javax.transaction.RollbackException;
-import javax.transaction.Status;
-import javax.transaction.SystemException;
-import javax.transaction.xa.Xid;
-
+import io.undertow.client.ClientRequest;
+import io.undertow.util.Headers;
+import io.undertow.util.Methods;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -43,11 +28,26 @@ import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SimpleTransactionControl;
 import org.xnio.IoUtils;
 
-import io.undertow.client.ClientRequest;
-import io.undertow.util.Headers;
-import io.undertow.util.Methods;
+import javax.net.ssl.SSLContext;
+import javax.transaction.HeuristicMixedException;
+import javax.transaction.HeuristicRollbackException;
+import javax.transaction.RollbackException;
+import javax.transaction.Status;
+import javax.transaction.SystemException;
+import javax.transaction.xa.Xid;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 /**
+ * Represents a remote transaction that is managed over HTTP protocol.
+ *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 class HttpRemoteTransactionHandle implements SimpleTransactionControl {
@@ -92,7 +92,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
             cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.createMarshaller(newConfig());
+                Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
                 marshaller.start(Marshalling.createByteOutput(output));
                 marshaller.writeInt(id.getFormatId());
                 final byte[] gtid = id.getGlobalTransactionId();
@@ -161,7 +161,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
             cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.createMarshaller(newConfig());
+                Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
                 marshaller.start(Marshalling.createByteOutput(output));
                 marshaller.writeInt(id.getFormatId());
                 final byte[] gtid = id.getGlobalTransactionId();
