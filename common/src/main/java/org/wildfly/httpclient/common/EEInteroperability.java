@@ -57,6 +57,7 @@ import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTOR
  * @author Richard Opalka
  */
 class EEInteroperability {
+    // Batavia transformer sensible constant - it can start with either "javax." or "jakarta." if transformation was performed
     private static final String VARIABLE_CONSTANT = "javax.ejb.FAKE_STRING";
     private static final boolean JAKARTAEE_ENVIRONMENT = VARIABLE_CONSTANT.startsWith("jakarta");
 
