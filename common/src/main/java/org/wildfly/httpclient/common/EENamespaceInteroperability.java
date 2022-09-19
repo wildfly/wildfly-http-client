@@ -159,22 +159,23 @@ final class EENamespaceInteroperability {
 
         protected class ClientConnectionHolder extends org.wildfly.httpclient.common.HttpConnectionPool.ClientConnectionHolder {
             // keep track if the connection is new
-            private boolean newConnection = true;
-            // indicates this connection is Jakarta EE and, hence, no class name transformation is needed
-            private boolean jakartaEE;
+            private static final int NEW            = 1 << 0x10;
+            // indicates this connection belongs to Jakarta EE namespace on both ends and, hence, no class name transformation is needed
+            private static final int JAKARTA_EE_NS  = 1 << 0x11;
 
             private ClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
                 super (connection, uri, sslContext);
+                setFlags(NEW);
             }
 
             @Override
             public void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback) {
-                if (newConnection) {
+                if (hasFlags(NEW)) {
                     // new connection: send the EE namespace header once with interop value to see what will be the response
                     request.getRequestHeaders().put(EE_NAMESPACE, EE_INTEROP);
                     request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                    newConnection = false;
-                } else if (jakartaEE) {
+                    clearFlags(NEW);
+                } else if (hasFlags(JAKARTA_EE_NS)) {
                     // connection already set as Jakarta, default factory can be used for marshalling
                     // (no transformation needed)
                     request.getRequestHeaders().put(EE_NAMESPACE, JAKARTA_EE);
@@ -214,13 +215,13 @@ final class EENamespaceInteroperability {
                             // this method adds the factory to the request instead of response, this is more efficient
                             // we prevent adding when jakartaEE is already true and creating a new entry in the response attachment map
                             final ClientResponse response = result.getResponse();
-                            if (!jakartaEE) {
+                            if (!hasFlags(JAKARTA_EE_NS)) {
                                 // we need to check for EE namespace header for each non-Jakarta response
                                 final HeaderValues serverEENamespace = response.getResponseHeaders().get(EE_NAMESPACE);
                                 if (serverEENamespace != null && serverEENamespace.contains(JAKARTA_EE)) {
                                     // this indicates this is the first response server sends, mark the connection
                                     // as jakarta and be done with it
-                                    jakartaEE = true;
+                                    setFlags(JAKARTA_EE_NS);
                                     // overwrite previous attachment, no transformation is needed for this connection any more
                                     result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
                                 } // else: do nothing, the connection is not Jakarta and the marshalling factory provider is already interoperable
