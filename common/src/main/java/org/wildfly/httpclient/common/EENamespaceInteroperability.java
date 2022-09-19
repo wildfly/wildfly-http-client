@@ -56,7 +56,7 @@ import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTOR
  * @author Flavia Rainone
  * @author Richard Opalka
  */
-class EENamespaceInteroperability {
+final class EENamespaceInteroperability {
     // Batavia transformer sensible constant - it can start with either "javax." or "jakarta." if transformation was performed
     private static final String VARIABLE_CONSTANT = "javax.ejb.FAKE_STRING";
     private static final boolean JAKARTAEE_ENVIRONMENT = VARIABLE_CONSTANT.startsWith("jakarta");
@@ -64,9 +64,8 @@ class EENamespaceInteroperability {
     /**
      * Indicates if EE namespace interoperable mode is enabled.
      */
-    public static final boolean EE_NAMESPACE_INTEROPERABLE_MODE = Boolean.parseBoolean(
-            WildFlySecurityManager.getPropertyPrivileged("org.wildfly.ee.namespace.interop", "false"))
-            && JAKARTAEE_ENVIRONMENT;
+    static final boolean EE_NAMESPACE_INTEROPERABLE_MODE = JAKARTAEE_ENVIRONMENT && Boolean.parseBoolean(
+            WildFlySecurityManager.getPropertyPrivileged("org.wildfly.ee.namespace.interop", "false"));
 
     // header indicating the ee-namespace mode that is being used by the request/response sender
     private static final HttpString EE_NAMESPACE = new HttpString("x-wf-ee-ns");
@@ -87,6 +86,8 @@ class EENamespaceInteroperability {
         }
     }
 
+    private EENamespaceInteroperability() {}
+
     /**
      * Wraps the HTTP server handler into an EE namespace interoperable handler. Such handler implements the
      * EE namespace interoperability at the server side before delegating to the wrapped {@code httpHandler}
@@ -94,7 +95,7 @@ class EENamespaceInteroperability {
      * @param httpHandler the handler to be wrapped
      * @return handler the ee namespace interoperability handler
      */
-    public static HttpHandler createInteroperabilityHandler(HttpHandler httpHandler) {
+    static HttpHandler createInteroperabilityHandler(HttpHandler httpHandler) {
         return new EENamespaceInteroperabilityHandler(httpHandler);
     }
 
@@ -106,7 +107,7 @@ class EENamespaceInteroperability {
      * @param httpHandler the handler to be wrapped
      * @return handler the ee namespace partial interoperability handler
      */
-    public static HttpHandler createPartialInteroperabilityHandler(HttpHandler httpHandler) {
+    static HttpHandler createPartialInteroperabilityHandler(HttpHandler httpHandler) {
         return new EENamespacePartialInteroperabilityHandler(httpHandler);
     }
 
@@ -117,7 +118,7 @@ class EENamespaceInteroperability {
      * @return the HTTPMarshallerFactoryProvider. All marshalling and unmarshalling done at both server
      * and client side have to be done through a factory provided by this object.
      */
-    public static HttpMarshallerFactoryProvider getHttpMarshallerFactoryProvider() {
+    static HttpMarshallerFactoryProvider getHttpMarshallerFactoryProvider() {
         return new HttpMarshallerFactoryProvider() {
             @Override
             public HttpMarshallerFactory getMarshallerFactory(AbstractAttachable attachable) {
@@ -137,10 +138,8 @@ class EENamespaceInteroperability {
      *
      * @return the {@link HttpConnectionPoolFactory}.
      */
-    public static HttpConnectionPoolFactory getHttpConnectionPoolFactory() {
-        return ((maxConnections, maxStreamsPerConnection, worker, byteBufferPool, options, hostPool, connectionIdleTimeout) -> {
-            return new HttpConnectionPool(maxConnections, maxStreamsPerConnection, worker, byteBufferPool, options, hostPool, connectionIdleTimeout);
-        });
+    static HttpConnectionPoolFactory getHttpConnectionPoolFactory() {
+        return (HttpConnectionPool::new);
     }
 
     /*
@@ -215,9 +214,7 @@ class EENamespaceInteroperability {
                             // this method adds the factory to the request instead of response, this is more efficient
                             // we prevent adding when jakartaEE is already true and creating a new entry in the response attachment map
                             final ClientResponse response = result.getResponse();
-                            if (jakartaEE) {
-                                // do nothing, request already contains the default marshalling factory
-                            } else {
+                            if (!jakartaEE) {
                                 // we need to check for EE namespace header for each non-Jakarta response
                                 final HeaderValues serverEENamespace = response.getResponseHeaders().get(EE_NAMESPACE);
                                 if (serverEENamespace != null && serverEENamespace.contains(JAKARTA_EE)) {
@@ -226,11 +223,8 @@ class EENamespaceInteroperability {
                                     jakartaEE = true;
                                     // overwrite previous attachment, no transformation is needed for this connection any more
                                     result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                                } else {
-                                    // do nothing, the connection is not Jakarta and the
-                                    // marshalling factory provider is already interoperable
-                                }
-                            }
+                                } // else: do nothing, the connection is not Jakarta and the marshalling factory provider is already interoperable
+                            } // else: do nothing, request already contains the default marshalling factory
                             responseListener.completed(result);
                         }
 

@@ -37,7 +37,7 @@ import java.io.IOException;
  * @author Richard Opalka
  * @author Flavia Rainone
  */
-public class HttpMarshallerFactory {
+public final class HttpMarshallerFactory {
     /**
      * The default HTTP Marshaller factory, creates Marshallers using a simple {@link MarshallingConfiguration}
      * with {@link MarshallingConfiguration#setVersion(int) version} {@code 2}.
@@ -52,7 +52,7 @@ public class HttpMarshallerFactory {
     // class name transformer to be used by this factory
     private final ClassNameTransformer classNameTransformer;
 
-    public HttpMarshallerFactory(ClassNameTransformer classNameTransformer) {
+    HttpMarshallerFactory(ClassNameTransformer classNameTransformer) {
         this.classNameTransformer = classNameTransformer;
         this.defaultConfiguration = createMarshallingConfiguration();
         this.defaultConfiguration.setClassNameTransformer(classNameTransformer);
