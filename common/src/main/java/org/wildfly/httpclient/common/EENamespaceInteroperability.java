@@ -159,9 +159,9 @@ final class EENamespaceInteroperability {
 
         protected class ClientConnectionHolder extends org.wildfly.httpclient.common.HttpConnectionPool.ClientConnectionHolder {
             // keep track if the connection is new
-            private static final int NEW            = 1 << 0x10;
+            private static final int NEW            = 1 << 2;
             // indicates this connection belongs to Jakarta EE namespace on both ends and, hence, no class name transformation is needed
-            private static final int JAKARTA_EE_NS  = 1 << 0x11;
+            private static final int JAKARTA_EE_NS  = 1 << 3;
 
             private ClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
                 super (connection, uri, sslContext);

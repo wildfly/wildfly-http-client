@@ -231,8 +231,7 @@ public class HttpConnectionPool implements Closeable {
         // keep track if the connection is in use (!IN_USE = idle)
         private static final int IN_USE  = 1;
         // indicate this connection is closed
-        private static final int CLOSED  = 1 << 0x1;
-
+        private static final int CLOSED  = 1 << 1;
 
         private final Runnable timeoutTask = new Runnable() {
             @Override
