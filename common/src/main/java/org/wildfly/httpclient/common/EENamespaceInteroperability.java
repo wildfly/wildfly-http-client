@@ -94,8 +94,20 @@ class EENamespaceInteroperability {
      * @param httpHandler the handler to be wrapped
      * @return handler the ee namespace interoperability handler
      */
-    public static HttpHandler wrap(HttpHandler httpHandler) {
+    public static HttpHandler createInteroperabilityHandler(HttpHandler httpHandler) {
         return new EENamespaceInteroperabilityHandler(httpHandler);
+    }
+
+    /**
+     * Wraps the HTTP server handler into a partial EE namespace interoperable handler. This handler allows non EE namespace
+     * interoperable servers to respond requests from EE namespace interoperable clients, without all the performance penalty
+     * paid by interoperable servers.
+     *
+     * @param httpHandler the handler to be wrapped
+     * @return handler the ee namespace partial interoperability handler
+     */
+    public static HttpHandler createPartialInteroperabilityHandler(HttpHandler httpHandler) {
+        return new EENamespacePartialInteroperabilityHandler(httpHandler);
     }
 
     /**
@@ -334,6 +346,29 @@ class EENamespaceInteroperability {
                 exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
                 exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
             }
+            next.handleRequest(exchange);
+        }
+    }
+
+    // handler that is able to respond to interoperable requests, for servers that are not running on interoperable mode
+    private static class EENamespacePartialInteroperabilityHandler implements HttpHandler {
+
+        private final HttpHandler next;
+
+        EENamespacePartialInteroperabilityHandler(HttpHandler next) {
+            this.next = next;
+        }
+
+        @Override
+        public void handleRequest(HttpServerExchange exchange) throws Exception {
+            if (exchange.getRequestHeaders().contains(EE_NAMESPACE) && exchange.getRequestHeaders().getFirst(EE_NAMESPACE).equals(EE_INTEROP)) {
+                exchange.getResponseHeaders().add(EE_NAMESPACE, JAKARTA_EE);
+                // transformation is required for unmarshalling because client is on EE namespace interoperable mode
+                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                // no transformation required for marshalling, server is sending response in Jakarta namespace
+                exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, HttpMarshallerFactory.DEFAULT_FACTORY);
+            }
+            // this is not fully interoperable, so we do nothing else, just handle the request
             next.handleRequest(exchange);
         }
     }

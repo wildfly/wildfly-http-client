@@ -22,8 +22,6 @@ import io.undertow.server.HttpServerExchange;
 
 import java.util.function.Function;
 
-import static org.wildfly.httpclient.common.EENamespaceInteroperability.EE_NAMESPACE_INTEROPERABLE_MODE;
-
 /**
  * Mode configuration for http services.
  * <p>
@@ -35,14 +33,15 @@ import static org.wildfly.httpclient.common.EENamespaceInteroperability.EE_NAMES
 public enum HttpServiceConfig {
 
     /**
-     * Default configuration.
+     * Default configuration. Used by non-EE namespace interoperable servers, is more performant but still allows serving
+     * requests from EE namespace interoperable clients.
      */
-    DEFAULT (Function.identity(), HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider()),
+    DEFAULT (EENamespaceInteroperability::createPartialInteroperabilityHandler, HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider()),
     /**
      * Configuration for running the HTTP remoting layer on EE namespace interoperable mode, where this
      * Java instance can interoperate with Javax EE clients and servers.
      */
-    EE_NAMESPACE_INTEROPERABLE_MODE(EENamespaceInteroperability::wrap, EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
+    EE_NAMESPACE_INTEROPERABLE_MODE(EENamespaceInteroperability::createInteroperabilityHandler, EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
 
     /**
      * Returns the right configuration according to the value of
