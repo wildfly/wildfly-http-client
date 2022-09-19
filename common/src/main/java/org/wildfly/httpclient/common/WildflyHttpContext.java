@@ -172,9 +172,9 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
 
             final HttpConnectionPoolFactory httpConnectionPoolFactory;
             final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
-            if (EEInteroperability.EE_INTEROPERABLE_MODE) {
-                httpConnectionPoolFactory = EEInteroperability.getHttpConnectionPoolFactory();
-                httpMarshallerFactoryProvider = EEInteroperability.getHttpMarshallerFactoryProvider();
+            if (EENamespaceInteroperability.EE_NAMESPACE_INTEROPERABLE_MODE) {
+                httpConnectionPoolFactory = EENamespaceInteroperability.getHttpConnectionPoolFactory();
+                httpMarshallerFactoryProvider = EENamespaceInteroperability.getHttpMarshallerFactoryProvider();
             } else {
                 httpConnectionPoolFactory = HttpConnectionPoolFactory.getDefault();
                 httpMarshallerFactoryProvider = HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider();
