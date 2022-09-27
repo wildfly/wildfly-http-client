@@ -26,6 +26,7 @@ import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
+import static org.wildfly.httpclient.common.Version.VERSION_1;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
@@ -53,7 +54,7 @@ class HttpEJBInvocationBuilder {
     private Method method;
     private InvocationType invocationType;
     private String invocationId;
-    private int version = 1;
+    private String version = VERSION_1.getVersion();
     private boolean cancelIfRunning;
 
     public String getAppName() {
@@ -137,11 +138,11 @@ class HttpEJBInvocationBuilder {
         return this;
     }
 
-    public int getVersion() {
+    public String getVersion() {
         return version;
     }
 
-    public HttpEJBInvocationBuilder setVersion(int version) {
+    public HttpEJBInvocationBuilder setVersion(String version) {
         this.version = version;
         return this;
     }
@@ -223,7 +224,7 @@ class HttpEJBInvocationBuilder {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
-        sb.append("/ejb/v");
+        sb.append("/ejb/");
         sb.append(version);
         sb.append("/");
         sb.append(type);

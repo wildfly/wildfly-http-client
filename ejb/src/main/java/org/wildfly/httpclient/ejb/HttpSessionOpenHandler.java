@@ -37,6 +37,7 @@ import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -56,12 +57,12 @@ import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
 import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
 
 /**
- * Http handler for open session requests.
+ * A versioned Http handler for EJB client open session requests.
  *
  * @author Stuart Douglas
+ * @author <a href="rachmato@redhat.com">Richard Achmatowicz</a>
  */
 class HttpSessionOpenHandler extends RemoteHTTPHandler {
-
 
     private final Association association;
     private final ExecutorService executorService;
@@ -69,8 +70,8 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
     private final LocalTransactionContext localTransactionContext;
     private final HttpServiceConfig httpServiceConfig;
 
-    HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
-        super(executorService);
+    HttpSessionOpenHandler(Version version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
+        super(version, executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
@@ -79,6 +80,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
+
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
         if (contentType == null || contentType.getVersion() != 1 || !SESSION_OPEN.getType().equals(contentType.getType())) {
@@ -87,11 +89,11 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
             return;
         }
         String relativePath = exchange.getRelativePath();
-        if(relativePath.startsWith("/")) {
+        if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
         }
         String[] parts = relativePath.split("/");
-        if(parts.length != 4) {
+        if (parts.length != 4) {
             exchange.setStatusCode(StatusCodes.NOT_FOUND);
             return;
         }
@@ -105,7 +107,6 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
         if (cookie != null) {
             sessionAffinity = cookie.getValue();
         }
-
 
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
         exchange.dispatch(executorService, () -> {
@@ -177,7 +178,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                     return ejbIdentifier;
                 }
 
-//                @Override
+                //                @Override
                 public SecurityIdentity getSecurityIdentity() {
                     return exchange.getAttachment(ElytronIdentityHandler.IDENTITY_KEY);
                 }
