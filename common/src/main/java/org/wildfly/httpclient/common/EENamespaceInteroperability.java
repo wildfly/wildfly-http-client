@@ -27,10 +27,10 @@ import io.undertow.client.PushCallback;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.handlers.PathHandler;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.AttachmentList;
-import io.undertow.util.HeaderValues;
 import io.undertow.util.HttpString;
 import org.wildfly.security.manager.WildFlySecurityManager;
 import org.xnio.OptionMap;
@@ -45,6 +45,8 @@ import java.util.List;
 
 import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
+import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 
 /**
  * EE namespace interoperability implementation for allowing Jakarta EE namespace servers and clients communication with
@@ -67,12 +69,10 @@ final class EENamespaceInteroperability {
     static final boolean EE_NAMESPACE_INTEROPERABLE_MODE = JAKARTAEE_ENVIRONMENT && Boolean.parseBoolean(
             WildFlySecurityManager.getPropertyPrivileged("org.wildfly.ee.namespace.interop", "false"));
 
-    // header indicating the ee-namespace mode that is being used by the request/response sender
-    private static final HttpString EE_NAMESPACE = new HttpString("x-wf-ee-ns");
-    // value for EE_NAMESPACE header: used only when both ends use EE jakarta namespace
-    private static final String JAKARTA_EE = "jakarta";
-    // value for EE_NAMESPACE header: used to indicate that client uses EE jakarta namespace and is on EE namespace interoperability mode
-    private static final String EE_INTEROP = "interop";
+    // header indicating the protocol version mode that is being used by the request/response sender
+    private static final HttpString PROTOCOL_VERSION = new HttpString("x-wf-version");
+    // value for PROTOCOL_VERSION header: used to handshake a higher version, only when both ends use EE jakarta namespace
+    private static final String LATEST_VERSION = String.valueOf(Protocol.LATEST);
     // key used to attach http marshaller factory to a client request / server exchange
     private static final AttachmentKey<HttpMarshallerFactory> HTTP_MARSHALLER_FACTORY_KEY = AttachmentKey.create(HttpMarshallerFactory.class);
     // key used to attach an http unmarshaller factory to a server exchange
@@ -96,19 +96,14 @@ final class EENamespaceInteroperability {
      * @return handler the ee namespace interoperability handler
      */
     static HttpHandler createInteroperabilityHandler(HttpHandler httpHandler) {
-        return new EENamespaceInteroperabilityHandler(httpHandler);
+        return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(httpHandler), new JakartaNamespaceHandler(httpHandler));
     }
 
-    /**
-     * Wraps the HTTP server handler into a partial EE namespace interoperable handler. This handler allows non EE namespace
-     * interoperable servers to respond requests from EE namespace interoperable clients, without all the performance penalty
-     * paid by interoperable servers.
-     *
-     * @param httpHandler the handler to be wrapped
-     * @return handler the ee namespace partial interoperability handler
-     */
-    static HttpHandler createPartialInteroperabilityHandler(HttpHandler httpHandler) {
-        return new EENamespacePartialInteroperabilityHandler(httpHandler);
+    static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
+        final PathHandler versionPathHandler = new PathHandler();
+        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
+        versionPathHandler.addPrefixPath(VERSION_TWO_PATH, latestProtocolHandler);
+        return versionPathHandler;
     }
 
     /**
@@ -147,9 +142,15 @@ final class EENamespaceInteroperability {
      */
 
     private static class HttpConnectionPool extends org.wildfly.httpclient.common.HttpConnectionPool {
+        private volatile int protocolVersion = -1;
 
         protected HttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout) {
             super(maxConnections, maxStreamsPerConnection, worker, byteBufferPool, options, hostPool, connectionIdleTimeout);
+        }
+
+        @Override
+        int getProtocolVersion() {
+            return protocolVersion == -1? 1 : protocolVersion;
         }
 
         @Override
@@ -158,32 +159,29 @@ final class EENamespaceInteroperability {
         }
 
         protected class ClientConnectionHolder extends org.wildfly.httpclient.common.HttpConnectionPool.ClientConnectionHolder {
-            // keep track if the connection is new
-            private static final int NEW            = 1 << 2;
-            // indicates this connection belongs to Jakarta EE namespace on both ends and, hence, no class name transformation is needed
-            private static final int JAKARTA_EE_NS  = 1 << 3;
 
             private ClientConnectionHolder(ClientConnection connection, URI uri, SSLContext sslContext) {
                 super (connection, uri, sslContext);
-                setFlags(NEW);
             }
 
             @Override
             public void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback) {
-                if (hasFlags(NEW)) {
-                    // new connection: send the EE namespace header once with interop value to see what will be the response
-                    request.getRequestHeaders().put(EE_NAMESPACE, EE_INTEROP);
-                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                    clearFlags(NEW);
-                } else if (hasFlags(JAKARTA_EE_NS)) {
-                    // connection already set as Jakarta, default factory can be used for marshalling
-                    // (no transformation needed)
-                    request.getRequestHeaders().put(EE_NAMESPACE, JAKARTA_EE);
-                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                } else {
-                    // connection is Javax EE, the only remaining possibility here
-                    // we need to transform class names Javax<->Jakarta
-                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                switch (protocolVersion) {
+                    case -1:
+                        // new connection pool: send the protocol version header once with LATEST_VERSION value to see what will be the response
+                        request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
+                        request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                        break;
+                    case Protocol.JAVAEE_PROTOCOL_VERSION:
+                        // connection is Javax EE, so we need to transform class names Javax<->Jakarta
+                        request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                        break;
+                    case org.wildfly.httpclient.common.Protocol.JAKARTAEE_PROTOCOL_VERSION:
+                    default:
+                        // connection already set as Jakarta namespace, default factory can be used for marshalling
+                        // (no transformation needed)
+                        request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
+                        request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
                 }
                 super.sendRequest(request, new ClientCallback<ClientExchange>() {
                     @Override
@@ -215,16 +213,18 @@ final class EENamespaceInteroperability {
                             // this method adds the factory to the request instead of response, this is more efficient
                             // we prevent adding when jakartaEE is already true and creating a new entry in the response attachment map
                             final ClientResponse response = result.getResponse();
-                            if (!hasFlags(JAKARTA_EE_NS)) {
-                                // we need to check for EE namespace header for each non-Jakarta response
-                                final HeaderValues serverEENamespace = response.getResponseHeaders().get(EE_NAMESPACE);
-                                if (serverEENamespace != null && serverEENamespace.contains(JAKARTA_EE)) {
-                                    // this indicates this is the first response server sends, mark the connection
-                                    // as jakarta and be done with it
-                                    setFlags(JAKARTA_EE_NS);
+                            if (protocolVersion == -1) {
+                                // we need to check for protocol version header to define the protocol version of the pool
+                                if (LATEST_VERSION.equals(response.getResponseHeaders().getFirst(PROTOCOL_VERSION))) {
+                                    // this indicates this is the first response server sends, set the protocol to 2
+                                    protocolVersion = Protocol.LATEST;
                                     // overwrite previous attachment, no transformation is needed for this connection any more
                                     result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                                } // else: do nothing, the connection is not Jakarta and the marshalling factory provider is already interoperable
+                                } else {
+                                    protocolVersion = Protocol.JAVAEE_PROTOCOL_VERSION;
+                                    //regarding marsh. factory key, do nothing, the connection is not Jakarta and the marshalling factory provider is already interoperable
+                                }
+
                             } // else: do nothing, request already contains the default marshalling factory
                             responseListener.completed(result);
                         }
@@ -318,21 +318,13 @@ final class EENamespaceInteroperability {
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
-            if (exchange.getRequestHeaders().contains(EE_NAMESPACE)) {
-                switch (exchange.getRequestHeaders().getFirst(EE_NAMESPACE)) {
-                    case EE_INTEROP:
-                        exchange.getResponseHeaders().add(EE_NAMESPACE, JAKARTA_EE);
-                        // transformation is required for unmarshalling because client is on EE namespace interoperable mode
-                        exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                        // no transformation required for marshalling, server is sending response in Jakarta
-                        exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                        break;
-                    case JAKARTA_EE:
-                        // no transformation is needed, this is a Jakarta connection at both ends
-                        exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                        exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                        break;
-                }
+            if (LATEST_VERSION.equals(exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION))) {
+                // respond that this end also supports version two
+                exchange.getResponseHeaders().add(PROTOCOL_VERSION, LATEST_VERSION);
+                // transformation is required for unmarshalling because client is on EE namespace interoperable mode
+                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                // no transformation required for marshalling, server is sending response in Jakarta
+                exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
             } else {
                 // transformation is required for unmarshalling request and marshalling response,
                 // because server is interoperable mode and the lack of a header indicates this is
@@ -345,25 +337,20 @@ final class EENamespaceInteroperability {
         }
     }
 
-    // handler that is able to respond to interoperable requests, for servers that are not running on interoperable mode
-    private static class EENamespacePartialInteroperabilityHandler implements HttpHandler {
+    private static class JakartaNamespaceHandler implements HttpHandler {
 
         private final HttpHandler next;
 
-        EENamespacePartialInteroperabilityHandler(HttpHandler next) {
+        JakartaNamespaceHandler(HttpHandler next) {
             this.next = next;
         }
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
-            if (exchange.getRequestHeaders().contains(EE_NAMESPACE) && exchange.getRequestHeaders().getFirst(EE_NAMESPACE).equals(EE_INTEROP)) {
-                exchange.getResponseHeaders().add(EE_NAMESPACE, JAKARTA_EE);
-                // transformation is required for unmarshalling because client is on EE namespace interoperable mode
-                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                // no transformation required for marshalling, server is sending response in Jakarta namespace
-                exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, HttpMarshallerFactory.DEFAULT_FACTORY);
-            }
-            // this is not fully interoperable, so we do nothing else, just handle the request
+            // no transformation required whatsoever, just make sure we have a factory set
+            // or else we will see a NPE when trying to use those attachments
+            exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
+            exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
             next.handleRequest(exchange);
         }
     }

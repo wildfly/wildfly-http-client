@@ -38,10 +38,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_CANCEL_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_DISCOVER_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_INVOKE_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.V1_EJB_OPEN_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 
 /**
  * HTTP service that handles EJB calls.
@@ -80,12 +80,12 @@ public class EjbHttpService {
 
     public HttpHandler createHttpHandler() {
         PathHandler pathHandler = new PathHandler();
-        pathHandler.addPrefixPath(V1_EJB_INVOKE_PATH, new AllowedMethodsHandler(
+        pathHandler.addPrefixPath(EJB_INVOKE_PATH, new AllowedMethodsHandler(
                 new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig), Methods.POST))
-                .addPrefixPath(V1_EJB_OPEN_PATH, new AllowedMethodsHandler(
+                .addPrefixPath(EJB_OPEN_PATH, new AllowedMethodsHandler(
                         new HttpSessionOpenHandler(association, executorService, localTransactionContext, httpServiceConfig), Methods.POST))
-                .addPrefixPath(V1_EJB_CANCEL_PATH, new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
-                .addPrefixPath(V1_EJB_DISCOVER_PATH, new AllowedMethodsHandler(
+                .addPrefixPath(EJB_CANCEL_PATH, new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
+                .addPrefixPath(EJB_DISCOVER_PATH, new AllowedMethodsHandler(
                         new HttpDiscoveryHandler(executorService, association, httpServiceConfig), Methods.GET));
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);

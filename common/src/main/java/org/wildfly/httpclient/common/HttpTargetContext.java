@@ -112,6 +112,14 @@ public class HttpTargetContext extends AbstractAttachable {
         }
     }
 
+    /**
+     * Returns the protocol version to be used by this target context.
+     * @return the protocol version
+     */
+    public int getProtocolVersion() {
+        return connectionPool.getProtocolVersion();
+    }
+
     private void acquireAffinitiy(AuthenticationConfiguration authenticationConfiguration) {
         if (affinityRequestSent.compareAndSet(false, true)) {
             acquireSessionAffinity(sessionAffinityLatch, authenticationConfiguration);

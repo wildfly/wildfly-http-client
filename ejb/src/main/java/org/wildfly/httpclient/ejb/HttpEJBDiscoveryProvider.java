@@ -53,8 +53,10 @@ import java.util.stream.Collectors;
 
 import static java.security.AccessController.doPrivileged;
 import static org.jboss.ejb.client.EJBClientContext.getCurrent;
-import static org.wildfly.httpclient.ejb.EjbConstants.DISCOVERY_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.DISCOVERY_PATH_PREFIX;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
 import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_SCHEME;
@@ -160,7 +162,8 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(newUri, authenticationContext, -1, "ejb", "jboss");
 
         ClientRequest request = new ClientRequest()
-                .setPath(targetContext.getUri().getPath() + DISCOVERY_PATH)
+                .setPath(targetContext.getUri().getPath() + DISCOVERY_PATH_PREFIX + VERSION_PATH +
+                        targetContext.getProtocolVersion() + EJB_DISCOVER_PATH)
                 .setMethod(Methods.GET);
         request.getRequestHeaders().add(Headers.ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
 

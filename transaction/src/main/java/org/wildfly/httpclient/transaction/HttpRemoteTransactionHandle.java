@@ -39,6 +39,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
 import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
@@ -88,7 +89,8 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             statusRef.set(Status.STATUS_COMMITTING);
             ClientRequest cr = new ClientRequest()
                     .setMethod(Methods.POST)
-                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + UT_COMMIT_PATH);
+                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH +
+                            targetContext.getProtocolVersion() + UT_COMMIT_PATH);
             cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
             cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
@@ -157,7 +159,8 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             statusRef.set(Status.STATUS_COMMITTING);
             ClientRequest cr = new ClientRequest()
                     .setMethod(Methods.POST)
-                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + UT_ROLLBACK_PATH);
+                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion()
+                            + UT_ROLLBACK_PATH);
             cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
             cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {

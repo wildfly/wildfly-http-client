@@ -47,12 +47,7 @@ final class EjbConstants {
     static final String EJB_INVOKE_PATH = "/invoke";
     static final String EJB_OPEN_PATH = "/open";
 
-    static final String V1_EJB_CANCEL_PATH = "/v1" + EJB_CANCEL_PATH;
-    static final String V1_EJB_DISCOVER_PATH = "/v1" + EJB_DISCOVER_PATH;
-    static final String V1_EJB_INVOKE_PATH = "/v1" + EJB_INVOKE_PATH;
-    static final String V1_EJB_OPEN_PATH = "/v1" + EJB_OPEN_PATH;
-
-    static final String DISCOVERY_PATH =  "/ejb" + V1_EJB_DISCOVER_PATH;
+    static final String DISCOVERY_PATH_PREFIX =  "/ejb";
 
     // cookies
     static final String JSESSIONID_COOKIE_NAME = "JSESSIONID";
