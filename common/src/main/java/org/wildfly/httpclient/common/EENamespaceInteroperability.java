@@ -27,6 +27,7 @@ import io.undertow.client.PushCallback;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.server.handlers.PathHandler;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.AttachmentList;
@@ -44,6 +45,8 @@ import java.util.List;
 
 import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
+import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 
 /**
  * EE namespace interoperability implementation for allowing Jakarta EE namespace servers and clients communication with
@@ -93,7 +96,7 @@ final class EENamespaceInteroperability {
      * @return handler the ee namespace interoperability handler
      */
     static HttpHandler createInteroperabilityHandler(HttpHandler httpHandler) {
-        return new EENamespaceInteroperabilityHandler(httpHandler);
+        return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(httpHandler), new JakartaNamespaceHandler(httpHandler));
     }
 
     /**
@@ -105,7 +108,14 @@ final class EENamespaceInteroperability {
      * @return handler the ee namespace partial interoperability handler
      */
     static HttpHandler createPartialInteroperabilityHandler(HttpHandler httpHandler) {
-        return new EENamespacePartialInteroperabilityHandler(httpHandler);
+        return createProtocolVersionHttpHandler(new EENamespacePartialInteroperabilityHandler(httpHandler), httpHandler);
+    }
+
+    static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
+        final PathHandler versionPathHandler = new PathHandler();
+        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
+        versionPathHandler.addPrefixPath(VERSION_TWO_PATH, latestProtocolHandler);
+        return versionPathHandler;
     }
 
     /**
@@ -358,6 +368,24 @@ final class EENamespaceInteroperability {
                 exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, HttpMarshallerFactory.DEFAULT_FACTORY);
             }
             // this is not fully interoperable, so we do nothing else, just handle the request
+            next.handleRequest(exchange);
+        }
+    }
+
+    private static class JakartaNamespaceHandler implements HttpHandler {
+
+        private final HttpHandler next;
+
+        JakartaNamespaceHandler(HttpHandler next) {
+            this.next = next;
+        }
+
+        @Override
+        public void handleRequest(HttpServerExchange exchange) throws Exception {
+            // no transformation required whatsoever, just make sure we have a factory set
+            // or else we will see a NPE when trying to use those attachments
+            exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
+            exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
             next.handleRequest(exchange);
         }
     }

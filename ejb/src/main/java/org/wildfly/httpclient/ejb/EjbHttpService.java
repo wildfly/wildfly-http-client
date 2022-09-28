@@ -38,8 +38,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
-import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
-import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
@@ -92,10 +90,7 @@ public class EjbHttpService {
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
         requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
-        PathHandler versionPathHandler = new PathHandler();
-        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, httpServiceConfig.wrap(requestEncodingHandler));
-        versionPathHandler.addPrefixPath(VERSION_TWO_PATH, requestEncodingHandler);
-        return versionPathHandler;
+        return httpServiceConfig.wrap(requestEncodingHandler);
     }
 
 }

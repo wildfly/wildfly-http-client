@@ -29,9 +29,9 @@ public class Protocol {
     // the first version compatible with jakarta ee namespace
     static final int JAKARTAEE_PROTOCOL_VERSION = 2;
     // version one path
-    public static final String VERSION_ONE_PATH = "/v1";
+    static final String VERSION_ONE_PATH = "/v1";
     // version two path
-    public static final String VERSION_TWO_PATH = "/v2";
+    static final String VERSION_TWO_PATH = "/v2";
     // version path prefix
     public static final String VERSION_PATH="/v";
     // latest protocol version
