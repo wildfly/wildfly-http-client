@@ -33,26 +33,16 @@ import java.util.function.Function;
 public enum HttpServiceConfig {
 
     /**
-     * Default configuration. Used by non-EE namespace interoperable servers, is more performant but still allows serving
-     * requests from EE namespace interoperable clients.
+     * Default configuration. Used by both EE namespace interoperable and non-interoperable servers
      */
-    DEFAULT (EENamespaceInteroperability::createPartialInteroperabilityHandler, HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider()),
-    /**
-     * Configuration for running the HTTP remoting layer on EE namespace interoperable mode, where this
-     * Java instance can interoperate with Javax EE clients and servers.
-     */
-    EE_NAMESPACE_INTEROPERABLE_MODE(EENamespaceInteroperability::createInteroperabilityHandler, EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
+    DEFAULT (EENamespaceInteroperability::createInteroperabilityHandler, EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
 
     /**
-     * Returns the right configuration according to the value of
-     * {@link EENamespaceInteroperability#EE_NAMESPACE_INTEROPERABLE_MODE}.
+     * Returns the default configuration.
      *
      * @return the configuration for http services
      */
     public static HttpServiceConfig getInstance() {
-        if (EENamespaceInteroperability.EE_NAMESPACE_INTEROPERABLE_MODE) {
-            return EE_NAMESPACE_INTEROPERABLE_MODE;
-        }
         return DEFAULT;
     }
 

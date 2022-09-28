@@ -99,18 +99,6 @@ final class EENamespaceInteroperability {
         return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(httpHandler), new JakartaNamespaceHandler(httpHandler));
     }
 
-    /**
-     * Wraps the HTTP server handler into a partial EE namespace interoperable handler. This handler allows non EE namespace
-     * interoperable servers to respond requests from EE namespace interoperable clients, without all the performance penalty
-     * paid by interoperable servers.
-     *
-     * @param httpHandler the handler to be wrapped
-     * @return handler the ee namespace partial interoperability handler
-     */
-    static HttpHandler createPartialInteroperabilityHandler(HttpHandler httpHandler) {
-        return createProtocolVersionHttpHandler(new EENamespacePartialInteroperabilityHandler(httpHandler), httpHandler);
-    }
-
     static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
         final PathHandler versionPathHandler = new PathHandler();
         versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
@@ -345,29 +333,6 @@ final class EENamespaceInteroperability {
                 exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
                 exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
             }
-            next.handleRequest(exchange);
-        }
-    }
-
-    // handler that is able to respond to interoperable requests, for servers that are not running on interoperable mode
-    private static class EENamespacePartialInteroperabilityHandler implements HttpHandler {
-
-        private final HttpHandler next;
-
-        EENamespacePartialInteroperabilityHandler(HttpHandler next) {
-            this.next = next;
-        }
-
-        @Override
-        public void handleRequest(HttpServerExchange exchange) throws Exception {
-            if (LATEST_VERSION.equals(exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION))) {
-                exchange.getResponseHeaders().add(PROTOCOL_VERSION, LATEST_VERSION);
-                // transformation is required for unmarshalling because client is on EE namespace interoperable mode
-                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                // no transformation required for marshalling, server is sending response in Jakarta namespace
-                exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, HttpMarshallerFactory.DEFAULT_FACTORY);
-            }
-            // this is not fully interoperable, so we do nothing else, just handle the request
             next.handleRequest(exchange);
         }
     }
