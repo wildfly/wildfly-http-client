@@ -22,6 +22,7 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.BlockingHandler;
+import io.undertow.server.handlers.PathHandler;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
@@ -48,6 +49,8 @@ import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.function.Function;
 
+import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
@@ -94,7 +97,11 @@ public class HttpRemoteTransactionService {
         routingHandler.add(Methods.POST, XA_PREP_PATH, new XAPrepHandler());
         routingHandler.add(Methods.POST, XA_ROLLBACK_PATH, new XARollbackHandler());
         routingHandler.add(Methods.GET, XA_RECOVER_PATH, new XARecoveryHandler());
-        return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
+        final HttpHandler remoteTxnHandler = new BlockingHandler(new ElytronIdentityHandler(routingHandler));
+        final PathHandler versionPathHandler = new PathHandler();
+        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, httpServiceConfig.wrap(remoteTxnHandler));
+        versionPathHandler.addPrefixPath(VERSION_TWO_PATH, remoteTxnHandler);
+        return versionPathHandler;
     }
 
     abstract class AbstractTransactionHandler implements HttpHandler {

@@ -37,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.READ_ONLY;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
@@ -72,13 +73,13 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void commit(boolean onePhase) throws XAException {
-        String operationPath = TXN_CONTEXT + XA_COMMIT_PATH + (onePhase ? "?opc=true" : "");
+        String operationPath = XA_COMMIT_PATH + (onePhase ? "?opc=true" : "");
         processOperation(operationPath);
     }
 
     @Override
     public void rollback() throws XAException {
-        processOperation(TXN_CONTEXT + XA_ROLLBACK_PATH);
+        processOperation(XA_ROLLBACK_PATH);
     }
 
     @Override
@@ -88,12 +89,12 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void beforeCompletion() throws XAException {
-        processOperation(TXN_CONTEXT + XA_BC_PATH);
+        processOperation(XA_BC_PATH);
     }
 
     @Override
     public int prepare() throws XAException {
-        boolean readOnly = processOperation(TXN_CONTEXT + XA_PREP_PATH, (result) -> {
+        boolean readOnly = processOperation(XA_PREP_PATH, (result) -> {
             String header = result.getResponseHeaders().getFirst(READ_ONLY);
             return header != null && Boolean.parseBoolean(header);
         });
@@ -102,7 +103,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void forget() throws XAException {
-        processOperation(TXN_CONTEXT + XA_FORGET_PATH);
+        processOperation(XA_FORGET_PATH);
     }
 
     private void processOperation(String operationPath) throws XAException {
@@ -113,7 +114,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final CompletableFuture<T> result = new CompletableFuture<>();
         ClientRequest cr = new ClientRequest()
                 .setMethod(Methods.POST)
-                .setPath(targetContext.getUri().getPath() + operationPath);
+                .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion() + operationPath);
         cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
         cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
         targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {

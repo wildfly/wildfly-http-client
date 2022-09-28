@@ -22,6 +22,7 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.BlockingHandler;
+import io.undertow.server.handlers.PathHandler;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
 import io.undertow.util.PathTemplateMatch;
@@ -53,6 +54,8 @@ import java.util.Deque;
 import java.util.function.Function;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
@@ -107,7 +110,11 @@ public class HttpRemoteNamingService {
         routingHandler.add(Methods.GET, LIST_BINDINGS_PATH + nameParamPathSuffix, new ListBindingsHandler());
         routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler());
         routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler());
-        return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
+        final HttpHandler remoteNamingHandler = new BlockingHandler(new ElytronIdentityHandler(routingHandler));
+        final PathHandler versionPathHandler = new PathHandler();
+        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, httpServiceConfig.wrap(remoteNamingHandler));
+        versionPathHandler.addPrefixPath(VERSION_TWO_PATH, remoteNamingHandler);
+        return versionPathHandler;
     }
 
 

@@ -165,6 +165,7 @@ class HttpEJBReceiver extends EJBReceiver {
             }
         }
         boolean compressResponse = receiverContext.getClientInvocationContext().isCompressResponse();
+        builder.setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         if (compressResponse) {
             request.getRequestHeaders().put(Headers.ACCEPT_ENCODING, Headers.GZIP.toString());
@@ -287,6 +288,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setDistinctName(locator.getDistinctName())
                 .setView(locator.getViewType().getName())
                 .setBeanName(locator.getBeanName());
+        builder.setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
                     Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
@@ -353,6 +355,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID))
                 .setBeanName(locator.getBeanName());
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
+        builder.setVersion(targetContext.getProtocolVersion());
         targetContext.sendRequest(builder.createRequest(targetContext.getUri().getPath()), sslContext, authenticationConfiguration, null, (stream, response, closeable) -> {
             try {
                 result.complete(true);

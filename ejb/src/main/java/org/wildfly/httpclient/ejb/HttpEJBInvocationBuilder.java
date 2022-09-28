@@ -30,6 +30,7 @@ import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
+import org.wildfly.httpclient.common.Protocol;
 
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
@@ -53,7 +54,7 @@ class HttpEJBInvocationBuilder {
     private Method method;
     private InvocationType invocationType;
     private String invocationId;
-    private int version = 1;
+    private int version = Protocol.LATEST;
     private boolean cancelIfRunning;
 
     public String getAppName() {
