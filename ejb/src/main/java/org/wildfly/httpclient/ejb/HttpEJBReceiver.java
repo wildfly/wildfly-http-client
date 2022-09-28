@@ -284,6 +284,10 @@ class HttpEJBReceiver extends EJBReceiver {
         targetContext.awaitSessionId(true, authenticationConfiguration);
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
+        // debugging
+        URI backendURI = targetContext.acquireBackendServer();
+        EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Getting backend server URI: %s", backendURI);
+
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
                 .setInvocationType(HttpEJBInvocationBuilder.InvocationType.STATEFUL_CREATE)
                 .setAppName(locator.getAppName())

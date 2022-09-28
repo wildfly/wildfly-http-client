@@ -27,6 +27,7 @@ import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.InputStreamByteInput;
@@ -46,12 +47,14 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.AccessController;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
@@ -71,7 +74,7 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     private static final String EXCEPTION_TYPE = "application/x-wf-jbmar-exception";
-
+    private static final HttpString BACKEND_HEADER = new HttpString("Backend");
     private static final String JSESSIONID = "JSESSIONID";
 
     private final HttpConnectionPool connectionPool;
@@ -142,6 +145,49 @@ public class HttpTargetContext extends AbstractAttachable {
             latch.countDown();
             HttpClientMessages.MESSAGES.failedToAcquireSession(e);
         }, null, latch::countDown);
+    }
+
+    public URI acquireBackendServer() throws Exception {
+        // HttpClientMessages.MESSAGES.info("HtpTargetContext: acquireBackendServer()");
+        return acquireBackendServer(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
+    }
+
+    private URI acquireBackendServer(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        ClientRequest clientRequest = new ClientRequest();
+        clientRequest.setMethod(Methods.GET);
+        clientRequest.setPath(uri.getPath() + "/common/v1/backend");
+        AuthenticationContext context = AuthenticationContext.captureCurrent();
+        SSLContext sslContext;
+        try {
+            sslContext = AUTH_CONTEXT_CLIENT.getSSLContext(uri, context);
+        } catch(GeneralSecurityException e) {
+            HttpClientMessages.MESSAGES.failedToAcquireBackendServer(e);
+            return null;
+        }
+
+        // returns a URI of the form <scheme>://<host>:<port>?name=<jboss.node.name>
+        // this permits having access to *both* the IP:port and the hostname identifiers for the server
+        CompletableFuture<URI> result = new CompletableFuture<>();
+        sendRequest(clientRequest, sslContext, authenticationConfiguration,
+                null,
+                null,
+                ((resultStream, response, closeable) -> {
+                    HeaderValues backends = response.getResponseHeaders().get(BACKEND_HEADER);
+                    if (backends == null) {
+                        result.completeExceptionally(HttpClientMessages.MESSAGES.failedToAcquireBackendServer(new Exception("Missing backend header on response")));
+                    }
+                    try {
+                        String backendString = backends.getFirst();
+                        URI backendURI = new URI(backendString);
+                        result.complete(backendURI);
+                    } catch(URISyntaxException use) {
+                        result.completeExceptionally(HttpClientMessages.MESSAGES.failedToAcquireBackendServer(use));
+                    } finally {
+                        IoUtils.safeClose(closeable);
+                    }
+                }),
+                result::completeExceptionally, null, null);
+        return result.get();
     }
 
     public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpStickinessHandler httpStickinessHandler, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
