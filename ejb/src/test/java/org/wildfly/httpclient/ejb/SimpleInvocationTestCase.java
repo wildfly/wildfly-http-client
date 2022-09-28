@@ -19,6 +19,7 @@
 package org.wildfly.httpclient.ejb;
 
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import org.jboss.ejb.client.EJBClient;
 import org.jboss.ejb.client.EJBClientContext;
 import org.jboss.ejb.client.EJBClientInvocationContext;
@@ -57,6 +58,7 @@ public class SimpleInvocationTestCase {
     @Before
     public void before() {
         EJBTestServer.registerServicesHandler("common/v1/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(Headers.SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
+        EJBTestServer.registerServicesHandler("common/v1/backend", httpServerExchange -> httpServerExchange.getResponseHeaders().put(new HttpString("Backend"), EJBTestServer.getDefaultServerURL()+"?node=localhost" ));
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 10000; ++i) {
             sb.append("Hello World ");
