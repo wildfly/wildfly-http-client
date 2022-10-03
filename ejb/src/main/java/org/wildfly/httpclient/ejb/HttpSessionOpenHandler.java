@@ -42,9 +42,9 @@ import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
 
-import javax.ejb.NoSuchEJBException;
-import javax.transaction.SystemException;
-import javax.transaction.Transaction;
+import jakarta.ejb.NoSuchEJBException;
+import jakarta.transaction.SystemException;
+import jakarta.transaction.Transaction;
 import javax.transaction.xa.XAException;
 import java.io.InputStream;
 import java.net.SocketAddress;

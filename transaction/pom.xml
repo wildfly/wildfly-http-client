@@ -30,27 +30,22 @@
     </parent>
 
     <artifactId>wildfly-http-transaction-client</artifactId>
+    <name>Wildfly Transaction Client HTTP Invocation Support - Jakarta EE Variant</name>
     <packaging>jar</packaging>
 
-    <name>Wildfly Transaction Client HTTP invocation support</name>
-
     <dependencies>
-
         <dependency>
             <groupId>io.undertow</groupId>
             <artifactId>undertow-core</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.wildfly.wildfly-http-client</groupId>
             <artifactId>wildfly-http-client-common</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.wildfly.wildfly-http-client</groupId>
             <artifactId>wildfly-http-naming-client</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.wildfly.wildfly-http-client</groupId>
             <artifactId>wildfly-http-client-common</artifactId>
@@ -61,17 +56,14 @@
             <artifactId>jboss-logging-processor</artifactId>
             <scope>provided</scope>
         </dependency>
-
         <dependency>
-            <groupId>org.jboss.spec.javax.transaction</groupId>
-            <artifactId>jboss-transaction-api_1.3_spec</artifactId>
+            <groupId>jakarta.transaction</groupId>
+            <artifactId>jakarta.transaction-api</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.wildfly.transaction</groupId>
-            <artifactId>wildfly-transaction-client</artifactId>
+            <artifactId>wildfly-transaction-client-jakarta</artifactId>
         </dependency>
-
         <!-- Test dependencies -->
         <dependency>
             <groupId>io.undertow</groupId>
@@ -79,24 +71,20 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.jboss.xnio</groupId>
             <artifactId>xnio-nio</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.jboss.marshalling</groupId>
             <artifactId>jboss-marshalling-river</artifactId>
         </dependency>
-
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.jboss.logmanager</groupId>
             <artifactId>jboss-logmanager</artifactId>

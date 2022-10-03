@@ -20,7 +20,7 @@ package org.wildfly.httpclient.ejb;
 
 import java.io.IOException;
 import java.io.InvalidClassException;
-import javax.ejb.EJBException;
+import jakarta.ejb.EJBException;
 
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.logging.BasicLogger;

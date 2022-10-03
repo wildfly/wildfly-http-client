@@ -34,7 +34,7 @@ import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
 import org.xnio.IoUtils;
 
 import javax.net.ssl.SSLContext;
-import javax.transaction.SystemException;
+import jakarta.transaction.SystemException;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
 import java.net.URI;

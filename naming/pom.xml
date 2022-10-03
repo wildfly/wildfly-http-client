@@ -30,34 +30,28 @@
     </parent>
 
     <artifactId>wildfly-http-naming-client</artifactId>
+    <name>Wildfly HTTP Client JNDI Invocation Support - Jakarta EE Variant</name>
     <packaging>jar</packaging>
 
-    <name>Wildfly HTTP Client JNDI invocation support</name>
-
     <dependencies>
-
         <dependency>
             <groupId>io.undertow</groupId>
             <artifactId>undertow-core</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.wildfly.wildfly-http-client</groupId>
             <artifactId>wildfly-http-client-common</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.wildfly</groupId>
-            <artifactId>wildfly-naming-client</artifactId>
+            <artifactId>wildfly-naming-client-jakarta</artifactId>
         </dependency>
         <dependency>
             <groupId>org.jboss.logging</groupId>
             <artifactId>jboss-logging-processor</artifactId>
             <scope>provided</scope>
         </dependency>
-
         <!-- Test dependencies -->
-
         <dependency>
             <groupId>org.wildfly.wildfly-http-client</groupId>
             <artifactId>wildfly-http-client-common</artifactId>
@@ -69,23 +63,19 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.jboss.xnio</groupId>
             <artifactId>xnio-nio</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
-            <groupId>org.jboss.spec.javax.ejb</groupId>
-            <artifactId>jboss-ejb-api_3.2_spec</artifactId>
+            <groupId>jakarta.ejb</groupId>
+            <artifactId>jakarta.ejb-api</artifactId>
         </dependency>
-
         <dependency>
-            <groupId>org.jboss.spec.javax.transaction</groupId>
-            <artifactId>jboss-transaction-api_1.3_spec</artifactId>
+            <groupId>jakarta.transaction</groupId>
+            <artifactId>jakarta.transaction-api</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.jboss.marshalling</groupId>
             <artifactId>jboss-marshalling-river</artifactId>

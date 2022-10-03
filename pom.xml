@@ -31,9 +31,8 @@
     <groupId>org.wildfly.wildfly-http-client</groupId>
     <artifactId>wildfly-http-client-parent</artifactId>
     <version>1.2.0.Final-SNAPSHOT</version>
+    <name>Wildfly HTTP Client Parent - Jakarta EE Variant</name>
     <packaging>pom</packaging>
-
-    <name>Wildfly HTTP Client parent</name>
 
     <licenses>
         <license>
@@ -58,22 +57,19 @@
         <version.xnio>3.8.4.Final</version.xnio>
         <version.org.jboss.ejb-client>4.0.44.Final</version.org.jboss.ejb-client>
         <version.org.wildfly.discovery>1.2.1.Final</version.org.wildfly.discovery>
-        <version.javax.ejb.api>2.0.0.Final</version.javax.ejb.api>
         <version.jakarta.ejb.jakarta-ejb-api>4.0.1</version.jakarta.ejb.jakarta-ejb-api>
-        <version.javax.transactions>2.0.0.Final</version.javax.transactions>
         <version.jakarta.transaction.jakarta-transaction-api>2.0.0</version.jakarta.transaction.jakarta-transaction-api>
         <version.org.wildfly.checkstyle-config>1.0.8.Final</version.org.wildfly.checkstyle-config>
         <version.org.jboss.marshalling>2.1.0.Final</version.org.jboss.marshalling>
         <version.org.jboss.modules>1.10.0.Final</version.org.jboss.modules>
         <version.org.wildfly.client-config>1.0.1.Final</version.org.wildfly.client-config>
         <version.org.wildfly.common>1.5.4.Final</version.org.wildfly.common>
-        <version.org.wildfly.naming.client>1.0.15.Final</version.org.wildfly.naming.client>
+        <version.org.wildfly.naming.client>1.0.16.Final</version.org.wildfly.naming.client>
         <version.org.wildfly.elytron>1.15.1.Final</version.org.wildfly.elytron>
         <version.org.wildfly.elytron.web>1.9.2.Final</version.org.wildfly.elytron.web>
         <version.org.wildfly.transaction.client>2.0.0.Final</version.org.wildfly.transaction.client>
         <version.org.jboss.threads>2.3.3.Final</version.org.jboss.threads>
         <version.org.kohsuke.metainf-services>1.7</version.org.kohsuke.metainf-services>
-        <version.org.wildfly.extras.batavia>1.0.11.Final</version.org.wildfly.extras.batavia>
     </properties>
 
     <modules>
@@ -81,37 +77,20 @@
         <module>ejb</module>
         <module>naming</module>
         <module>transaction</module>
-        <module>common-jakarta</module>
-        <module>ejb-jakarta</module>
-        <module>transaction-jakarta</module>
     </modules>
 
     <dependencyManagement>
         <dependencies>
-
             <dependency>
                 <groupId>io.undertow</groupId>
                 <artifactId>undertow-core</artifactId>
                 <version>${version.io.undertow}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.jboss.logging</groupId>
                 <artifactId>jboss-logging-processor</artifactId>
                 <scope>provided</scope>
                 <version>${version.org.jboss.logging-tools}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.jboss</groupId>
-                <artifactId>jboss-ejb-client</artifactId>
-                <version>${version.org.jboss.ejb-client}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>*</groupId>
-                        <artifactId>*</artifactId>
-                    </exclusion>
-                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.jboss</groupId>
@@ -124,28 +103,15 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-
             <dependency>
                 <groupId>org.wildfly.discovery</groupId>
                 <artifactId>wildfly-discovery-client</artifactId>
                 <version>${version.org.wildfly.discovery}</version>
             </dependency>
-
-            <dependency>
-                <groupId>org.jboss.spec.javax.ejb</groupId>
-                <artifactId>jboss-ejb-api_3.2_spec</artifactId>
-                <version>${version.javax.ejb.api}</version>
-            </dependency>
             <dependency>
                 <groupId>jakarta.ejb</groupId>
                 <artifactId>jakarta.ejb-api</artifactId>
                 <version>${version.jakarta.ejb.jakarta-ejb-api}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.jboss.spec.javax.transaction</groupId>
-                <artifactId>jboss-transaction-api_1.3_spec</artifactId>
-                <version>${version.javax.transactions}</version>
             </dependency>
             <dependency>
                 <groupId>jakarta.transaction</groupId>
@@ -158,15 +124,9 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-
             <dependency>
                 <groupId>org.wildfly.wildfly-http-client</groupId>
                 <artifactId>wildfly-http-client-common</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.wildfly.wildfly-http-client</groupId>
-                <artifactId>wildfly-http-client-common-jakarta</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -174,7 +134,6 @@
                 <artifactId>wildfly-http-naming-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.wildfly.wildfly-http-client</groupId>
                 <artifactId>wildfly-http-transaction-client</artifactId>
@@ -182,37 +141,16 @@
             </dependency>
             <dependency>
                 <groupId>org.wildfly.wildfly-http-client</groupId>
-                <artifactId>wildfly-http-transaction-client-jakarta</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.wildfly.wildfly-http-client</groupId>
                 <artifactId>wildfly-http-client-common</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
                 <scope>test</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>org.wildfly.wildfly-http-client</groupId>
-                <artifactId>wildfly-http-client-common-jakarta</artifactId>
-                <version>${project.version}</version>
-                <type>test-jar</type>
-                <scope>test</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>org.wildfly.transaction</groupId>
-                <artifactId>wildfly-transaction-client</artifactId>
-                <version>${version.org.wildfly.transaction.client}</version>
             </dependency>
             <dependency>
                 <groupId>org.wildfly.transaction</groupId>
                 <artifactId>wildfly-transaction-client-jakarta</artifactId>
                 <version>${version.org.wildfly.transaction.client}</version>
             </dependency>
-
             <!-- Test dependencies -->
             <dependency>
                 <groupId>io.undertow</groupId>
@@ -221,41 +159,30 @@
                 <scope>test</scope>
                 <version>${version.io.undertow}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.jboss.marshalling</groupId>
                 <artifactId>jboss-marshalling-river</artifactId>
                 <version>${version.org.jboss.marshalling}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.jboss.marshalling</groupId>
                 <artifactId>jboss-marshalling</artifactId>
                 <version>${version.org.jboss.marshalling}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.jboss.xnio</groupId>
                 <artifactId>xnio-api</artifactId>
                 <version>${version.xnio}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.jboss.xnio</groupId>
                 <artifactId>xnio-nio</artifactId>
                 <version>${version.xnio}</version>
             </dependency>
-            
             <dependency>
                 <groupId>org.jboss.threads</groupId>
                 <artifactId>jboss-threads</artifactId>
                 <version>${version.org.jboss.threads}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.wildfly</groupId>
-                <artifactId>wildfly-naming-client</artifactId>
-                <version>${version.org.wildfly.naming.client}</version>
             </dependency>
             <dependency>
                 <groupId>org.wildfly</groupId>
@@ -407,30 +334,6 @@
         </plugins>
         <pluginManagement>
             <plugins>
-                <plugin>
-                    <groupId>org.wildfly.extras.batavia</groupId>
-                    <artifactId>transformer-tools-mvn</artifactId>
-                    <version>${version.org.wildfly.extras.batavia}</version>
-                    <executions>
-                        <execution>
-                            <id>transform-sources</id>
-                            <phase>generate-sources</phase>
-                            <goals>
-                                <goal>transform-sources</goal>
-                            </goals>
-                            <configuration>
-                                <source-project>${jakarta.transformer.input.dir}</source-project>
-                            </configuration>
-                        </execution>
-                    </executions>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.wildfly.extras.batavia</groupId>
-                            <artifactId>transformer-impl-eclipse</artifactId>
-                            <version>${version.org.wildfly.extras.batavia}</version>
-                        </dependency>
-                    </dependencies>
-                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>

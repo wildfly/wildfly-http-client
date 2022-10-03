@@ -49,11 +49,11 @@ import org.wildfly.transaction.client.RemoteTransactionContext;
 import org.wildfly.transaction.client.XAOutflowHandle;
 import org.xnio.IoUtils;
 
-import javax.ejb.Asynchronous;
+import jakarta.ejb.Asynchronous;
 import javax.net.ssl.SSLContext;
-import javax.transaction.RollbackException;
-import javax.transaction.SystemException;
-import javax.transaction.Transaction;
+import jakarta.transaction.RollbackException;
+import jakarta.transaction.SystemException;
+import jakarta.transaction.Transaction;
 import javax.transaction.xa.Xid;
 import java.io.DataOutput;
 import java.io.IOException;

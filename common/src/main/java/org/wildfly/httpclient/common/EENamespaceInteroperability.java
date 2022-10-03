@@ -60,7 +60,7 @@ import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
  */
 final class EENamespaceInteroperability {
     // Batavia transformer sensible constant - it can start with either "javax." or "jakarta." if transformation was performed
-    private static final String VARIABLE_CONSTANT = "javax.ejb.FAKE_STRING";
+    private static final String VARIABLE_CONSTANT = "jakarta.ejb.FAKE_STRING";
     private static final boolean JAKARTAEE_ENVIRONMENT = VARIABLE_CONSTANT.startsWith("jakarta");
 
     /**
