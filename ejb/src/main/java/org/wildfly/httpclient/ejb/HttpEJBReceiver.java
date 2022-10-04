@@ -23,11 +23,13 @@ import io.undertow.client.ClientRequest;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
+import org.jboss.ejb.client.AbstractInvocationContext;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBReceiver;
 import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.ejb.client.EJBReceiverSessionCreationContext;
+import org.jboss.ejb.client.EJBSessionCreationInvocationContext;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
 import org.jboss.marshalling.ByteOutput;
@@ -42,6 +44,7 @@ import org.wildfly.httpclient.transaction.XidProvider;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
+import org.wildfly.transaction.client.AbstractTransaction;
 import org.wildfly.transaction.client.ContextTransactionManager;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.RemoteTransaction;
@@ -71,6 +74,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
@@ -97,7 +101,7 @@ class HttpEJBReceiver extends EJBReceiver {
     private final AttachmentKey<EjbContextData> EJB_CONTEXT_DATA = AttachmentKey.create(EjbContextData.class);
     private final org.jboss.ejb.client.AttachmentKey<String> INVOCATION_ID = new org.jboss.ejb.client.AttachmentKey<>();
     private final RemoteTransactionContext transactionContext;
-
+    private final org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> TXN_STRICT_STICKINESS_MAP = new org.jboss.ejb.client.AttachmentKey<>();
     private static final AtomicLong invocationIdGenerator = new AtomicLong();
 
     HttpEJBReceiver() {
@@ -120,8 +124,7 @@ class HttpEJBReceiver extends EJBReceiver {
         EJBLocator<?> locator = clientInvocationContext.getLocator();
 
         URI uri = clientInvocationContext.getDestination();
-        WildflyHttpContext current = WildflyHttpContext.getCurrent();
-        HttpTargetContext targetContext = current.getTargetContext(uri);
+        HttpTargetContext targetContext = resolveTargetContext(clientInvocationContext, uri);
         if (targetContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
@@ -259,15 +262,17 @@ class HttpEJBReceiver extends EJBReceiver {
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
     protected SessionID createSession(final EJBReceiverSessionCreationContext receiverContext) throws Exception {
+        EJBSessionCreationInvocationContext sessionCreationInvocationContext = receiverContext.getClientInvocationContext();
         final EJBLocator<?> locator = receiverContext.getClientInvocationContext().getLocator();
-        URI uri = receiverContext.getClientInvocationContext().getDestination();
+        URI uri = sessionCreationInvocationContext.getDestination();
+
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
-        WildflyHttpContext current = WildflyHttpContext.getCurrent();
-        HttpTargetContext targetContext = current.getTargetContext(uri);
+
+        HttpTargetContext targetContext = resolveTargetContext(sessionCreationInvocationContext, uri);
         if (targetContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
@@ -339,9 +344,14 @@ class HttpEJBReceiver extends EJBReceiver {
             // ¯\_(ツ)_/¯
             return false;
         }
-        WildflyHttpContext current = WildflyHttpContext.getCurrent();
-        HttpTargetContext targetContext = current.getTargetContext(uri);
-        if (targetContext == null) {
+
+        HttpTargetContext targetContext;
+        try {
+            targetContext = resolveTargetContext(clientInvocationContext, uri);
+            if (targetContext == null) {
+                throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
+            }
+        } catch(Exception e) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
 
@@ -459,6 +469,78 @@ class HttpEJBReceiver extends EJBReceiver {
             throw EjbHttpClientMessages.MESSAGES.cannotEnlistTx();
         }
     }
+
+    // -------------------------------------------------------
+
+    private boolean inTransaction(AbstractInvocationContext context) {
+        return context.getTransaction() != null;
+    }
+
+    private boolean inRemoteTransaction(AbstractInvocationContext context) {
+        return context.getTransaction() != null && context.getTransaction() instanceof RemoteTransaction;
+    }
+
+    private boolean inLocalTransaction(AbstractInvocationContext context) {
+        return context.getTransaction() != null && context.getTransaction() instanceof LocalTransaction;
+    }
+
+    /*
+     * For a given URI, resolves the required HttpTargetContext used as a transport between client and server.
+     * In particular, this method takes into account requirements for strict stickiness for invocations which are
+     * in transaction scope. This is achieved by:
+     * - resolving a URI pointing to a load balancer to one of that load balancer's backend servers
+     * - consistently returning the same resolved URI across the lifetime of the transaction
+     * In this way, URIs used in transactions, whether they be RemoteTransactions or LocalTransactions, will always
+     * target only one fixed backend server.
+     */
+    private HttpTargetContext resolveTargetContext(final AbstractInvocationContext context, final URI uri) throws Exception {
+        HttpTargetContext currentContext = null;
+
+        // get the HttpTargetContext for the discovered URI
+        WildflyHttpContext current = WildflyHttpContext.getCurrent();
+        currentContext = current.getTargetContext(uri);
+        if (currentContext == null) {
+            throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(context.getLocator());
+        }
+
+        // if we are in a transaction, get a reference to the transaction's URI map and its resolved URI
+        if (inTransaction(context)) {
+            ConcurrentMap<URI, String> map = getOrCreateTransactionURIMap(context.getTransaction());
+            String backendNode = map.get(uri);
+            // we need to update the map for this discovered URI with a backend node
+            if (backendNode == null) {
+                // acquire a randomly chosen backend node from this URI (in form http://<host>:<port>?node=<node>)
+                URI backendURI = currentContext.acquireBackendServer();
+                backendNode = parseURIQueryString(backendURI.getQuery());
+                map.putIfAbsent(uri, backendNode);
+            }
+        }
+        return currentContext;
+    }
+
+    /*
+     * For a given transaction, returns the mapping of URIs which is used for the purpose of maintaining
+     * strict stickiness semantics in transactions. Each URI (representing a load balancer) is mapped to
+     * a fixed backend node.
+     */
+    private ConcurrentMap<URI, String> getOrCreateTransactionURIMap(AbstractTransaction transaction) throws Exception {
+        Object resource = transaction.getResource(TXN_STRICT_STICKINESS_MAP);
+        ConcurrentMap<URI, String> map = null;
+        if (resource == null) {
+            map = new ConcurrentHashMap<>();
+            resource = transaction.putResourceIfAbsent(TXN_STRICT_STICKINESS_MAP, map);
+        }
+        return resource == null ? map : ConcurrentMap.class.cast(resource);
+    }
+
+    /*
+     * Parse the node name out of the string http://<host>:<port>?node=<node>
+     */
+    private String parseURIQueryString(String queryString) {
+        return queryString.substring("node=".length());
+    }
+
+    // -------------------------------------------------------
 
     private static Map<String, Object> readAttachments(final ObjectInput input) throws IOException, ClassNotFoundException {
         final int numAttachments = PackedInteger.readPackedInteger(input);
