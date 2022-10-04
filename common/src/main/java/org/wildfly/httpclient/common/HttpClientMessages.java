@@ -73,9 +73,4 @@ interface HttpClientMessages extends BasicLogger {
 
     @Message(id = 13, value = "Authentication failed (full response %s)")
     AuthenticationException authenticationFailed(ClientResponse response);
-
-    @LogMessage(level = Logger.Level.DEBUG)
-    @Message(id = 14, value = "JavaEE to JakartaEE backward compatibility layer have been installed")
-    void javaeeToJakartaeeBackwardCompatibilityLayerInstalled();
-
 }
