@@ -73,6 +73,14 @@ class PoolAuthenticationContext {
 
     private static final SecureRandomSessionIdGenerator cnonceGenerator = new SecureRandomSessionIdGenerator();
 
+    /**
+     * This method is used to receive the 401 status code from the server and, based on the WWW-authenticate field, set
+     * the authentication type field. In the case of DIGEST authentication, it will also save the Digest parameters sent
+     * from the server
+     *
+     * @param response the HTTP response from the server
+     * @return true if the WWW-authenticate header was non-null and successfully processed; false otherwise
+     */
     boolean handleResponse(ClientResponse response) {
         if (response.getResponseCode() != StatusCodes.UNAUTHORIZED) {
             return false;
@@ -163,6 +171,15 @@ class PoolAuthenticationContext {
         return uriBuilder.toString();
     }
 
+    /**
+     * This method should be executed after we have had a response from the server with a 401 status code.
+     * The WWW-Authenticate header will have been used to set the type field.
+     *
+     * @param uri the destination of the request
+     * @param request the request contents
+     * @param authenticationConfiguration the authentication configuration to use
+     * @return true if the request was successfully prepared; false otherwise
+     */
     boolean prepareRequest(URI uri, ClientRequest request, AuthenticationConfiguration authenticationConfiguration) {
         if (current == Type.NONE) {
             return false;
