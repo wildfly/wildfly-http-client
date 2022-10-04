@@ -23,7 +23,6 @@ import io.undertow.client.ClientRequest;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
-import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBReceiver;
@@ -133,8 +132,6 @@ class HttpEJBReceiver extends EJBReceiver {
                 }
             }
         }
-        targetContext.awaitSessionId(false, AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(targetContext.getUri(), receiverContext.getAuthenticationContext()));
-
 
         EjbContextData ejbData = targetContext.getAttachment(EJB_CONTEXT_DATA);
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
@@ -151,13 +148,14 @@ class HttpEJBReceiver extends EJBReceiver {
 
         if (clientInvocationContext.getInvokedMethod().getReturnType() == Future.class) {
             receiverContext.proceedAsynchronously();
-            //cancellation is only supported if we have affinity
-            if (targetContext.getSessionId() != null) {
+            // cancellation is only supported if we have affinity (InvocationIdentifier = invocationID + SessionAffinity)
+            // TODO: check this logic, why only if affinity?
+//            if (targetContext.getSessionId() != null) {
                 long invocationId = invocationIdGenerator.incrementAndGet();
                 String invocationIdString = Long.toString(invocationId);
                 builder.setInvocationId(invocationIdString);
                 clientInvocationContext.putAttachment(INVOCATION_ID, invocationIdString);
-            }
+//            }
         } else if (clientInvocationContext.getInvokedMethod().getReturnType() == void.class) {
             if (clientInvocationContext.getInvokedMethod().isAnnotationPresent(Asynchronous.class)) {
                 receiverContext.proceedAsynchronously();
@@ -281,7 +279,6 @@ class HttpEJBReceiver extends EJBReceiver {
             }
         }
 
-        targetContext.awaitSessionId(true, authenticationConfiguration);
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
         // debugging
@@ -329,9 +326,8 @@ class HttpEJBReceiver extends EJBReceiver {
 
         EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
         EJBLocator<?> locator = clientInvocationContext.getLocator();
-
-        Affinity affinity = locator.getAffinity();
         URI uri = clientInvocationContext.getDestination();
+
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
@@ -348,6 +344,7 @@ class HttpEJBReceiver extends EJBReceiver {
         if (targetContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
+
         if (targetContext.getAttachment(EJB_CONTEXT_DATA) == null) {
             synchronized (this) {
                 if (targetContext.getAttachment(EJB_CONTEXT_DATA) == null) {
@@ -355,7 +352,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 }
             }
         }
-        targetContext.awaitSessionId(false, authenticationConfiguration);
+
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
                 .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CANCEL)
                 .setAppName(locator.getAppName())
