@@ -22,9 +22,7 @@ import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
-import io.undertow.server.handlers.Cookie;
 import io.undertow.util.AbstractAttachable;
-import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
@@ -55,7 +53,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
 
@@ -63,6 +60,7 @@ import java.util.zip.GZIPInputStream;
  * Http target context used by client side.
  *
  * @author Stuart Douglas
+ * @author <a href="mailto:rachmato@redhat.com">Richard Achmatowicz</a>
  */
 public class HttpTargetContext extends AbstractAttachable {
 
@@ -79,12 +77,9 @@ public class HttpTargetContext extends AbstractAttachable {
 
     private final HttpConnectionPool connectionPool;
     private final boolean eagerlyAcquireAffinity;
-    private volatile CountDownLatch sessionAffinityLatch = new CountDownLatch(1);
-    private volatile String sessionId;
     private final URI uri;
     private final AuthenticationContext initAuthenticationContext;
 
-    private final AtomicBoolean affinityRequestSent = new AtomicBoolean();
     private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
 
     private static ClassLoader getContextClassLoader() {
@@ -110,33 +105,8 @@ public class HttpTargetContext extends AbstractAttachable {
 
     void init() {
         if (eagerlyAcquireAffinity) {
-            acquireAffinitiy(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
+            // this is now a noop as we can't associate affinity to a single backend server with the target context
         }
-    }
-
-    private void acquireAffinitiy(AuthenticationConfiguration authenticationConfiguration) {
-        if (affinityRequestSent.compareAndSet(false, true)) {
-            acquireSessionAffinity(sessionAffinityLatch, authenticationConfiguration);
-        }
-    }
-
-    private void acquireSessionAffinity(CountDownLatch latch, AuthenticationConfiguration authenticationConfiguration) {
-        ClientRequest clientRequest = new ClientRequest();
-        clientRequest.setMethod(Methods.GET);
-        clientRequest.setPath(uri.getPath() + "/common/v1/affinity");
-        AuthenticationContext context = AuthenticationContext.captureCurrent();
-        SSLContext sslContext;
-        try {
-            sslContext = AUTH_CONTEXT_CLIENT.getSSLContext(uri, context);
-        } catch (GeneralSecurityException e) {
-            latch.countDown();
-            HttpClientMessages.MESSAGES.failedToAcquireSession(e);
-            return;
-        }
-        sendRequest(clientRequest, sslContext, authenticationConfiguration, null, null, null, (e) -> {
-            latch.countDown();
-            HttpClientMessages.MESSAGES.failedToAcquireSession(e);
-        }, null, latch::countDown);
     }
 
     public URI acquireBackendServer() throws Exception {
@@ -187,9 +157,6 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpStickinessHandler httpStickinessHandler, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
-        if (sessionId != null) {
-            request.getRequestHeaders().add(Headers.COOKIE, JSESSIONID + "=" + sessionId);
-        }
         final ClassLoader tccl = getContextClassLoader();
         connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
     }
@@ -233,27 +200,6 @@ public class HttpTargetContext extends AbstractAttachable {
         }
     }
 
-    private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
-        //handle session affinity
-        HeaderValues cookies = response.getResponseHeaders().get(Headers.SET_COOKIE);
-        if (cookies != null) {
-            for (String cookie : cookies) {
-                Cookie c = Cookies.parseSetCookieHeader(cookie);
-                if (c.getName().equals(JSESSIONID)) {
-                    HttpClientMessages.MESSAGES.debugf("%s Cookie found in Set-Cookie header in the response. cookie name = [%s], cookie value = [%s], cookie path = [%s]", JSESSIONID, c.getName(), c.getValue(), c.getPath());
-                    String path = c.getPath();
-                    if (path == null || path.isEmpty() || request.getPath().startsWith(path)) {
-                        HttpClientMessages.MESSAGES.debugf("Use sessionId %s as a request cookie for session affinity", c.getValue());
-                        setSessionId(c.getValue());
-                    }
-                }
-            }
-        }
-        if (getSessionId() != null) {
-            request.getRequestHeaders().put(Headers.COOKIE, JSESSIONID + "=" + getSessionId());
-        }
-    }
-
     private static Map<String, Object> readAttachments(final ObjectInput input) throws IOException, ClassNotFoundException {
         final int numAttachments = input.readByte();
         if (numAttachments == 0) {
@@ -278,41 +224,8 @@ public class HttpTargetContext extends AbstractAttachable {
         return connectionPool;
     }
 
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    void setSessionId(String sessionId) {
-        this.sessionId = sessionId;
-    }
-
     public URI getUri() {
         return uri;
-    }
-
-    public void clearSessionId() {
-        awaitSessionId(true, null); //to prevent a race make sure we have one before we clear it
-        synchronized (this) {
-            CountDownLatch old = sessionAffinityLatch;
-            sessionAffinityLatch = new CountDownLatch(1);
-            old.countDown();
-            this.affinityRequestSent.set(false);
-            this.sessionId = null;
-        }
-    }
-
-    public String awaitSessionId(boolean required, AuthenticationConfiguration authConfig) {
-        if (required) {
-            acquireAffinitiy(authConfig);
-        }
-        if (affinityRequestSent.get()) {
-            try {
-                sessionAffinityLatch.await();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return sessionId;
     }
 
     private boolean isLegacyAuthenticationFailedException() {
@@ -471,7 +384,6 @@ public class HttpTargetContext extends AbstractAttachable {
             connection.getConnection().getWorker().execute(() -> {
                 ClientResponse response = result.getResponse();
                 if (!authAdded || connection.getAuthenticationContext().isStale(result)) {
-                    handleSessionAffinity(request, response);
                     if (connection.getAuthenticationContext().handleResponse(response)) {
                         URI uri = connection.getUri();
                         connection.done(false);
@@ -530,8 +442,6 @@ public class HttpTargetContext extends AbstractAttachable {
                     return;
                 }
                 try {
-                    handleSessionAffinity(request, response);
-
                     if (isException) {
                         final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
