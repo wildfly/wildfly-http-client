@@ -44,15 +44,15 @@ final class TransactionConstants {
     static final String TXN_CONTEXT = "/txn";
 
     // paths
-    static final String UT_BEGIN_PATH = "/v1/ut/begin";
-    static final String UT_COMMIT_PATH = "/v1/ut/commit";
-    static final String UT_ROLLBACK_PATH = "/v1/ut/rollback";
-    static final String XA_COMMIT_PATH = "/v1/xa/commit";
-    static final String XA_ROLLBACK_PATH = "/v1/xa/rollback";
-    static final String XA_PREP_PATH = "/v1/xa/prep";
-    static final String XA_FORGET_PATH = "/v1/xa/forget";
-    static final String XA_BC_PATH = "/v1/xa/bc";
-    static final String XA_RECOVER_PATH = "/v1/xa/recover";
+    static final String UT_BEGIN_PATH = "/ut/begin";
+    static final String UT_COMMIT_PATH = "/ut/commit";
+    static final String UT_ROLLBACK_PATH = "/ut/rollback";
+    static final String XA_COMMIT_PATH = "/xa/commit";
+    static final String XA_ROLLBACK_PATH = "/xa/rollback";
+    static final String XA_PREP_PATH = "/xa/prep";
+    static final String XA_FORGET_PATH = "/xa/forget";
+    static final String XA_BC_PATH = "/xa/bc";
+    static final String XA_RECOVER_PATH = "/xa/recover";
 
     // protocols
     static final String HTTP_SCHEME = "http";

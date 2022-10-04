@@ -31,14 +31,19 @@ import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.RemoteTransactionPeer;
 import org.wildfly.transaction.client.spi.RemoteTransactionProvider;
 
+import static org.wildfly.httpclient.common.Version.VERSION_2;
+
 /**
+ * A class which provides a versioned peer for controlling remote non-XA and XA transactions running on a target server.
+ *
  * @author Stuart Douglas
+ * @author <a href="rachmato@redhat.com>Richard Achmatowicz</a>
  */
 public class HttpRemoteTransactionProvider implements RemoteTransactionProvider {
 
     @Override
     public RemoteTransactionPeer getPeerHandle(final URI uri, final SSLContext sslContext, final AuthenticationConfiguration authenticationConfiguration) throws SystemException {
-        return new HttpRemoteTransactionPeer(WildflyHttpContext.getCurrent().getTargetContext(uri), sslContext, authenticationConfiguration);
+        return new HttpRemoteTransactionPeer(VERSION_2, WildflyHttpContext.getCurrent().getTargetContext(uri), sslContext, authenticationConfiguration);
     }
 
     @Override

@@ -24,6 +24,7 @@ import io.undertow.util.Methods;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
@@ -54,17 +55,22 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER
 import static org.wildfly.httpclient.transaction.TransactionConstants.XID_LIST;
 
 /**
+ * A versioned peer for controlling non-XA and XA transactions running on a target server.
+ *
  * @author Stuart Douglas
+ * @author <a href="rachmato@redhat.com>Richard Achmatowicz</a>
  */
 public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
+    private final Version version;
     private final HttpTargetContext targetContext;
     private final SSLContext sslContext;
     private final AuthenticationConfiguration authenticationConfiguration;
     private final AuthenticationContext authenticationContext;
 
-    public HttpRemoteTransactionPeer(HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+    public HttpRemoteTransactionPeer(Version version, HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+        this.version = version;
         this.targetContext = targetContext;
         this.sslContext = sslContext;
         this.authenticationConfiguration = authenticationConfiguration;
@@ -74,7 +80,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     @Override
     public SubordinateTransactionControl lookupXid(Xid xid) throws XAException {
         try {
-            return new HttpSubordinateTransactionHandle(xid, targetContext, getSslContext(targetContext.getUri()), authenticationConfiguration);
+            return new HttpSubordinateTransactionHandle(version, xid, targetContext, getSslContext(targetContext.getUri()), authenticationConfiguration);
         } catch (GeneralSecurityException e) {
             XAException xaException = new XAException(XAException.XAER_RMFAIL);
             xaException.initCause(e);
@@ -193,7 +199,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         try {
             Xid xid = beginXid.get();
-            return new HttpRemoteTransactionHandle(xid, targetContext, sslContext, authenticationConfiguration);
+            return new HttpRemoteTransactionHandle(version, xid, targetContext, sslContext, authenticationConfiguration);
 
         } catch (InterruptedException e) {
             throw new RuntimeException(e);

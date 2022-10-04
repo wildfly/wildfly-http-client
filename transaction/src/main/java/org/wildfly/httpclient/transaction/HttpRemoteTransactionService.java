@@ -36,6 +36,7 @@ import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
@@ -65,7 +66,11 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBAC
 import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 /**
+ * A versioned service for handling non-XA and XA transaction requests from a client's remotely controlling
+ * transactions on this node.
+ *
  * @author Stuart Douglas
+ * @author <a href="rachmato@redhat.com>Richard Achmatowicz</a>
  */
 public class HttpRemoteTransactionService {
 
@@ -85,19 +90,28 @@ public class HttpRemoteTransactionService {
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
-        routingHandler.add(Methods.POST, UT_BEGIN_PATH, new BeginHandler());
-        routingHandler.add(Methods.POST, UT_ROLLBACK_PATH, new UTRollbackHandler());
-        routingHandler.add(Methods.POST, UT_COMMIT_PATH, new UTCommitHandler());
-        routingHandler.add(Methods.POST, XA_BC_PATH, new XABeforeCompletionHandler());
-        routingHandler.add(Methods.POST, XA_COMMIT_PATH, new XACommitHandler());
-        routingHandler.add(Methods.POST, XA_FORGET_PATH, new XAForgetHandler());
-        routingHandler.add(Methods.POST, XA_PREP_PATH, new XAPrepHandler());
-        routingHandler.add(Methods.POST, XA_ROLLBACK_PATH, new XARollbackHandler());
-        routingHandler.add(Methods.GET, XA_RECOVER_PATH, new XARecoveryHandler());
+        // register VERSION_1 and VERSION_2 handlers
+        for (Version version : Version.values()) {
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + UT_BEGIN_PATH, new BeginHandler(version));
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + UT_ROLLBACK_PATH, new UTRollbackHandler(version));
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + UT_COMMIT_PATH, new UTCommitHandler(version));
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + XA_BC_PATH, new XABeforeCompletionHandler(version));
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + XA_COMMIT_PATH, new XACommitHandler(version));
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + XA_FORGET_PATH, new XAForgetHandler(version));
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + XA_PREP_PATH, new XAPrepHandler(version));
+            routingHandler.add(Methods.POST, "/" + version.getVersion() + XA_ROLLBACK_PATH, new XARollbackHandler(version));
+            routingHandler.add(Methods.GET, "/" + version.getVersion() + XA_RECOVER_PATH, new XARecoveryHandler(version));
+        }
         return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
     abstract class AbstractTransactionHandler implements HttpHandler {
+
+        private final Version version;
+
+        public AbstractTransactionHandler(Version version) {
+            this.version = version;
+        }
 
         @Override
         public final void handleRequest(HttpServerExchange exchange) throws Exception {
@@ -137,6 +151,12 @@ public class HttpRemoteTransactionService {
 
     class BeginHandler implements HttpHandler {
 
+        private final Version version;
+
+        public BeginHandler(Version version) {
+            this.version = version;
+        }
+
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
             try {
@@ -167,6 +187,12 @@ public class HttpRemoteTransactionService {
     }
 
     class XARecoveryHandler implements HttpHandler {
+
+        private final Version version;
+
+        public XARecoveryHandler(Version version) {
+            this.version = version;
+        }
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
@@ -208,6 +234,10 @@ public class HttpRemoteTransactionService {
 
     class UTRollbackHandler extends AbstractTransactionHandler {
 
+        public UTRollbackHandler(Version version) {
+            super(version);
+        }
+
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getTransaction().rollback();
@@ -215,6 +245,10 @@ public class HttpRemoteTransactionService {
     }
 
     class UTCommitHandler extends AbstractTransactionHandler {
+
+        public UTCommitHandler(Version version) {
+            super(version);
+        }
 
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
@@ -224,6 +258,10 @@ public class HttpRemoteTransactionService {
 
     class XABeforeCompletionHandler extends AbstractTransactionHandler {
 
+        public XABeforeCompletionHandler(Version version) {
+            super(version);
+        }
+
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().beforeCompletion();
@@ -231,6 +269,10 @@ public class HttpRemoteTransactionService {
     }
 
     class XAForgetHandler extends AbstractTransactionHandler {
+
+        public XAForgetHandler(Version version) {
+            super(version);
+        }
 
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
@@ -240,6 +282,10 @@ public class HttpRemoteTransactionService {
 
     class XAPrepHandler extends AbstractTransactionHandler {
 
+        public XAPrepHandler(Version version) {
+            super(version);
+        }
+
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().prepare();
@@ -248,6 +294,10 @@ public class HttpRemoteTransactionService {
 
     class XARollbackHandler extends AbstractTransactionHandler {
 
+        public XARollbackHandler(Version version) {
+            super(version);
+        }
+
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().rollback();
@@ -255,6 +305,10 @@ public class HttpRemoteTransactionService {
     }
 
     class XACommitHandler extends AbstractTransactionHandler {
+
+        public XACommitHandler(Version version) {
+            super(version);
+        }
 
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
