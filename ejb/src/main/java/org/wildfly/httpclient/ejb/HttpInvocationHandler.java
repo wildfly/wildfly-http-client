@@ -101,6 +101,8 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
+
+        // validate content type of payload
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
         if (contentType == null || contentType.getVersion() != 1 || !INVOCATION.getType().equals(contentType.getType())) {
@@ -109,6 +111,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
             return;
         }
 
+        // parse request path
         String relativePath = exchange.getRelativePath();
         if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
@@ -122,14 +125,14 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
         final String module = handleDash(parts[1]);
         final String distinct = handleDash(parts[2]);
         final String bean = parts[3];
-
-
         String originalSessionId = handleDash(parts[4]);
         final byte[] sessionID = originalSessionId.isEmpty() ? null : Base64.getUrlDecoder().decode(originalSessionId);
         String viewName = parts[5];
         String method = parts[6];
         String[] parameterTypeNames = new String[parts.length - 7];
         System.arraycopy(parts, 7, parameterTypeNames, 0, parameterTypeNames.length);
+
+        // process Cookies and Headers
         Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
@@ -142,6 +145,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
             identifier = null;
         }
 
+        // process request
         exchange.dispatch(executorService, () -> {
             CancelHandle handle = association.receiveInvocationRequest(new InvocationRequest() {
 
