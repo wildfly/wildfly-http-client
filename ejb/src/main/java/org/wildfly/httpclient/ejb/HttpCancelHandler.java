@@ -56,6 +56,8 @@ class HttpCancelHandler extends RemoteHTTPHandler {
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
+
+        // validate content type of payload
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
         if (contentType != null) {
@@ -64,6 +66,7 @@ class HttpCancelHandler extends RemoteHTTPHandler {
             return;
         }
 
+        // parse request path
         String relativePath = exchange.getRelativePath();
         if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
@@ -79,6 +82,8 @@ class HttpCancelHandler extends RemoteHTTPHandler {
         final String bean = parts[3];
         String invocationId = parts[4];
         boolean cancelIdRunning = Boolean.parseBoolean(parts[5]);
+
+        // process Cookies and Headers
         // TODO: cancellation requires that a Cookie be present
         Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
@@ -90,6 +95,8 @@ class HttpCancelHandler extends RemoteHTTPHandler {
             EjbHttpClientMessages.MESSAGES.debugf("Exchange %s did not include both session id and invocation id in cancel request", exchange);
             return;
         }
+
+        // process request
         CancelHandle handle = cancellationFlags.remove(identifier);
         if (handle != null) {
             handle.cancel(cancelIdRunning);
