@@ -32,8 +32,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 
-import javax.ejb.ApplicationException;
-import javax.ejb.EJBException;
+import jakarta.ejb.ApplicationException;
+import jakarta.ejb.EJBException;
 import java.io.InvalidClassException;
 import java.lang.reflect.Method;
 import java.net.URI;

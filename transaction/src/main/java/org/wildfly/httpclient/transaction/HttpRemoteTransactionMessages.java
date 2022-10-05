@@ -18,8 +18,8 @@
 
 package org.wildfly.httpclient.transaction;
 
-import javax.transaction.RollbackException;
-import javax.transaction.SystemException;
+import jakarta.transaction.RollbackException;
+import jakarta.transaction.SystemException;
 import javax.transaction.xa.XAException;
 
 import org.jboss.logging.BasicLogger;

@@ -24,7 +24,7 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.HTTPS_SCHE
 import java.net.URI;
 
 import javax.net.ssl.SSLContext;
-import javax.transaction.SystemException;
+import jakarta.transaction.SystemException;
 
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;

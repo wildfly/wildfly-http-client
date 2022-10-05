@@ -25,35 +25,30 @@
     <parent>
         <groupId>org.wildfly.wildfly-http-client</groupId>
         <artifactId>wildfly-http-client-parent</artifactId>
-        <version>1.2.0.Final-SNAPSHOT</version>
+        <version>2.0.0.Final-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>wildfly-http-client-common</artifactId>
+    <name>Wildfly HTTP Client Common - Jakarta EE Variant</name>
     <packaging>jar</packaging>
 
-    <name>Wildfly HTTP Client Common</name>
-
     <dependencies>
-
         <dependency>
             <groupId>io.undertow</groupId>
             <artifactId>undertow-core</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.jboss.logging</groupId>
             <artifactId>jboss-logging-processor</artifactId>
             <scope>provided</scope>
         </dependency>
-
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.jboss.xnio</groupId>
             <artifactId>xnio-nio</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.jboss.marshalling</groupId>
             <artifactId>jboss-marshalling-river</artifactId>
@@ -137,7 +132,6 @@
             <artifactId>jboss-logmanager</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.wildfly.security.elytron-web</groupId>
             <artifactId>undertow-common-test</artifactId>

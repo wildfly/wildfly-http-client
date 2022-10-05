@@ -59,14 +59,10 @@ import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
  * @author Richard Opalka
  */
 final class EENamespaceInteroperability {
-    // Batavia transformer sensible constant - it can start with either "javax." or "jakarta." if transformation was performed
-    private static final String VARIABLE_CONSTANT = "javax.ejb.FAKE_STRING";
-    private static final boolean JAKARTAEE_ENVIRONMENT = VARIABLE_CONSTANT.startsWith("jakarta");
-
     /**
      * Indicates if EE namespace interoperable mode is enabled.
      */
-    static final boolean EE_NAMESPACE_INTEROPERABLE_MODE = JAKARTAEE_ENVIRONMENT && Boolean.parseBoolean(
+    static final boolean EE_NAMESPACE_INTEROPERABLE_MODE = Boolean.parseBoolean(
             WildFlySecurityManager.getPropertyPrivileged("org.wildfly.ee.namespace.interop", "false"));
 
     // header indicating the protocol version mode that is being used by the request/response sender
