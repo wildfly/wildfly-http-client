@@ -35,7 +35,7 @@ public class Protocol {
     // version path prefix
     public static final String VERSION_PATH="/v";
     // latest protocol version
-    public static int LATEST = 2;
+    public static int LATEST = 3;
 
     private Protocol() {
     }

@@ -20,24 +20,32 @@ package org.wildfly.httpclient.ejb;
 
 import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
+import io.undertow.client.ClientResponse;
+import io.undertow.server.session.SecureRandomSessionIdGenerator;
+import io.undertow.server.session.SessionIdGenerator;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import io.undertow.util.StatusCodes;
 import org.jboss.ejb.client.AbstractInvocationContext;
+import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBReceiver;
 import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.ejb.client.EJBReceiverSessionCreationContext;
 import org.jboss.ejb.client.EJBSessionCreationInvocationContext;
+import org.jboss.ejb.client.NodeAffinity;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
+import org.jboss.ejb.client.URIAffinity;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.httpclient.transaction.XidProvider;
@@ -103,6 +111,10 @@ class HttpEJBReceiver extends EJBReceiver {
     private final RemoteTransactionContext transactionContext;
     private final org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> TXN_STRICT_STICKINESS_MAP = new org.jboss.ejb.client.AttachmentKey<>();
     private static final AtomicLong invocationIdGenerator = new AtomicLong();
+
+    private final HttpString STRICT_STICKINESS_HOST = new HttpString("StrictStickinessHost");
+    private final HttpString STRICT_STICKINESS_RESULT = new HttpString("StrictStickinessResult");
+    protected final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionID = new ConcurrentHashMap<>();
 
     HttpEJBReceiver() {
         if(System.getSecurityManager() == null) {
@@ -194,7 +206,7 @@ class HttpEJBReceiver extends EJBReceiver {
                         IoUtils.safeClose(data);
                     }
                 }),
-                new InvocationStickinessHandler(receiverContext),
+                new InvocationStickinessHandler(receiverContext, node2SessionID),
                 ((input, response, closeable) -> {
                         if (response.getResponseCode() == StatusCodes.ACCEPTED && clientInvocationContext.getInvokedMethod().getReturnType() == void.class) {
                             ejbData.asyncMethods.add(clientInvocationContext.getInvokedMethod());
@@ -286,10 +298,6 @@ class HttpEJBReceiver extends EJBReceiver {
 
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
-        // debugging
-        URI backendURI = targetContext.acquireBackendServer();
-        EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Getting backend server URI: %s", backendURI);
-
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
                 .setInvocationType(HttpEJBInvocationBuilder.InvocationType.STATEFUL_CREATE)
                 .setAppName(locator.getAppName())
@@ -306,7 +314,7 @@ class HttpEJBReceiver extends EJBReceiver {
                     writeTransaction(ContextTransactionManager.getInstance().getTransaction(), marshaller, targetContext.getUri());
                     marshaller.finish();
                 },
-                new SessionCreationStickinessHandler(receiverContext),
+                new SessionCreationStickinessHandler(receiverContext, node2SessionID),
                 ((unmarshaller, response, c) -> {
                     try {
                         String sessionId = response.getResponseHeaders().getFirst(EjbConstants.EJB_SESSION_ID);
@@ -486,12 +494,10 @@ class HttpEJBReceiver extends EJBReceiver {
 
     /*
      * For a given URI, resolves the required HttpTargetContext used as a transport between client and server.
-     * In particular, this method takes into account requirements for strict stickiness for invocations which are
-     * in transaction scope. This is achieved by:
-     * - resolving a URI pointing to a load balancer to one of that load balancer's backend servers
-     * - consistently returning the same resolved URI across the lifetime of the transaction
-     * In this way, URIs used in transactions, whether they be RemoteTransactions or LocalTransactions, will always
-     * target only one fixed backend server.
+     * In addition to obtaining a valid HttpTargetContext, if the operation is in transaction scope,
+     * this method will ensure that a randomly chosen backend server (if the target is a load balancer) will be
+     * selected for this transaction and all operations in the scope of this transaction will be directed to that
+     * backend node.
      */
     private HttpTargetContext resolveTargetContext(final AbstractInvocationContext context, final URI uri) throws Exception {
         HttpTargetContext currentContext = null;
@@ -503,7 +509,8 @@ class HttpEJBReceiver extends EJBReceiver {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(context.getLocator());
         }
 
-        // if we are in a transaction, get a reference to the transaction's URI map and its resolved URI
+        // if we are in a transaction, get a reference to the transaction's URI map and make sure that a backend
+        // node has been assigned for this transaction
         if (inTransaction(context)) {
             ConcurrentMap<URI, String> map = getOrCreateTransactionURIMap(context.getTransaction());
             String backendNode = map.get(uri);
@@ -511,9 +518,14 @@ class HttpEJBReceiver extends EJBReceiver {
             if (backendNode == null) {
                 // acquire a randomly chosen backend node from this URI (in form http://<host>:<port>?node=<node>)
                 URI backendURI = currentContext.acquireBackendServer();
+                // debugging
+                EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Got backend server URI: %s", backendURI);
+
                 backendNode = parseURIQueryString(backendURI.getQuery());
                 map.putIfAbsent(uri, backendNode);
             }
+            // debugging
+            EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Using backend server: %s", backendNode);
         }
         return currentContext;
     }
@@ -583,22 +595,130 @@ class HttpEJBReceiver extends EJBReceiver {
     /*
      * This class manages the relationship between the proxy's strong and weak affinity and
      * the stickiness requirements of session beans resulting from session creation.
+     *
+     * Remember that for session creation operations:
+     * - requests start off with SLSB locators identifying a bean for which the session is to be created
+     * - responses are used to convert the SLSB locator ito a SFSB locator with a SessionID
+     *
      */
     private class SessionCreationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
-        private final EJBReceiverSessionCreationContext sessionCreationContext;
+        private final EJBReceiverSessionCreationContext receiverSessionCreationContext;
+        private final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId;
 
-        public SessionCreationStickinessHandler(EJBReceiverSessionCreationContext sessionCreationContext) {
-            this.sessionCreationContext = sessionCreationContext;
+        // need a fixed sessionID for this client
+        private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
+        private final String clientSessionID =sessionIdGenerator.createSessionId();
+
+        public SessionCreationStickinessHandler(EJBReceiverSessionCreationContext receiverSessionCreationContext, ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId) {
+            this.receiverSessionCreationContext = receiverSessionCreationContext;
+            this.node2SessionId = node2SessionId;
         }
 
+        /*
+         * In the case of SFSB session creation requests, we want the following conditions to hold:
+         * - if request not in transaction scope:
+         *   - no JSESSIONID Cookie to permit the load balancer to select backend node
+         *   - no additional Headers
+         * - if request in transaction scope:
+         *   - add JSESSIONID Cookie with fixed backend node for the enclosing transaction
+         *   - add STRICT_STICKINESS_HOST header with stickiness node based on transaction map
+         */
         @Override
-        public void prepareRequest(ClientRequest request) {
+        public void prepareRequest(ClientRequest request) throws Exception {
+            EjbHttpClientMessages.MESSAGES.infof("Calling SessionCreationStickinessHandler.prepareRequest for request %s", request);
+            EJBSessionCreationInvocationContext context = receiverSessionCreationContext.getClientInvocationContext();
 
+            if (inTransaction(context)) {
+                // get the backend node from the transaction's map
+                ConcurrentMap<URI, String> map = getOrCreateTransactionURIMap(context.getTransaction());
+                String route = map.get(context.getDestination());
+                if (route == null) {
+                    throw EjbHttpClientMessages.MESSAGES.couldNotResolveRouteForTransactionScopedInvocation(context.getTransaction().toString());
+                }
+
+                // add JSESSIONID Cookie to request for routing
+                HttpStickinessHelper.addEncodedSessionID(request, clientSessionID, route);
+
+                // indicate strict stickiness
+                HttpStickinessHelper.addStrictStickinessHost(request, route);
+            }
         }
 
+        /*
+         * In the case of SFSB session creation responses, we want the following conditions to hold:
+         * - if request not in transaction scope:
+         *   - expect JSESSIONID Cookie, extract route
+         *   - check for STRICT_AFFINITY_NODE=<node>
+         *     - if no STRICT_AFFINITY_NODE header present, update weak affinity of proxy to NodeAffinity(route)
+         *     - if STRICT_AFFINITY_NODE header present, assert equals route, update weak affinity of proxy to URIAffinity(node)
+         * - if request in transaction scope:
+         *   - expect JSESSIONID Cookie, extract route
+         *   - check for STRICT_AFFINITY_NODE=<node>
+         *     - if STRICT_AFFINITY_NODE header present, assert equals route, update weak affinity of proxy to URIAffinity(node)
+         *     - if no STRICT_AFFINITY_NODE header present, throw exception
+         */
         @Override
-        public void processResponse(ClientExchange result) {
+        public void processResponse(ClientExchange result) throws Exception {
+            EjbHttpClientMessages.MESSAGES.infof("Calling SessionCreationStickinessHandler.processResponse for response %s", result.getResponse());
 
+            EJBSessionCreationInvocationContext clientInvocationContext = receiverSessionCreationContext.getClientInvocationContext();
+            EJBLocator locator = clientInvocationContext.getLocator();
+            URI uri = clientInvocationContext.getDestination();
+
+            // locator of request is StatelessLocator, but we should not see Responses with no Cookie coming through here
+            // need to modify the test suite to return a route?
+            EjbHttpClientMessages.MESSAGES.infof("Calling SessionCreationStickinessHandler.processResponse for locator %s", locator);
+
+            ClientResponse response = result.getResponse();
+
+            // extract route from Cookie and update sessionID map
+            if (!HttpStickinessHelper.hasEncodedSessionID(response)) {
+                throw new Exception("SessionCreationStickinessHandler.processResponse(), SFSB session creation response is missing JSESSIONID Cookie");
+            }
+
+            String route = HttpStickinessHelper.updateNode2SessionIDMap(node2SessionId, uri, response);
+            EjbHttpClientMessages.MESSAGES.infof("SessionCreationStickinessHandler.processResponse(), route = %s", route);
+
+            // check for strict stickiness requirement; throw exception if violated
+            // NOTE: if state is replicated, there will be no STRICT_STICKINESS_HOST, and we use the route instead
+            boolean isSticky = false;
+
+            if (HttpStickinessHelper.hasStrictStickinessResult(response)) {
+                if (!HttpStickinessHelper.getStrictStickinessResult(response)) {
+                    String host = HttpStickinessHelper.getStrictStickinessHost(response) ;
+                    // actual route and stickiness host should not match
+                    assert !host.equals(route);
+                    throw new Exception("SessionCreationStickinessHandler.processResponse(): route and host do not match!: route = " + route + ",host = " + host);
+                }
+                isSticky = true;
+            }
+
+            Affinity weakAffinity = null;
+            if (!inTransaction(clientInvocationContext)) {
+                // non-transactional case:
+                // - update the proxy's weak affinity based on the route and stickiness values received
+                if (!isSticky) {
+                    weakAffinity = new NodeAffinity(route);
+                } else {
+                    weakAffinity = new URIAffinity(HttpStickinessHelper.createURIAffinityValue(route));
+                }
+            } else {
+                // transactional case:
+                // - if no STRICT_AFFINITY_NODE present, throw exception
+                if (!isSticky) {
+                    throw new Exception("Session creation response has no strict stickiness header");
+                }
+                weakAffinity = new URIAffinity(HttpStickinessHelper.createURIAffinityValue(route));
+            }
+
+            if (inTransaction(clientInvocationContext)) {
+                EjbHttpClientMessages.MESSAGES.infof("SessionCreationStickinessHandler.processResponse() [txn] updating weak affinity to %s", weakAffinity);
+            } else {
+                EjbHttpClientMessages.MESSAGES.infof("SessionCreationStickinessHandler.processResponse() [non-txn] updating weak affinity to %s", weakAffinity);
+            }
+
+            // update the weak affinity in the proxy
+            clientInvocationContext.setWeakAffinity(weakAffinity);
         }
     }
 
@@ -607,20 +727,168 @@ class HttpEJBReceiver extends EJBReceiver {
      * the stickiness requirements of session beans resulting from invocation.
      */
     private class InvocationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
-        private final EJBReceiverInvocationContext invocationContext;
+        private final EJBReceiverInvocationContext receiverInvocationContext;
+        private final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId;
 
-        public InvocationStickinessHandler(EJBReceiverInvocationContext invocationContext) {
-            this.invocationContext = invocationContext;
+        public InvocationStickinessHandler(EJBReceiverInvocationContext receiverInvocationContext,ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId ) {
+            this.receiverInvocationContext = receiverInvocationContext;
+            this.node2SessionId = node2SessionId;
         }
 
+        /*
+         * In the case of SLSB invocation requests, we want the following conditions to hold:
+         * - if request not in transaction scope:
+         *   - no additional conditions as SLSB requests are free to roam
+         * - if request in transaction scope:
+         *   - assert weak affinity of proxy is URIAffinity
+         *     - get route from URIAffinity
+         *     - add JSESSIONID Cookie with route to request
+         *     - add Header STRICT_AFFINITY_NODE=<route>         *
+         * NOTE: a SLSB can have its string affinity changed to ClusterAffinity on the server side, therefore when
+         * the SLSB is in transaction scope, we do not want it to roam freely
+         *
+         * In the case of SFSB invocation requests, we want the following conditions to hold:
+         * - if request not in transaction scope:
+         *   - if weak affinity of proxy is NodeAffinity:
+         *     - get route from NodeAffinity
+         *     - add JSESSIONID Cookie with route to request
+         *     - no additional Headers
+         *   - if weak affinity of proxy is URIAffinity:
+         *     - get route from URIAffinity
+         *     - add JSESSIONID Cookie with route to request
+         *     - add Header STRICT_AFFINITY_NODE=<route>
+         * - if request in transaction scope:
+         *   - assert weak affinity is URIAffinity
+         *   - get route from URIAffinity
+         *   - add JSESSIONID Cookie with node to request
+         *   - add Header STRICT_AFFINITY_NODE=<route>  -
+         */
         @Override
-        public void prepareRequest(ClientRequest request) {
+        public void prepareRequest(ClientRequest request) throws Exception {
+            EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler.prepareRequest for request %s", request);
 
+            EJBClientInvocationContext context = receiverInvocationContext.getClientInvocationContext();
+            EJBLocator locator = context.getLocator();
+            URI uri = context.getDestination();
+            Affinity weakAffinity = context.getWeakAffinity();
+
+            EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler().prepareRequest(), node2sessionID map: %s", node2SessionId);
+
+            if (inTransaction(context)) {
+                // process transaction case
+                assert weakAffinity instanceof URIAffinity;
+                String route = ((URIAffinity)weakAffinity).getUri().getHost();
+                assert route != null;
+
+                // get sessionID from map
+                String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionID, uri, route);
+
+                // add the JSESSIONID Cookie to the request
+                HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+
+                // add a stickiness header with the node
+                HttpStickinessHelper.addStrictStickinessHost(request, route);
+
+            } else if (locator instanceof StatefulEJBLocator) {
+                // process SFSB cases
+                if (weakAffinity instanceof NodeAffinity) {
+                    String route = ((NodeAffinity)weakAffinity).getNodeName();
+                    assert route != null;
+
+                    EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler.prepareRequest(), node2sessionID map: %s, uri = %s, route = %s", node2SessionId, uri, route);
+
+                    // get sessionID from map
+                    String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionID, uri, route);
+
+                    // add the JSESSIONID Cookie to the request
+                    HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+
+                } else if (weakAffinity instanceof URIAffinity) {
+                    String route = ((URIAffinity)weakAffinity).getUri().getHost();
+                    assert route != null;
+                    // get sessionID from map
+                    String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionID, uri, route);
+
+                    // add the JSESSIONID Cookie to the request
+                    HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+
+                    // add a stickiness header with the node
+                    HttpStickinessHelper.addStrictStickinessHost(request, route);
+                } else {
+                    // bad weak affinity value
+                    throw new Exception("InvocationStickinessHandler.prepareRequest(): bad weak affinity value!: weak affinity = " + weakAffinity.toString());
+                }
+            }
         }
 
+        /*
+         * In the case of SLSB invocation responses, we want the following conditions to hold:
+         * - if request not in transaction scope:
+         *   - no additional conditions as SLSB requests are free to roam
+         * - if request is in transaction scope:
+         *   - expect JSESSIONID Cookie, extract route
+         *   - assert Header STRICT_AFFINITY_RESULT=<boolean>
+         *     - if STRICT_AFFINITY_RESULT header present, extract result:
+         *       - if result == false, throw exception
+         * NOTE: a SLSB can have its string affinity changed to ClusterAffinity on the server side, therefore when
+         * the SLSB is in transaction scope, we do not want it to roam freely
+         *
+         * In the case of SFSB invocation responses, we want the following conditions to hold:
+         * - if request not in transaction scope:
+         *   - expect JSESSIONID Cookie, extract route
+         *   - check for STRICT_AFFINITY_RESULT=<boolean>
+         *     - if no STRICT_AFFINITY_RESULT header present
+         *       - update weak affinity of proxy to NodeAffinity(route)
+         *     - if STRICT_AFFINITY_RESULT header present, extract result:
+         *       - if result == false, throw exception
+         * - if request is in transaction scope:
+         *   - expect JSESSIONID Cookie, extract route
+         *   - assert Header STRICT_AFFINITY_RESULT=<boolean>
+         *     - if STRICT_AFFINITY_RESULT header present, extract result:
+         *       - if result == false, throw exception
+         *
+         */
         @Override
-        public void processResponse(ClientExchange result) {
+        public void processResponse(ClientExchange result) throws Exception  {
+            EjbHttpClientMessages.MESSAGES.infof("InvocationStickinessHandler.processResponse for response %s", result.getResponse());
 
+            EJBClientInvocationContext context = receiverInvocationContext.getClientInvocationContext();
+            EJBLocator locator = context.getLocator();
+            URI uri = context.getDestination();
+            Affinity weakAffinity = context.getWeakAffinity();
+
+            ClientResponse response = result.getResponse();
+
+            boolean isSticky = HttpStickinessHelper.getStrictStickinessResult(response);
+
+            if (inTransaction(context)) {
+                // process transaction case
+                if (!isSticky) {
+                    // stickiness not respected for this transaction
+                    throw new Exception("Stickiness not respected for transaction-scoped invocation");
+                }
+                // no need to update proxy as it is is URIAffinity
+                // assert something?
+
+            } else if (locator instanceof StatefulEJBLocator) {
+                // process SFSB cases (which always have a route)
+                boolean hasEncodedSessionID = HttpStickinessHelper.hasEncodedSessionID(response);
+                if (!hasEncodedSessionID) {
+                    // throw exception
+                    throw new Exception("SFSB response is missing its route");
+                }
+                String encodedSessionID = HttpStickinessHelper.getEncodedSessionID(response);
+                String sessionID = HttpStickinessHelper.extractSessionIDFromEncodedSessionID(encodedSessionID);
+                String route = HttpStickinessHelper.extractRouteFromEncodedSessionID(encodedSessionID);
+                EjbHttpClientMessages.MESSAGES.infof("InvocationStickinessHandler.processResponse(), sessionID, sessionID = %s, route = %s", sessionID, route);
+
+                if (!isSticky) {
+                    // update NodeAffinity in case we failed over
+                    context.setWeakAffinity(new NodeAffinity(route));
+                } else {
+                    // no need to update proxy as it is URIAffinity
+                }
+            }
         }
     }
 }

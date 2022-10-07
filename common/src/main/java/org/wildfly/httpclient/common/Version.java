@@ -26,7 +26,8 @@ package org.wildfly.httpclient.common;
  */
 public enum Version {
     VERSION_1(1),
-    LATEST(2)
+    VERSION_2(2),
+    LATEST(3)
     ;
     private final int version;
 
