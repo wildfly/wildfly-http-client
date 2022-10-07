@@ -250,8 +250,8 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public interface HttpStickinessHandler {
-        void prepareRequest(ClientRequest request);
-        void processResponse(ClientExchange result);
+        void prepareRequest(ClientRequest request) throws Exception ;
+        void processResponse(ClientExchange result) throws Exception ;
     }
 
     /*
@@ -301,7 +301,15 @@ public class HttpTargetContext extends AbstractAttachable {
 
             // set up stickiness metadata for this request
             if (httpStickinessHandler != null) {
-                httpStickinessHandler.prepareRequest(request);
+                try {
+                    httpStickinessHandler.prepareRequest(request);
+                } catch(Exception e) {
+                    try {
+                        failureHandler.handleFailure(e);
+                    } finally {
+                        connection.done(true);
+                    }
+                }
             }
 
             if (httpMarshaller != null) {
@@ -478,7 +486,15 @@ public class HttpTargetContext extends AbstractAttachable {
 
                         // set up stickiness metadata for this response
                         if (httpStickinessHandler != null) {
-                            httpStickinessHandler.processResponse(result);
+                            try {
+                                httpStickinessHandler.processResponse(result);
+                            } catch(Exception e) {
+                                try {
+                                    failureHandler.handleFailure(e);
+                                } finally {
+                                    connection.done(true);
+                                }
+                            }
                         }
 
                         if (httpResultHandler != null) {
