@@ -190,4 +190,15 @@ public class SimpleNamingOperationTestCase {
         NamingEnumeration<Binding> list = ic.listBindings("test");
         Assert.assertNotNull(list);
     }
+
+    @Test
+    public void testHttpNamingEjbObjectResolverHelper() throws NamingException {
+        InitialContext ic = createContext();
+        Assert.assertEquals(TestHttpNamingEjbObjectResolverHelper.create("readResolve->" + HTTPTestServer.getDefaultServerURL()),
+                ic.lookup("test-resolver-helper"));
+
+        ic.rebind("test-resolver-helper", TestHttpNamingEjbObjectResolverHelper.create("test"));
+        Assert.assertEquals(TestHttpNamingEjbObjectResolverHelper.create("writeReplace->" + HTTPTestServer.getDefaultServerURL()),
+                ic.lookup("test-resolver-helper"));
+    }
 }

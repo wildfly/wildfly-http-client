@@ -184,14 +184,14 @@ public class HttpRootContext extends AbstractContext {
 
     private static Marshaller createMarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
         if (helper != null) {
-            httpMarshallerFactory.createMarshaller(helper.getObjectResolver(uri));
+            return httpMarshallerFactory.createMarshaller(helper.getObjectResolver(uri));
         }
         return httpMarshallerFactory.createMarshaller();
     }
 
     private static Unmarshaller createUnmarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
         if (helper != null) {
-            httpMarshallerFactory.createUnmarshaller(helper.getObjectResolver(uri));
+            return httpMarshallerFactory.createUnmarshaller(helper.getObjectResolver(uri));
         }
         return httpMarshallerFactory.createUnmarshaller();
     }
