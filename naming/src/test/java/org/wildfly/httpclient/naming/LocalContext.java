@@ -43,6 +43,7 @@ public class LocalContext implements Context {
     public LocalContext(boolean readOnly) {
         bindings.put("test", "test value");
         bindings.put("comp/UserTransaction", "transaction");
+        bindings.put("test-resolver-helper", TestHttpNamingEjbObjectResolverHelper.create("test"));
         this.readOnly = readOnly;
     }
 
