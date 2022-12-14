@@ -26,6 +26,7 @@ import io.undertow.client.UndertowClient;
 import io.undertow.connector.ByteBufferPool;
 import io.undertow.protocols.ssl.UndertowXnioSsl;
 import org.xnio.ChannelListener;
+import org.xnio.IoFuture;
 import org.xnio.IoUtils;
 import org.xnio.OptionMap;
 import org.xnio.XnioExecutor;
@@ -39,6 +40,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
@@ -153,30 +155,35 @@ public class HttpConnectionPool implements Closeable {
             return;
         }
 
+        // get a ClientConnection to the target and invoke the ConnectionListener (or FailureListener)
         try {
-
             final SSLContext context = sslContext;
-            UndertowClient.getInstance().connect(new ClientCallback<ClientConnection>() {
-                @Override
-                public void completed(ClientConnection result) {
-                    result.getCloseSetter().set((ChannelListener<ClientConnection>) connections::remove);
-                    ClientConnectionHolder clientConnectionHolder = createClientConnectionHolder(result, hostPoolAddress.getURI(), context);
-                    clientConnectionHolder.tryAcquire(); //aways suceeds
-                    next.connectionListener.done(clientConnectionHolder);
-                }
+            ClientConnection connection = null;
+            URI uri = new URI(hostPoolAddress.getURI().getScheme(), hostPoolAddress.getURI().getUserInfo(), address.getHostAddress(), hostPoolAddress.getURI().getPort(), "/", null, null);
 
-                @Override
-                public void failed(IOException e) {
-                    hostPoolAddress.failed(); //notify the host pool that this host has failed
-                    activeInvocationCount.decrementAndGet();
-                    next.errorListener.error(e);
-                }
-            }, new URI(hostPoolAddress.getURI().getScheme(), hostPoolAddress.getURI().getUserInfo(), address.getHostAddress(), hostPoolAddress.getURI().getPort(), "/", null, null), worker, ssl, byteBufferPool, options);
+            // get a ClientConnection asynchronously
+            IoFuture<ClientConnection> result = UndertowClient.getInstance().connect(uri, worker, ssl, byteBufferPool, options);
+
+            try {
+                connection = result.get();
+            } catch (IOException e) {
+                // we failed to get a ClientConnection, call the ErrorListener
+                hostPoolAddress.failed();
+                activeInvocationCount.decrementAndGet();
+                next.errorListener.error(e);
+            } catch (CancellationException e) {
+                // can't happen
+            }
+
+            // we now have a new ClientConnection, call the ConnectionListener
+            connection.getCloseSetter().set((ChannelListener<ClientConnection>) connections::remove);
+            ClientConnectionHolder clientConnectionHolder = createClientConnectionHolder(connection, hostPoolAddress.getURI(), context);
+            clientConnectionHolder.tryAcquire(); // always succeeds
+            next.connectionListener.done(clientConnectionHolder);
+
         } catch (URISyntaxException e) {
             next.errorListener.error(e);
         }
-
-
     }
 
     @Override
