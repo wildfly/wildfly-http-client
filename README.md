@@ -1,7 +1,7 @@
 Wildfly HTTP Client
 ===========
 
-Wildfly HTTP Client is a client libraries that support EJB, Naming and Transactions over HTTP. It consists of
+Wildfly HTTP Client is a client libraries that support EJB, Naming and Transactions over HTTP. It consists of:
 
 * Request Timeouts
 * Digest Auth
@@ -9,9 +9,34 @@ Wildfly HTTP Client is a client libraries that support EJB, Naming and Transacti
 * Multiplexing support
 * SSL testing
 
+Building From Source
+--------------------
 
-Issues: https://issues.jboss.org/browse/WEJBHTTP
+```console
+$ git clone https://github.com/wildfly/wildfly-http-client
+```
+
+Setup the JBoss Maven Repository
+--------------------------------
+
+To use dependencies from JBoss.org, you need to add the JBoss Maven Repositories to your Maven settings.xml. For details see [Maven Getting Started - Users](https://developer.jboss.org/docs/DOC-15169)
 
 
-### Build
-    mvn install
+Build with Maven
+----------------
+
+The command below builds the project and runs the embedded suite.
+
+```console
+$ mvn clean install
+```
+
+Issue Tracking
+--------------
+
+Bugs and features are tracked at https://issues.jboss.org/browse/WEJBHTTP
+
+Contributions
+-------------
+
+All new features and enhancements should be submitted to master branch only.
