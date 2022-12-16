@@ -39,4 +39,4 @@ Bugs and features are tracked at https://issues.jboss.org/browse/WEJBHTTP
 Contributions
 -------------
 
-All new features and enhancements should be submitted to master branch only.
+All new features and enhancements should be submitted against main branch only.
