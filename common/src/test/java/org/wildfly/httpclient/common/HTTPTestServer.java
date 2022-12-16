@@ -281,6 +281,10 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         return createSSLContext(loadKeyStore(SERVER_KEY_STORE), loadKeyStore(SERVER_TRUST_STORE));
     }
 
+    public static SSLContext createClientSSLContext() {
+        return createSSLContext(loadKeyStore(CLIENT_KEY_STORE), loadKeyStore(CLIENT_TRUST_STORE));
+    }
+
     private static SSLContext createSSLContext(final KeyStore keyStore, final KeyStore trustStore) {
         KeyManager[] keyManagers;
         try {

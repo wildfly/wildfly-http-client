@@ -36,9 +36,7 @@
     </discovery>
     <authentication-client xmlns="urn:elytron:1.0">
         <authentication-rules>
-            <rule use-configuration="administrator">
-                <match-host name="localhost" />
-            </rule>
+            <rule use-configuration="administrator"/>
         </authentication-rules>
         <authentication-configurations>
             <configuration name="administrator">
