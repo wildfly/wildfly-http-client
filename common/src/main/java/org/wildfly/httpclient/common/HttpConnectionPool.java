@@ -36,6 +36,7 @@ import org.xnio.IoUtils;
 import org.xnio.OptionMap;
 import org.xnio.XnioExecutor;
 import org.xnio.XnioWorker;
+import io.undertow.UndertowOptions;
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientConnection;
 import io.undertow.client.UndertowClient;
@@ -73,9 +74,22 @@ public class HttpConnectionPool implements Closeable {
         this.maxStreamsPerConnection = maxStreamsPerConnection;
         this.worker = worker;
         this.byteBufferPool = byteBufferPool;
-        this.options = options;
         this.hostPool = hostPool;
         this.connectionIdleTimeout = connectionIdleTimeout;
+        final String hostname = hostPool.getUri().getHost();
+        if ("https".equals(hostPool.getUri().getScheme()) && hostname != null) {
+            try {
+                final InetAddress address = hostPool.getAddress().getAddress();
+                if (address.toString().charAt(0) != '/') {
+                    // address not starting with / means hostname used, add the SNI option
+                    options = OptionMap.builder().addAll(options).set(UndertowOptions.SSL_SNI_HOSTNAME, hostname).getMap();
+                }
+            } catch (UnknownHostException e) {
+                // if exception the URI contains a hostname
+                options = OptionMap.builder().addAll(options).set(UndertowOptions.SSL_SNI_HOSTNAME, hostname).getMap();
+            }
+        }
+        this.options = options;
     }
 
     public void getConnection(ConnectionListener connectionListener, ErrorListener errorListener, boolean ignoreConnectionLimits, SSLContext sslContext) {
