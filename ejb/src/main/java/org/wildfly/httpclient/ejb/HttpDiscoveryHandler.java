@@ -48,7 +48,7 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
 
     @Deprecated
     public HttpDiscoveryHandler(ExecutorService executorService, Association association) {
-        this (executorService, association, HttpServiceConfig.DEFAULT);
+        this (executorService, association, HttpServiceConfig.getInstance());
     }
 
     public HttpDiscoveryHandler(ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
