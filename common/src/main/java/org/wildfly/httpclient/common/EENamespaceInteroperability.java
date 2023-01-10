@@ -124,14 +124,14 @@ final class EENamespaceInteroperability {
         return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(multiVersionedProtocolHandlers[0]), versionedJakartaNamespaceHandlers);
     }
 
-    static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
+    private static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
         final PathHandler versionPathHandler = new PathHandler();
         versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
         versionPathHandler.addPrefixPath(VERSION_TWO_PATH, latestProtocolHandler);
         return versionPathHandler;
     }
 
-    static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler... versionedProtocolHandlers) {
+    private static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler... versionedProtocolHandlers) {
         final PathHandler versionPathHandler = new PathHandler();
         versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
         int version = 2;
