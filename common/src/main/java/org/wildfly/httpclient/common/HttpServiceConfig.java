@@ -20,8 +20,6 @@ package org.wildfly.httpclient.common;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 
-import java.util.function.Function;
-
 /**
  * Mode configuration for http services.
  * <p>
@@ -30,14 +28,12 @@ import java.util.function.Function;
  *
  * @author Flavia Rainone
  */
-public enum HttpServiceConfig {
+public class HttpServiceConfig {
 
     /**
      * Default configuration. Used by both EE namespace interoperable and non-interoperable servers
      */
-    DEFAULT (EENamespaceInteroperability::createInteroperabilityHandler,
-            EENamespaceInteroperability::createInteroperabilityHandler,
-            EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
+    private static final HttpServiceConfig INSTANCE = new HttpServiceConfig (EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
 
     /**
      * Returns the default configuration.
@@ -45,16 +41,12 @@ public enum HttpServiceConfig {
      * @return the configuration for http services
      */
     public static HttpServiceConfig getInstance() {
-        return DEFAULT;
+        return INSTANCE;
     }
 
-    private final Function<HttpHandler, HttpHandler> singleHandlerWrapper;
-    private final Function<HttpHandler[], HttpHandler> multiVersionedHandlerWrapper;
     private final HttpMarshallerFactoryProvider marshallerFactoryProvider;
 
-    HttpServiceConfig(Function<HttpHandler, HttpHandler> singleHandlerWrapper, Function<HttpHandler[], HttpHandler> multiVersionedHandlerWrapper, HttpMarshallerFactoryProvider marshallerFactoryProvider) {
-        this.singleHandlerWrapper = singleHandlerWrapper;
-        this.multiVersionedHandlerWrapper = multiVersionedHandlerWrapper;
+    HttpServiceConfig(HttpMarshallerFactoryProvider marshallerFactoryProvider) {
         this.marshallerFactoryProvider = marshallerFactoryProvider;
     }
 
@@ -75,7 +67,7 @@ public enum HttpServiceConfig {
      *         before invoking the inner {@code handler}.
      */
     public HttpHandler wrap(HttpHandler handler) {
-        return singleHandlerWrapper.apply(handler);
+        return EENamespaceInteroperability.createInteroperabilityHandler(handler);
     }
 
     /**
@@ -101,7 +93,7 @@ public enum HttpServiceConfig {
      *         versioning to invoke the appropriate handler
      */
     public HttpHandler wrap(HttpHandler... multiVersionedHandlers) {
-        return multiVersionedHandlerWrapper.apply(multiVersionedHandlers);
+        return EENamespaceInteroperability.createInteroperabilityHandler(multiVersionedHandlers);
     }
 
     /**
