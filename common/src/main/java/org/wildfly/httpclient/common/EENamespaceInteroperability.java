@@ -46,6 +46,7 @@ import java.util.List;
 import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
 import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 
 /**
@@ -86,7 +87,12 @@ final class EENamespaceInteroperability {
 
     /**
      * Wraps the HTTP server handler into an EE namespace interoperable handler. Such handler implements the
-     * EE namespace interoperability at the server side before delegating to the wrapped {@code httpHandler}
+     * EE namespace interoperability at the server side before delegating to the wrapped {@code httpHandler}.
+     * The resulting handler handles the EE namespace interoperability according to the value of  {@link
+     * #EE_NAMESPACE_INTEROPERABLE_MODE}. It accepts {@code javax} namespace requests at the path prefix {@code
+     * "/v1"}, while {@code jakarta} namespace requests are received at the path prefix {@code "/v2"}. Both
+     * requests are forwarded to {@code handler}, but in case of {@code "/v1"} the {@code javax} namespace is
+     * converted to {@code jakarta}.
      *
      * @param httpHandler the handler to be wrapped
      * @return handler the ee namespace interoperability handler
@@ -95,10 +101,43 @@ final class EENamespaceInteroperability {
         return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(httpHandler), new JakartaNamespaceHandler(httpHandler));
     }
 
+    /**
+     * Wraps the multi-versioned HTTP server handlers into an EE namespace interoperable handler. Such handler
+     * implements the EE namespace interoperability at the server side before delegating to the wrapped HTTP
+     * handler. The resulting handler handles the EE namespace interoperability according to the value of
+     * {@link #EE_NAMESPACE_INTEROPERABLE_MODE}. It accepts {@code javax} namespace requests at the path prefix
+     * {@code "/v1"}, while {@code jakarta} namespace requests are received at the subsequent path prefixes
+     * {@code "/v2"}, {@code "/v3"}, and so on. Requests to {@code "/v1"} and {@code "/v2"} path prefixes will be
+     * forwarded to {@code multiVersionedProtocolHandlers[0]}, while {@code "/v3"} will be forwarded to {@code
+     * multiVersionedProtocolHandlers[1]}. The sequence of paths follows until each multi-versioned handler
+     * {@code multiVersionedProtocolHandlers[N]} is associated with a prefix path {@code "/v&lt;N+2&gt;"}.
+     *
+     * @param multiVersionedProtocolHandlers the multiple handlers to be wrapped.
+     * @return handler the ee namespace interoperability handler
+     */
+    static HttpHandler createInteroperabilityHandler(HttpHandler... multiVersionedProtocolHandlers) {
+        assert multiVersionedProtocolHandlers.length > 0;
+        HttpHandler[] versionedJakartaNamespaceHandlers = new HttpHandler[multiVersionedProtocolHandlers.length];
+        for (int i = 0; i < multiVersionedProtocolHandlers.length; i++) {
+            versionedJakartaNamespaceHandlers[i] = new JakartaNamespaceHandler(multiVersionedProtocolHandlers[i]);
+        }
+        return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(multiVersionedProtocolHandlers[0]), versionedJakartaNamespaceHandlers);
+    }
+
     static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
         final PathHandler versionPathHandler = new PathHandler();
         versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
         versionPathHandler.addPrefixPath(VERSION_TWO_PATH, latestProtocolHandler);
+        return versionPathHandler;
+    }
+
+    static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler... versionedProtocolHandlers) {
+        final PathHandler versionPathHandler = new PathHandler();
+        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
+        int version = 2;
+        for (HttpHandler versionedProtocolHandler: versionedProtocolHandlers) {
+            versionPathHandler.addPrefixPath(VERSION_PATH + version++, versionedProtocolHandler);
+        }
         return versionPathHandler;
     }
 
