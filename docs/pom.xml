@@ -24,13 +24,13 @@
     <parent>
         <groupId>org.wildfly.wildfly-http-client</groupId>
         <artifactId>wildfly-http-client-parent</artifactId>
-        <version>1.1.16.Final-SNAPSHOT</version>
+        <version>1.1.16.Final</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <groupId>org.wildfly.wildfly-http-client</groupId>
     <artifactId>wildfly-http-client-documentation</artifactId>
-    <version>1.1.16.Final-SNAPSHOT</version>
+    <version>1.1.16.Final</version>
     <name>Wildfly HTTP Client Documentation - Java EE Variant</name>
     <packaging>pom</packaging>
 
