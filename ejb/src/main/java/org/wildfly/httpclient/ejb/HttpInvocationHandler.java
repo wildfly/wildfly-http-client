@@ -23,6 +23,7 @@ import io.undertow.server.handlers.Cookie;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
 import org.jboss.ejb.client.Affinity;
+import org.jboss.ejb.client.EJBClient;
 import org.jboss.ejb.client.EJBHomeLocator;
 import org.jboss.ejb.client.EJBIdentifier;
 import org.jboss.ejb.client.EJBLocator;
@@ -193,6 +194,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                         } else {
                             contextData = new HashMap<>();
                         }
+                        contextData.put(EJBClient.SOURCE_ADDRESS_KEY, exchange.getConnection().getPeerAddress());
 
                         unmarshaller.finish();
 
