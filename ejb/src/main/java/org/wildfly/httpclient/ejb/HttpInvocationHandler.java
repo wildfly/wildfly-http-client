@@ -47,6 +47,7 @@ import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -73,9 +74,10 @@ import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
 import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
 
 /**
- * Http handler for EJB invocations.
+ * A server-side handler for processing EJB client invocation requests.
  *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 class HttpInvocationHandler extends RemoteHTTPHandler {
 
@@ -86,10 +88,10 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     private final Function<String, Boolean> classResolverFilter;
     private final HttpServiceConfig httpServiceConfig;
 
-    HttpInvocationHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+    HttpInvocationHandler(Version version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                           Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter,
                           HttpServiceConfig httpServiceConfig) {
-        super(executorService);
+        super(version, executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
@@ -210,7 +212,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
 
                         final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpMarshallerFactory(exchange);
                         final Marshaller marshaller = marshallerFactory.createMarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
-                        return new ResolvedInvocation(contextData, methodParams, locator, exchange, marshaller, sessionAffinity, transaction, identifier);
+                        return new ResolvedInvocation(getVersion(), contextData, methodParams, locator, exchange, marshaller, sessionAffinity, transaction, identifier);
                     } catch (IOException | ClassNotFoundException e) {
                         throw e;
                     } catch (Throwable e) {
@@ -323,6 +325,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     }
 
     class ResolvedInvocation implements InvocationRequest.Resolved {
+        private final Version version;
         private final Map<String, Object> contextData;
         private final Object[] methodParams;
         private final EJBLocator<?> locator;
@@ -332,7 +335,8 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
         private final Transaction transaction;
         private final InvocationIdentifier identifier;
 
-        public ResolvedInvocation(Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Transaction transaction, final InvocationIdentifier identifier) {
+        public ResolvedInvocation(Version version, Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Transaction transaction, final InvocationIdentifier identifier) {
+            this.version = version;
             this.contextData = contextData;
             this.methodParams = methodParams;
             this.locator = locator;

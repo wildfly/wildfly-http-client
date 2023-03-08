@@ -31,6 +31,7 @@ import io.undertow.util.Methods;
 import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.CancelHandle;
 import org.wildfly.httpclient.common.HttpServiceConfig;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.transaction.client.LocalTransactionContext;
 
 import java.util.Map;
@@ -44,7 +45,7 @@ import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 
 /**
- * HTTP service that handles EJB calls.
+ * HTTP service that handles EJB client invocations.
  *
  * @author Stuart Douglas
  * @author Flavia Rainone
@@ -64,8 +65,7 @@ public class EjbHttpService {
         this(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, null);
     }
 
-    public EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                          Function<String, Boolean> classResolverFilter) {
+    public EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, Function<String, Boolean> classResolverFilter) {
         this(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, classResolverFilter);
     }
 
@@ -79,18 +79,26 @@ public class EjbHttpService {
     }
 
     public HttpHandler createHttpHandler() {
-        PathHandler pathHandler = new PathHandler();
-        pathHandler.addPrefixPath(EJB_INVOKE_PATH, new AllowedMethodsHandler(
-                new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig), Methods.POST))
-                .addPrefixPath(EJB_OPEN_PATH, new AllowedMethodsHandler(
-                        new HttpSessionOpenHandler(association, executorService, localTransactionContext, httpServiceConfig), Methods.POST))
-                .addPrefixPath(EJB_CANCEL_PATH, new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
-                .addPrefixPath(EJB_DISCOVER_PATH, new AllowedMethodsHandler(
-                        new HttpDiscoveryHandler(executorService, association, httpServiceConfig), Methods.GET));
-        EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
-        RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
-        requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
-        return httpServiceConfig.wrap(requestEncodingHandler);
-    }
+        // create a combined handler for each handler version
+        RequestEncodingHandler[] requestEncodingHandlers = new RequestEncodingHandler[Version.values().length];
 
+        for (Version version : Version.values()) {
+            PathHandler pathHandler = new PathHandler();
+            pathHandler.addPrefixPath(EJB_INVOKE_PATH, new AllowedMethodsHandler(
+                            new HttpInvocationHandler(version, association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig), Methods.POST))
+                    .addPrefixPath(EJB_OPEN_PATH, new AllowedMethodsHandler(
+                            new HttpSessionOpenHandler(version, association, executorService, localTransactionContext, httpServiceConfig), Methods.POST))
+                    .addPrefixPath(EJB_CANCEL_PATH, new AllowedMethodsHandler(
+                            new HttpCancelHandler(version, association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
+                    .addPrefixPath(EJB_DISCOVER_PATH, new AllowedMethodsHandler(
+                            new HttpDiscoveryHandler(version, executorService, association, httpServiceConfig), Methods.GET));
+            EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
+            RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
+            requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
+
+            int versionIndex = version.getVersion()-1;
+            requestEncodingHandlers[versionIndex] = requestEncodingHandler;
+        }
+        return httpServiceConfig.wrap(requestEncodingHandlers);
+    }
 }

@@ -27,6 +27,7 @@ import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
+import org.wildfly.httpclient.common.Version;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -36,9 +37,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Http handler for discovery requests.
+ * A server-side handler for processing EJB client discovery requests.
  *
  * @author <a href="mailto:tadamski@redhat.com">Tomasz Adamski</a>
+ * @author Richard Achmatowicz
  */
 
 public class HttpDiscoveryHandler extends RemoteHTTPHandler {
@@ -47,12 +49,12 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
     private final HttpServiceConfig httpServiceConfig;
 
     @Deprecated
-    public HttpDiscoveryHandler(ExecutorService executorService, Association association) {
-        this (executorService, association, HttpServiceConfig.getInstance());
+    public HttpDiscoveryHandler(Version version, ExecutorService executorService, Association association) {
+        this (version, executorService, association, HttpServiceConfig.getInstance());
     }
 
-    public HttpDiscoveryHandler(ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
-        super(executorService);
+    public HttpDiscoveryHandler(Version version, ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
+        super(version, executorService);
         association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {
             @Override
             public void moduleAvailable(List<EJBModuleIdentifier> modules) {

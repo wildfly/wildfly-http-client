@@ -25,6 +25,7 @@ import io.undertow.util.Methods;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
 import org.xnio.IoUtils;
@@ -52,15 +53,18 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
  * Represents a remote subordinate transaction that is managed over HTTP protocol.
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
+ * @author Richard Achmatowicz
  */
 class HttpSubordinateTransactionHandle implements SubordinateTransactionControl {
 
+    private final Version version;
     private final HttpTargetContext targetContext;
     private final Xid id;
     private final SSLContext sslContext;
     private final AuthenticationConfiguration authenticationConfiguration;
 
-    HttpSubordinateTransactionHandle(final Xid id, final HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+    HttpSubordinateTransactionHandle(final Version version, final Xid id, final HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+        this.version = version;
         this.id = id;
         this.targetContext = targetContext;
         this.sslContext = sslContext;

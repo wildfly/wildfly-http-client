@@ -37,6 +37,7 @@ import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -56,9 +57,10 @@ import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
 import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
 
 /**
- * Http handler for open session requests.
+ * A server-side handler for processing EJB client session open requests
  *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
@@ -69,8 +71,8 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
     private final LocalTransactionContext localTransactionContext;
     private final HttpServiceConfig httpServiceConfig;
 
-    HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
-        super(executorService);
+    HttpSessionOpenHandler(Version version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
+        super(version, executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
