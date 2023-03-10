@@ -20,12 +20,18 @@ package org.wildfly.httpclient.common;
 /*
  * Versioning enum for HttpHandler implementations.
  *
+ * TODO: due to the way EENamespaceInteroperability.createInteroperabilityHandler(HttpHandler...) works,
+ * the original protocol versions JAVAEE_PROTOCOL_VERSION and JAKARTA_PROTOCOL_VERSION need to share
+ * the same handler instance, so it was not possible to match protocol handler indexes to protocol versions
+ * in a 1-to-1 manner. In order to avoid a confusing protocol version to handler version mismatch, they share
+ * the handler installed at index 2.
  * TODO: integrate this with the Protocol class in a nice way.
  *
  * @author Richard Achmatowicz
  */
 public enum Version {
-    VERSION_1(1),
+    EARLIEST(2),
+    VERSION_1(2),
     VERSION_2(2),
     LATEST(3)
     ;

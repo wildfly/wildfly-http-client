@@ -115,7 +115,7 @@ public class HttpRemoteNamingService {
             routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler(version));
             routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler(version));
 
-            int versionIndex = version.getVersion()-1;
+            int versionIndex = version.getVersion() - Version.EARLIEST.getVersion();
             handlers[versionIndex] = new BlockingHandler(new ElytronIdentityHandler(routingHandler));
         }
         return httpServiceConfig.wrap(handlers);

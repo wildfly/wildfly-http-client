@@ -96,7 +96,7 @@ public class EjbHttpService {
             RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
             requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
 
-            int versionIndex = version.getVersion()-1;
+            int versionIndex = version.getVersion() - Version.EARLIEST.getVersion();
             requestEncodingHandlers[versionIndex] = requestEncodingHandler;
         }
         return httpServiceConfig.wrap(requestEncodingHandlers);

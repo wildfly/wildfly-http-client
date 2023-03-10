@@ -103,7 +103,7 @@ public class HttpRemoteTransactionService {
             routingHandler.add(Methods.POST, XA_ROLLBACK_PATH, new XARollbackHandler(version));
             routingHandler.add(Methods.GET, XA_RECOVER_PATH, new XARecoveryHandler(version));
 
-            int versionIndex = version.getVersion()-1;
+            int versionIndex = version.getVersion() - Version.EARLIEST.getVersion();
             handlers[versionIndex] = new BlockingHandler(new ElytronIdentityHandler(routingHandler));
         }
         return httpServiceConfig.wrap(handlers);
