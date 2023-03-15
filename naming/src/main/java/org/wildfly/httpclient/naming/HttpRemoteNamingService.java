@@ -37,7 +37,7 @@ import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.httpclient.common.VersionedHttpHandler;
 
 import javax.naming.Binding;
@@ -99,9 +99,9 @@ public class HttpRemoteNamingService {
 
     public HttpHandler createHandler() {
         // create a composite handler for each protocol version
-        BlockingHandler[] handlers = new BlockingHandler[Version.values().length];
+        BlockingHandler[] handlers = new BlockingHandler[HandlerVersion.values().length];
 
-        for (Version version : Version.values()) {
+        for (HandlerVersion version : HandlerVersion.values()) {
             RoutingHandler routingHandler = new RoutingHandler();
             final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
             routingHandler.add(Methods.POST, LOOKUP_PATH + nameParamPathSuffix, new LookupHandler(version));
@@ -115,7 +115,7 @@ public class HttpRemoteNamingService {
             routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler(version));
             routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler(version));
 
-            int versionIndex = version.getVersion() - Version.EARLIEST.getVersion();
+            int versionIndex = version.getVersion() - HandlerVersion.EARLIEST.getVersion();
             handlers[versionIndex] = new BlockingHandler(new ElytronIdentityHandler(routingHandler));
         }
         return httpServiceConfig.wrap(handlers);
@@ -124,7 +124,7 @@ public class HttpRemoteNamingService {
 
     private abstract class NameHandler extends VersionedHttpHandler {
 
-        public NameHandler(Version version) {
+        public NameHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -154,7 +154,7 @@ public class HttpRemoteNamingService {
 
     private final class LookupHandler extends NameHandler {
 
-        public LookupHandler(Version version) {
+        public LookupHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -166,7 +166,7 @@ public class HttpRemoteNamingService {
 
     private final class LookupLinkHandler extends NameHandler {
 
-        public LookupLinkHandler(Version version) {
+        public LookupLinkHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -178,7 +178,7 @@ public class HttpRemoteNamingService {
 
     private class CreateSubContextHandler extends NameHandler {
 
-        public CreateSubContextHandler(Version version) {
+        public CreateSubContextHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -190,7 +190,7 @@ public class HttpRemoteNamingService {
 
     private class UnbindHandler extends NameHandler {
 
-        public UnbindHandler(Version version) {
+        public UnbindHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -203,7 +203,7 @@ public class HttpRemoteNamingService {
 
     private class ListBindingsHandler extends NameHandler {
 
-        public ListBindingsHandler(Version version) {
+        public ListBindingsHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -216,7 +216,7 @@ public class HttpRemoteNamingService {
 
     private class RenameHandler extends NameHandler {
 
-        public RenameHandler(Version version) {
+        public RenameHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -240,7 +240,7 @@ public class HttpRemoteNamingService {
 
     private class DestroySubcontextHandler extends NameHandler {
 
-        public DestroySubcontextHandler(Version version) {
+        public DestroySubcontextHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -253,7 +253,7 @@ public class HttpRemoteNamingService {
 
     private class ListHandler extends NameHandler {
 
-        public ListHandler(Version version) {
+        public ListHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -266,7 +266,7 @@ public class HttpRemoteNamingService {
 
     private class RebindHandler extends BindHandler {
 
-        public RebindHandler(Version version) {
+        public RebindHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -278,7 +278,7 @@ public class HttpRemoteNamingService {
 
     private class BindHandler extends NameHandler {
 
-        public BindHandler(Version version) {
+        public BindHandler(HandlerVersion version) {
             super(version);
         }
 

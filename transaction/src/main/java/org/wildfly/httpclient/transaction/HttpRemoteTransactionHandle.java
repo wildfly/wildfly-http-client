@@ -25,7 +25,7 @@ import io.undertow.util.Methods;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SimpleTransactionControl;
 import org.xnio.IoUtils;
@@ -56,14 +56,14 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
  */
 class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
-    private final Version version;
+    private final HandlerVersion version;
     private final HttpTargetContext targetContext;
     private final AtomicInteger statusRef = new AtomicInteger(Status.STATUS_ACTIVE);
     private final Xid id;
     private final SSLContext sslContext;
     private final AuthenticationConfiguration authenticationConfiguration;
 
-    HttpRemoteTransactionHandle(final Version version, final Xid id, final HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+    HttpRemoteTransactionHandle(final HandlerVersion version, final Xid id, final HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
         this.version = version;
         this.id = id;
         this.targetContext = targetContext;

@@ -132,11 +132,11 @@ class HttpEJBReceiver extends EJBReceiver {
     @Override
     protected void processInvocation(EJBReceiverInvocationContext receiverContext) throws Exception {
 
-        EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
+        final EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
         EJBLocator<?> locator = clientInvocationContext.getLocator();
 
-        URI uri = clientInvocationContext.getDestination();
-        HttpTargetContext targetContext = resolveTargetContext(clientInvocationContext, uri);
+        final URI uri = clientInvocationContext.getDestination();
+        final HttpTargetContext targetContext = resolveTargetContext(clientInvocationContext, uri);
         if (targetContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
@@ -274,9 +274,9 @@ class HttpEJBReceiver extends EJBReceiver {
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
     protected SessionID createSession(final EJBReceiverSessionCreationContext receiverContext) throws Exception {
-        EJBSessionCreationInvocationContext sessionCreationInvocationContext = receiverContext.getClientInvocationContext();
+        final EJBSessionCreationInvocationContext sessionCreationInvocationContext = receiverContext.getClientInvocationContext();
         final EJBLocator<?> locator = receiverContext.getClientInvocationContext().getLocator();
-        URI uri = sessionCreationInvocationContext.getDestination();
+        final URI uri = sessionCreationInvocationContext.getDestination();
 
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
@@ -284,7 +284,7 @@ class HttpEJBReceiver extends EJBReceiver {
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
 
-        HttpTargetContext targetContext = resolveTargetContext(sessionCreationInvocationContext, uri);
+        final HttpTargetContext targetContext = resolveTargetContext(sessionCreationInvocationContext, uri);
         if (targetContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
@@ -337,9 +337,9 @@ class HttpEJBReceiver extends EJBReceiver {
     @Override
     protected boolean cancelInvocation(EJBReceiverInvocationContext receiverContext, boolean cancelIfRunning) {
 
-        EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
-        EJBLocator<?> locator = clientInvocationContext.getLocator();
-        URI uri = clientInvocationContext.getDestination();
+        final EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
+        final EJBLocator<?> locator = clientInvocationContext.getLocator();
+        final URI uri = clientInvocationContext.getDestination();
 
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
@@ -353,7 +353,7 @@ class HttpEJBReceiver extends EJBReceiver {
             return false;
         }
 
-        HttpTargetContext targetContext;
+        final HttpTargetContext targetContext;
         try {
             targetContext = resolveTargetContext(clientInvocationContext, uri);
             if (targetContext == null) {
@@ -503,7 +503,7 @@ class HttpEJBReceiver extends EJBReceiver {
         HttpTargetContext currentContext = null;
 
         // get the HttpTargetContext for the discovered URI
-        WildflyHttpContext current = WildflyHttpContext.getCurrent();
+        final WildflyHttpContext current = WildflyHttpContext.getCurrent();
         currentContext = current.getTargetContext(uri);
         if (currentContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(context.getLocator());

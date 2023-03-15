@@ -31,7 +31,7 @@ import io.undertow.util.Methods;
 import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.CancelHandle;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.transaction.client.LocalTransactionContext;
 
 import java.util.Map;
@@ -80,9 +80,9 @@ public class EjbHttpService {
 
     public HttpHandler createHttpHandler() {
         // create a combined handler for each handler version
-        RequestEncodingHandler[] requestEncodingHandlers = new RequestEncodingHandler[Version.values().length];
+        RequestEncodingHandler[] requestEncodingHandlers = new RequestEncodingHandler[HandlerVersion.values().length];
 
-        for (Version version : Version.values()) {
+        for (HandlerVersion version : HandlerVersion.values()) {
             PathHandler pathHandler = new PathHandler();
             pathHandler.addPrefixPath(EJB_INVOKE_PATH, new AllowedMethodsHandler(
                             new HttpInvocationHandler(version, association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig), Methods.POST))
@@ -96,7 +96,7 @@ public class EjbHttpService {
             RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
             requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
 
-            int versionIndex = version.getVersion() - Version.EARLIEST.getVersion();
+            int versionIndex = version.getVersion() - HandlerVersion.EARLIEST.getVersion();
             requestEncodingHandlers[versionIndex] = requestEncodingHandler;
         }
         return httpServiceConfig.wrap(requestEncodingHandlers);

@@ -26,13 +26,13 @@ import io.undertow.server.HttpHandler;
  */
 public abstract class VersionedHttpHandler implements HttpHandler {
 
-    private Version version ;
+    private HandlerVersion version ;
 
-    public VersionedHttpHandler(Version version) {
+    public VersionedHttpHandler(HandlerVersion version) {
         this.version = version;
     }
 
-    public Version getVersion() {
+    public HandlerVersion getVersion() {
         return version;
     }
 }

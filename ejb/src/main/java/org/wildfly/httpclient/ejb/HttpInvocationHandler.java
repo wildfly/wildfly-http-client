@@ -50,7 +50,7 @@ import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -91,7 +91,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     private final Function<String, Boolean> classResolverFilter;
     private final HttpServiceConfig httpServiceConfig;
 
-    HttpInvocationHandler(Version version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+    HttpInvocationHandler(HandlerVersion version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                           Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter,
                           HttpServiceConfig httpServiceConfig) {
         super(version, executorService);
@@ -418,7 +418,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     }
 
     class ResolvedInvocation implements InvocationRequest.Resolved {
-        private final Version version;
+        private final HandlerVersion version;
         private final Map<String, Object> contextData;
         private final Object[] methodParams;
         private final EJBLocator<?> locator;
@@ -430,7 +430,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
         private final Transaction transaction;
         private final InvocationIdentifier identifier;
 
-        public ResolvedInvocation(Version version, Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Affinity strongAffinity, Affinity weakAffinity, Transaction transaction, final InvocationIdentifier identifier) {
+        public ResolvedInvocation(HandlerVersion version, Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Affinity strongAffinity, Affinity weakAffinity, Transaction transaction, final InvocationIdentifier identifier) {
             this.version = version;
             this.contextData = contextData;
             this.methodParams = methodParams;

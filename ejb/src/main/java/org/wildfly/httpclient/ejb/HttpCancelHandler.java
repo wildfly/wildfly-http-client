@@ -26,7 +26,7 @@ import java.util.concurrent.ExecutorService;
 import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.CancelHandle;
 import org.wildfly.httpclient.common.ContentType;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.transaction.client.LocalTransactionContext;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.Cookie;
@@ -46,7 +46,7 @@ class HttpCancelHandler extends RemoteHTTPHandler {
     private final LocalTransactionContext localTransactionContext;
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
 
-    HttpCancelHandler(Version version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
+    HttpCancelHandler(HandlerVersion version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
         super(version, executorService);
         this.association = association;
         this.executorService = executorService;

@@ -40,7 +40,7 @@ import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.HttpStickinessHelper;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -76,7 +76,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
     // a fixed HTTP session ID to use in Cookies from this handler
     private final String serverSessionID ;
 
-    HttpSessionOpenHandler(Version version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
+    HttpSessionOpenHandler(HandlerVersion version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
         super(version, executorService);
         this.association = association;
         this.executorService = executorService;

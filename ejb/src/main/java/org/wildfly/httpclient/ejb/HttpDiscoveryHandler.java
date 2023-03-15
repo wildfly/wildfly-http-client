@@ -27,7 +27,7 @@ import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -49,11 +49,11 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
     private final HttpServiceConfig httpServiceConfig;
 
     @Deprecated
-    public HttpDiscoveryHandler(Version version, ExecutorService executorService, Association association) {
+    public HttpDiscoveryHandler(HandlerVersion version, ExecutorService executorService, Association association) {
         this (version, executorService, association, HttpServiceConfig.getInstance());
     }
 
-    public HttpDiscoveryHandler(Version version, ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
+    public HttpDiscoveryHandler(HandlerVersion version, ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
         super(version, executorService);
         association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {
             @Override

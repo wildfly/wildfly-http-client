@@ -29,7 +29,7 @@ package org.wildfly.httpclient.common;
  *
  * @author Richard Achmatowicz
  */
-public enum Version {
+public enum HandlerVersion {
     EARLIEST(2),
     VERSION_1(2),
     VERSION_2(2),
@@ -37,7 +37,7 @@ public enum Version {
     ;
     private final int version;
 
-    Version(int version) {
+    HandlerVersion(int version) {
         this.version = version;
     }
 
@@ -45,7 +45,7 @@ public enum Version {
         return version;
     }
 
-    public boolean since(Version version) {
+    public boolean since(HandlerVersion version) {
         return this.version >= version.version;
     }
 }

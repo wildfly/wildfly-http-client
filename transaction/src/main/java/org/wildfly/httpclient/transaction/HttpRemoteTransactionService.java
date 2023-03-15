@@ -36,7 +36,7 @@ import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.httpclient.common.VersionedHttpHandler;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -90,8 +90,8 @@ public class HttpRemoteTransactionService {
 
     public HttpHandler createHandler() {
         // create one composite handler for each protocol version
-        BlockingHandler[] handlers = new BlockingHandler[Version.values().length];
-        for (Version version: Version.values()) {
+        BlockingHandler[] handlers = new BlockingHandler[HandlerVersion.values().length];
+        for (HandlerVersion version: HandlerVersion.values()) {
             RoutingHandler routingHandler = new RoutingHandler();
             routingHandler.add(Methods.POST, UT_BEGIN_PATH, new BeginHandler(version));
             routingHandler.add(Methods.POST, UT_ROLLBACK_PATH, new UTRollbackHandler(version));
@@ -103,7 +103,7 @@ public class HttpRemoteTransactionService {
             routingHandler.add(Methods.POST, XA_ROLLBACK_PATH, new XARollbackHandler(version));
             routingHandler.add(Methods.GET, XA_RECOVER_PATH, new XARecoveryHandler(version));
 
-            int versionIndex = version.getVersion() - Version.EARLIEST.getVersion();
+            int versionIndex = version.getVersion() - HandlerVersion.EARLIEST.getVersion();
             handlers[versionIndex] = new BlockingHandler(new ElytronIdentityHandler(routingHandler));
         }
         return httpServiceConfig.wrap(handlers);
@@ -111,7 +111,7 @@ public class HttpRemoteTransactionService {
 
     abstract class AbstractTransactionHandler extends VersionedHttpHandler {
 
-        public AbstractTransactionHandler(Version version) {
+        public AbstractTransactionHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -153,7 +153,7 @@ public class HttpRemoteTransactionService {
 
     class BeginHandler extends VersionedHttpHandler {
 
-        public BeginHandler(Version version) {
+        public BeginHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -188,7 +188,7 @@ public class HttpRemoteTransactionService {
 
     class XARecoveryHandler extends VersionedHttpHandler {
 
-        public XARecoveryHandler(Version version) {
+        public XARecoveryHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -232,7 +232,7 @@ public class HttpRemoteTransactionService {
 
     class UTRollbackHandler extends AbstractTransactionHandler {
 
-        public UTRollbackHandler(Version version) {
+        public UTRollbackHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -244,7 +244,7 @@ public class HttpRemoteTransactionService {
 
     class UTCommitHandler extends AbstractTransactionHandler {
 
-        public UTCommitHandler(Version version) {
+        public UTCommitHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -256,7 +256,7 @@ public class HttpRemoteTransactionService {
 
     class XABeforeCompletionHandler extends AbstractTransactionHandler {
 
-        public XABeforeCompletionHandler(Version version) {
+        public XABeforeCompletionHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -268,7 +268,7 @@ public class HttpRemoteTransactionService {
 
     class XAForgetHandler extends AbstractTransactionHandler {
 
-        public XAForgetHandler(Version version) {
+        public XAForgetHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -280,7 +280,7 @@ public class HttpRemoteTransactionService {
 
     class XAPrepHandler extends AbstractTransactionHandler {
 
-        public XAPrepHandler(Version version) {
+        public XAPrepHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -292,7 +292,7 @@ public class HttpRemoteTransactionService {
 
     class XARollbackHandler extends AbstractTransactionHandler {
 
-        public XARollbackHandler(Version version) {
+        public XARollbackHandler(HandlerVersion version) {
             super(version);
         }
 
@@ -304,7 +304,7 @@ public class HttpRemoteTransactionService {
 
     class XACommitHandler extends AbstractTransactionHandler {
 
-        public XACommitHandler(Version version) {
+        public XACommitHandler(HandlerVersion version) {
             super(version);
         }
 

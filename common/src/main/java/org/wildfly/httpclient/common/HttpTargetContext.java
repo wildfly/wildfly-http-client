@@ -118,7 +118,6 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public URI acquireBackendServer() throws Exception {
-        // HttpClientMessages.MESSAGES.info("HtpTargetContext: acquireBackendServer()");
         return acquireBackendServer(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
     }
 
@@ -195,7 +194,7 @@ public class HttpTargetContext extends AbstractAttachable {
                 request.getRequestHeaders().put(Headers.TRANSFER_ENCODING, Headers.CHUNKED.toString());
             }
 
-            ClientSendCallback clientSendCallback = new ClientSendCallback(connection, request, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler,
+            final ClientSendCallback clientSendCallback = new ClientSendCallback(connection, request, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler,
                     expectedResponse, completedTask, allowNoContent, authAdded, finalAuthenticationConfiguration, finalSslContext, classLoader);
 
             connection.sendRequest(request, clientSendCallback) ;
@@ -265,7 +264,7 @@ public class HttpTargetContext extends AbstractAttachable {
     /*
      * Callback used by ConnectionPool.sendRequest to handle either a successful or failed request send operation.
      */
-    private class ClientSendCallback implements ClientCallback<ClientExchange> {
+    private final class ClientSendCallback implements ClientCallback<ClientExchange> {
         private HttpConnectionPool.ConnectionHandle connection;
         private ClientRequest request;
         private HttpMarshaller httpMarshaller;
@@ -356,7 +355,7 @@ public class HttpTargetContext extends AbstractAttachable {
     /*
      * Callback used by ConnectionPool.sendRequest to handle either a successful or failed response receive operation.
      */
-    private class ClientReceiveCallback implements ClientCallback<ClientExchange> {
+    private final class ClientReceiveCallback implements ClientCallback<ClientExchange> {
         private HttpConnectionPool.ConnectionHandle connection;
         private ClientRequest request;
         private HttpMarshaller httpMarshaller;

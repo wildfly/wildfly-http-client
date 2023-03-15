@@ -24,7 +24,7 @@ import io.undertow.util.Methods;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.httpclient.common.Version;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
@@ -64,13 +64,13 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XID_LIST;
 public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
-    private final Version version;
+    private final HandlerVersion version;
     private final HttpTargetContext targetContext;
     private final SSLContext sslContext;
     private final AuthenticationConfiguration authenticationConfiguration;
     private final AuthenticationContext authenticationContext;
 
-    public HttpRemoteTransactionPeer(Version version, HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+    public HttpRemoteTransactionPeer(HandlerVersion version, HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
         this.version = version;
         this.targetContext = targetContext;
         this.sslContext = sslContext;
