@@ -56,7 +56,7 @@ public class SimpleInvocationTestCase {
 
     @Before
     public void before() {
-        EJBTestServer.registerServicesHandler("common/v1/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(Headers.SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
+        EJBTestServer.registerWrappedServicesHandler("/common", "/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(Headers.SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 10000; ++i) {
             sb.append("Hello World ");

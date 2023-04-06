@@ -46,7 +46,7 @@ public class AsyncInvocationTestCase {
 
     @Before
     public void before() {
-        EJBTestServer.registerServicesHandler("common/v1/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(Headers.SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
+        EJBTestServer.registerWrappedServicesHandler("/common", "/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(Headers.SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
     }
 
     @Test
