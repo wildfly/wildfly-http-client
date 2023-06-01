@@ -60,7 +60,7 @@
         <version.jakarta.transaction.jakarta-transaction-api>2.0.1</version.jakarta.transaction.jakarta-transaction-api>
         <version.org.wildfly.checkstyle-config>1.0.8.Final</version.org.wildfly.checkstyle-config>
         <version.org.jboss.marshalling>2.1.1.Final</version.org.jboss.marshalling>
-        <version.org.jboss.modules>1.10.0.Final</version.org.jboss.modules>
+        <version.org.jboss.modules>2.1.0.Final</version.org.jboss.modules>
         <version.org.wildfly.client-config>1.0.1.Final</version.org.wildfly.client-config>
         <version.org.wildfly.common>1.5.4.Final</version.org.wildfly.common>
         <version.org.wildfly.naming.client>2.0.0.Final</version.org.wildfly.naming.client>
