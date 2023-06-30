@@ -209,7 +209,8 @@ final class EENamespaceInteroperability {
                             // this method adds the factory to the request instead of response, this is more efficient
                             // we prevent adding when jakartaEE is already true and creating a new entry in the response attachment map
                             final ClientResponse response = result.getResponse();
-                            if (protocolVersion == -1) {
+                            // if the response represents an UNAUTHORIZED (401) HTTP response, do not update the protocol version (WEJBHTTP-110)
+                            if (protocolVersion == -1 && response.getResponseCode() != 401) {
                                 // we need to check for protocol version header to define the protocol version of the pool
                                 if (LATEST_VERSION.equals(response.getResponseHeaders().getFirst(PROTOCOL_VERSION))) {
                                     // this indicates this is the first response server sends, set the protocol to 2
