@@ -27,6 +27,7 @@ import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.common.annotation.NotNull;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.WildflyHttpContext;
@@ -197,8 +198,11 @@ public class HttpRootContext extends AbstractContext {
     }
 
     private <T, R> R performWithRetry(NamingOperation<T, R> function, ProviderEnvironment environment, RetryContext context, Name name, T param) throws NamingException {
+
+        HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: calling performWithRetry");
         // Directly pass-through single provider executions
         if (context == null) {
+            HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: called peformWithRetry (retryContext == null)");
             return function.apply(null, name, param);
         }
 
@@ -206,6 +210,7 @@ public class HttpRootContext extends AbstractContext {
             try {
                 R result = function.apply(context, name, param);
                 environment.dropFromBlocklist(context.currentDestination());
+                HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: called peformWithRetry (retryContext != null), notFound = %s", notFound);
                 return result;
             } catch (NameNotFoundException e) {
                 if (notFound++ > MAX_NOT_FOUND_RETRY) {
@@ -253,7 +258,9 @@ public class HttpRootContext extends AbstractContext {
         environment.updateBlocklist(location);
     }
 
-    private Object processInvocation(Name name, HttpString method, String pathSegment) throws NamingException {
+    private Object processInvocation(@NotNull Name name, @NotNull HttpString method, @NotNull String pathSegment) throws NamingException {
+
+        HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: calling Object processInvocation(name=%s, method=%s, pathSegment=%s)", name, method, pathSegment);
         ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
         final RetryContext context = canRetry(environment) ? new RetryContext() : null;
         return performWithRetry((contextOrNull, name1, param) -> {
@@ -287,7 +294,8 @@ public class HttpRootContext extends AbstractContext {
         }, environment, context, name, null);
     }
 
-    private Object performOperation(Name name, URI providerUri, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
+    private Object performOperation(@NotNull Name name, @NotNull URI providerUri, @NotNull HttpTargetContext targetContext, @NotNull ClientRequest clientRequest) throws NamingException {
+        HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: calling Object performOperation(request = %s)", clientRequest);
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
@@ -306,12 +314,15 @@ public class HttpRootContext extends AbstractContext {
         targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, null, (input, response, closeable) -> {
             try {
                 if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
+                    HttpNamingClientMessages.MESSAGES.infof("HttpRootContext.HttpResultHandler: response has no content, completing");
                     result.complete(new HttpRemoteContext(HttpRootContext.this, name.toString()));
                     IoUtils.safeClose(input);
                     return;
                 }
 
                 httpNamingProvider.performExceptionAction((a, b) -> {
+
+                    HttpNamingClientMessages.MESSAGES.infof("HttpRootContext.HttpResultHandler: response has content, unmarshalling");
 
                     Exception exception = null;
                     Object returned = null;
@@ -336,8 +347,10 @@ public class HttpRootContext extends AbstractContext {
                         setContextClassLoader(old);
                     }
                     if (exception != null) {
+                        HttpNamingClientMessages.MESSAGES.infof("HttpRootContext.HttpResultHandler: got exception, completingExceptionally future");
                         result.completeExceptionally(exception);
                     } else {
+                        HttpNamingClientMessages.MESSAGES.infof("HttpRootContext.HttpResultHandler: got result, completing future");
                         result.complete(returned);
                     }
                     return null;
@@ -370,7 +383,9 @@ public class HttpRootContext extends AbstractContext {
     }
 
 
-    private void processInvocation(Name name, HttpString method, Object object, String pathSegment, Name newName) throws NamingException {
+    private void processInvocation(@NotNull Name name, @NotNull HttpString method, Object object, @NotNull String pathSegment, Name newName) throws NamingException {
+        HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: calling void processInvocation(name=%s, method=%s, pathSegment=%s)",
+                name, method, pathSegment);
         ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
         final RetryContext context = canRetry(environment) ? new RetryContext() : null;
         performWithRetry((contextOrNull, name1, param) -> {
@@ -417,7 +432,8 @@ public class HttpRootContext extends AbstractContext {
         return environment.getProviderUris().size() > 1;
     }
 
-    private void performOperation(URI providerUri, Object object, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
+    private void performOperation(@NotNull URI providerUri, Object object, @NotNull HttpTargetContext targetContext, @NotNull ClientRequest clientRequest) throws NamingException {
+        HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: calling void performOperation(request = %s)", clientRequest);
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
@@ -444,6 +460,7 @@ public class HttpRootContext extends AbstractContext {
             try {
                 result.complete(null);
             } finally {
+                HttpNamingClientMessages.MESSAGES.infof("HttpRootContext: void performOperation(), closing channel");
                 IoUtils.safeClose(closeable);
             }
         }, result::completeExceptionally, null, null);

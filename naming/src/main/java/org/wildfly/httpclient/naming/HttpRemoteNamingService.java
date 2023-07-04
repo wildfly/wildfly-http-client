@@ -115,21 +115,29 @@ public class HttpRemoteNamingService {
 
         @Override
         public final void handleRequest(HttpServerExchange exchange) throws Exception {
+            HttpNamingClientMessages.MESSAGES.infof("NameHandler: calling handleRequest(%s)", exchange.getRequestPath());
             PathTemplateMatch params = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY);
             String name = URLDecoder.decode(params.getParameters().get(NAME_PATH_PARAMETER), UTF_8.name());
             try {
+                HttpNamingClientMessages.MESSAGES.infof("NameHandler: calling doOperation(name=%s)", name);
                 Object result = doOperation(exchange, name);
                 if (exchange.isComplete()) {
+                    HttpNamingClientMessages.MESSAGES.infof("NameHandler: exchange is complete, returning");
                     return;
                 }
                 if (result == null) {
+                    HttpNamingClientMessages.MESSAGES.infof("NameHandler: result is null, returning");
                     exchange.setStatusCode(StatusCodes.OK);
                 } else if (result instanceof Context) {
+                    HttpNamingClientMessages.MESSAGES.infof("NameHandler: result is context, returning");
                     exchange.setStatusCode(StatusCodes.NO_CONTENT);
                 } else {
+                    HttpNamingClientMessages.MESSAGES.infof("NameHandler: calling doMarshall");
                     doMarshall(exchange, result);
+                    HttpNamingClientMessages.MESSAGES.infof("NameHandler: called doMarshall");
                 }
             } catch (Throwable e) {
+                HttpNamingClientMessages.MESSAGES.infof("NameHandler: got exception, e = " +e);
                 sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
@@ -268,6 +276,7 @@ public class HttpRemoteNamingService {
     }
 
     public static void sendException(HttpServerExchange exchange, HttpServiceConfig httpServiceConfig, int status, Throwable e) throws IOException {
+        HttpNamingClientMessages.MESSAGES.infof("HttpRemoteNamingService: sending exceptionto client, e = " + e);
         HttpServerHelper.sendException(exchange, httpServiceConfig, status, e);
     }
 
