@@ -186,6 +186,7 @@ class WildflyClientOutputStream extends OutputStream implements ByteOutput {
     }
 
     private void runWriteTask() {
+        new Exception(Thread.currentThread() + ": at run write task, look who is invoking me...").printStackTrace();
         Assert.assertHoldsLock(lock);
         state |= FLAG_WRITING;
         channel.getWriteSetter().set(channelListener);
