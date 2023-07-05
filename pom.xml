@@ -43,7 +43,7 @@
     </licenses>
 
     <properties>
-        <test.level>DEBUG</test.level>
+        <test.level>TRACE</test.level>
         <maven.compiler.target>11</maven.compiler.target>
         <maven.compiler.source>11</maven.compiler.source>
         <!-- Versions -->
