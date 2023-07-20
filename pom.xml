@@ -68,7 +68,7 @@
         <version.org.wildfly.elytron.web>1.9.2.Final</version.org.wildfly.elytron.web>
         <version.org.wildfly.transaction.client>3.0.0.Final</version.org.wildfly.transaction.client>
         <version.org.jboss.threads>2.3.3.Final</version.org.jboss.threads>
-        <version.org.kohsuke.metainf-services>1.7</version.org.kohsuke.metainf-services>
+        <version.org.kohsuke.metainf-services>1.11</version.org.kohsuke.metainf-services>
     </properties>
 
     <modules>
