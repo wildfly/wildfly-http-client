@@ -29,6 +29,7 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.server.handlers.CanonicalPathHandler;
 import io.undertow.server.handlers.PathHandler;
+import io.undertow.server.handlers.RequestDumpingHandler;
 import io.undertow.server.handlers.error.SimpleErrorPageHandler;
 import io.undertow.util.NetworkUtils;
 import org.junit.runner.Description;
@@ -88,6 +89,12 @@ import java.util.stream.Collectors;
 import static org.wildfly.security.password.interfaces.ClearPassword.ALGORITHM_CLEAR;
 
 /**
+ * HttpTestServer is a JUnit test runner which provides a configured local instance of Undertow to be used
+ * as a target of invocations carried out in tests. In addition to providing default configurations for
+ * security, buffer pools and XnioWorkers, the test runner also permits setting general context path handlers
+ * as well as service handlers for the /wildfly-services context paths representing invokable services used by
+ * the ejb, naming and transaction services.
+ * -
  * @author Stuart Douglas
  */
 public class HTTPTestServer extends BlockJUnit4ClassRunner {
@@ -183,6 +190,23 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         registeredServices.add(path);
     }
 
+    /*
+     * Register a service handler wrapped with the interoperability logic.
+     * This allows registering context paths of the form:
+     *   /prefix/{v1,v2}/postfix
+     * The interoperability logic will handle the version parameter
+     * automatically, according to the interoperability handshake.
+     *
+     * @param prefix the prefix context path before the version
+     * @param postfix the postfix context path after the version
+     * @param handler the handler to invoke for the context path
+     */
+    public static void registerWrappedServicesHandler(String prefix, String postfix, HttpHandler handler) {
+        PathHandler wrappedHandler = new PathHandler();
+        wrappedHandler.addPrefixPath(postfix, handler);
+        registerServicesHandler(prefix, HttpServiceConfig.DEFAULT.wrap(wrappedHandler));
+    }
+
     public static XnioWorker getWorker() {
         return worker;
     }
@@ -274,6 +298,7 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         root = new AuthenticationCallHandler(root);
         root = new SimpleErrorPageHandler(root);
         root = new CanonicalPathHandler(root);
+        root = new RequestDumpingHandler(root);
         return root;
     }
 

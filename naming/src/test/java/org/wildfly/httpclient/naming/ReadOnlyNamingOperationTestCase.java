@@ -19,6 +19,7 @@
 package org.wildfly.httpclient.naming;
 
 import io.undertow.server.handlers.CookieImpl;
+import io.undertow.util.Headers;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,7 +36,7 @@ public class ReadOnlyNamingOperationTestCase {
 
     @Before
     public void setup() {
-        HTTPTestServer.registerServicesHandler("/common/v1/affinity", exchange -> exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", "foo")));
+        HTTPTestServer.registerWrappedServicesHandler("/common", "/affinity", exchange -> exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", "foo")));
         HTTPTestServer.registerServicesHandler("/naming", new HttpRemoteNamingService(new LocalContext(true), f -> false).createHandler());
     }
 
