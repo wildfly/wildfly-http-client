@@ -24,10 +24,12 @@ import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
 import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.EJBClient;
+import org.jboss.ejb.client.ClusterAffinity;
 import org.jboss.ejb.client.EJBHomeLocator;
 import org.jboss.ejb.client.EJBIdentifier;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBMethodLocator;
+import org.jboss.ejb.client.NodeAffinity;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
 import org.jboss.ejb.client.StatelessEJBLocator;
@@ -46,7 +48,9 @@ import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -73,9 +77,10 @@ import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
 import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
 
 /**
- * Http handler for EJB invocations.
+ * A server-side handler for processing EJB client invocation requests.
  *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 class HttpInvocationHandler extends RemoteHTTPHandler {
 
@@ -86,10 +91,10 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     private final Function<String, Boolean> classResolverFilter;
     private final HttpServiceConfig httpServiceConfig;
 
-    HttpInvocationHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+    HttpInvocationHandler(HandlerVersion version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                           Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter,
                           HttpServiceConfig httpServiceConfig) {
-        super(executorService);
+        super(version, executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
@@ -100,6 +105,14 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
+        EjbHttpClientMessages.MESSAGES.infof("HttpInvocationHandler: running handler version %s to process request", getVersion().getVersion());
+
+        // debug
+        HttpStickinessHelper.dumpRequestCookies(exchange);
+        HttpStickinessHelper.dumpRequestHeaders(exchange);
+
+
+        // validate content type of payload
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
         if (contentType == null || contentType.getVersion() != 1 || !INVOCATION.getType().equals(contentType.getType())) {
@@ -108,6 +121,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
             return;
         }
 
+        // parse request path
         String relativePath = exchange.getRelativePath();
         if(relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
@@ -121,28 +135,99 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
         final String module = handleDash(parts[1]);
         final String distinct = handleDash(parts[2]);
         final String bean = parts[3];
-
-
         String originalSessionId = handleDash(parts[4]);
         final byte[] sessionID = originalSessionId.isEmpty() ? null : Base64.getUrlDecoder().decode(originalSessionId);
         String viewName = parts[5];
         String method = parts[6];
         String[] parameterTypeNames = new String[parts.length - 7];
         System.arraycopy(parts, 7, parameterTypeNames, 0, parameterTypeNames.length);
-        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
-        final String sessionAffinity = cookie != null ? cookie.getValue() : null;
+
+        // process Cookies and Headers
+        String encodedHTTPSessionID = null;
+        switch (getVersion()) {
+            // process Cookies and Headers for VERSION_1
+            // - make the sessionAffinity value available for cancellation, if it exists
+            case VERSION_1:
+            case VERSION_2: {
+                // get the HTTP sessionID, if any
+                Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
+                encodedHTTPSessionID = cookie != null ? cookie.getValue() : null;
+            }
+            break;
+
+            // process Cookies and Headers for VERSION_2
+            // NOTE: we do not know what the bean type is at this stage, so we cannot process conditional on SFSB or SLSB
+            // - get the HTTP sessionAffinity value available for cancellation, if any
+            // - check for STRICT_STICKINESS_NODE to see if stickiness is required and throw an exception if we have failed over
+            case LATEST: {
+
+                // get the HTTP sessionID, if any
+                if (HttpStickinessHelper.hasEncodedSessionID(exchange)) {
+                    encodedHTTPSessionID = HttpStickinessHelper.getEncodedSessionID(exchange);
+                }
+
+                // validate strict stickiness, if any
+                String actualHost = System.getProperty("jboss.node.name");
+                String intendedHost = null;
+                if (HttpStickinessHelper.hasStrictStickinessHost(exchange)) {
+                    intendedHost = HttpStickinessHelper.getStrictStickinessHost(exchange);
+                }
+                if (intendedHost != null && !intendedHost.equals(actualHost)) {
+                    // TODO: need to set status to NO_CONTENT?
+                    exchange.setStatusCode(StatusCodes.OK);
+                    HttpStickinessHelper.addStrictStickinessResult(exchange, "failed");
+                    HttpStickinessHelper.addStrictStickinessHost(exchange, intendedHost);
+                    EjbHttpClientMessages.MESSAGES.infof("Failover attempted on invocation with strict stickiness: intended node %s, actual node %s", intendedHost, actualHost);
+                    return;
+                }
+            }
+            break;
+        }
+
+        // extract the "session affinity" from the Cookie (NOTE: this can be null for SLSB with no JSESSIONID Cookie)
+        String httpSessionID = null;
+        if (encodedHTTPSessionID != null) {
+            httpSessionID = HttpStickinessHelper.extractSessionIDFromEncodedSessionID(encodedHTTPSessionID);
+        }
+
+        final String sessionAffinity = httpSessionID;
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
+
+        EjbHttpClientMessages.MESSAGES.infof("HttpInvocationHandler: received invocation for bean %s with encodedHTTPSessionID = %s", ejbIdentifier, encodedHTTPSessionID);
 
         final String cancellationId = exchange.getRequestHeaders().getFirst(EjbConstants.INVOCATION_ID);
         final InvocationIdentifier identifier;
-        if(cancellationId != null && sessionAffinity != null) {
+
+        // cancellation only supported for requests having an HTTP session ID (why?)
+        if (cancellationId != null && sessionAffinity != null) {
             identifier = new InvocationIdentifier(cancellationId, sessionAffinity);
         } else {
             identifier = null;
         }
 
+        // process request
         exchange.dispatch(executorService, () -> {
             CancelHandle handle = association.receiveInvocationRequest(new InvocationRequest() {
+                Affinity strongAffinity;
+                Affinity weakAffinity;
+
+                /*
+                 * The Association processing will cause this field to be updated before writeInvocationResult() is called.
+                 */
+                @Override
+                public void updateStrongAffinity(Affinity affinity) {
+                    InvocationRequest.super.updateStrongAffinity(affinity);
+                    this.strongAffinity = affinity;
+                }
+
+                /*
+                 * The Association processing will cause this field to be updated before writeInvocationResult() is called.
+                 */
+                @Override
+                public void updateWeakAffinity(Affinity affinity) {
+                    InvocationRequest.super.updateWeakAffinity(affinity);
+                    this.weakAffinity = affinity;
+                }
 
                 @Override
                 public SocketAddress getPeerAddress() {
@@ -157,16 +242,16 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                 @Override
                 public Resolved getRequestContent(final ClassLoader classLoader) throws IOException, ClassNotFoundException {
 
-                    Object[] methodParams = new Object[parameterTypeNames.length];
-                    final Class<?> view = Class.forName(viewName, false, classLoader);
                     final HttpMarshallerFactory unmarshallingFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
                     final Unmarshaller unmarshaller = unmarshallingFactory.createUnmarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
 
+                    // instantiate the view class
+                    final Class<?> view = Class.forName(viewName, false, classLoader);
+
+                    // import transaction, if any
                     try (InputStream inputStream = exchange.getInputStream()) {
                         unmarshaller.start(new InputStreamByteInput(inputStream));
                         ReceivedTransaction txConfig = readTransaction(unmarshaller);
-
-
                         final Transaction transaction;
                         if (txConfig == null || localTransactionContext == null) { //the TX context may be null in unit tests
                             transaction = null;
@@ -178,9 +263,14 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                                 throw new IllegalStateException(e); //TODO: what to do here?
                             }
                         }
+
+                        // unmarshall method parameters
+                        Object[] methodParams = new Object[parameterTypeNames.length];
                         for (int i = 0; i < parameterTypeNames.length; ++i) {
                             methodParams[i] = unmarshaller.readObject();
                         }
+
+                        // unmarshal attachments
                         final Map<String, Object> contextData;
                         final int attachmentCount = PackedInteger.readPackedInteger(unmarshaller);
                         if (attachmentCount > 0) {
@@ -198,6 +288,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
 
                         unmarshaller.finish();
 
+                        // setup Locator for bean
                         EJBLocator<?> locator;
                         if (EJBHome.class.isAssignableFrom(view)) {
                             locator = new EJBHomeLocator(view, app, module, bean, distinct, Affinity.LOCAL); //TODO: what is the correct affinity?
@@ -210,7 +301,8 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
 
                         final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpMarshallerFactory(exchange);
                         final Marshaller marshaller = marshallerFactory.createMarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
-                        return new ResolvedInvocation(contextData, methodParams, locator, exchange, marshaller, sessionAffinity, transaction, identifier);
+                        // return the unmarshalled (resolved) invocation
+                        return new ResolvedInvocation(getVersion(), contextData, methodParams, locator, exchange, marshaller, sessionAffinity, strongAffinity, weakAffinity, transaction, identifier);
                     } catch (IOException | ClassNotFoundException e) {
                         throw e;
                     } catch (Throwable e) {
@@ -309,7 +401,10 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
                     throw new RuntimeException("nyi");
                 }
             });
-            if(handle != null && identifier != null) {
+
+            // register the handle to cancel the invocation request processing, if required
+            // this only happens if we have an InvocationIdentifier defined
+            if (handle != null && identifier != null) {
                 cancellationFlags.put(identifier, handle);
             }
         });
@@ -323,22 +418,28 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
     }
 
     class ResolvedInvocation implements InvocationRequest.Resolved {
+        private final HandlerVersion version;
         private final Map<String, Object> contextData;
         private final Object[] methodParams;
         private final EJBLocator<?> locator;
         private final HttpServerExchange exchange;
         private final Marshaller marshaller;
         private final String sessionAffinity;
+        private final Affinity strongAffinity;
+        private final Affinity weakAffinity;
         private final Transaction transaction;
         private final InvocationIdentifier identifier;
 
-        public ResolvedInvocation(Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Transaction transaction, final InvocationIdentifier identifier) {
+        public ResolvedInvocation(HandlerVersion version, Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Affinity strongAffinity, Affinity weakAffinity, Transaction transaction, final InvocationIdentifier identifier) {
+            this.version = version;
             this.contextData = contextData;
             this.methodParams = methodParams;
             this.locator = locator;
             this.exchange = exchange;
             this.marshaller = marshaller;
             this.sessionAffinity = sessionAffinity;
+            this.strongAffinity = strongAffinity;
+            this.weakAffinity = weakAffinity;
             this.transaction = transaction;
             this.identifier = identifier;
         }
@@ -372,22 +473,87 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
             return sessionAffinity;
         }
 
+        public Affinity getStrongAffinity() {
+            return strongAffinity;
+        }
+
+        @Override
+        public Affinity getWeakAffinity() {
+            return weakAffinity;
+        }
+
         HttpServerExchange getExchange() {
             return exchange;
         }
 
         @Override
         public void writeInvocationResult(Object result) {
-            if(identifier != null) {
+            // the invocation is completing, so no future opportunity to cancel
+            if (identifier != null) {
                 cancellationFlags.remove(identifier);
             }
+
             try {
+                // process Cookies and Headers
+                switch(getVersion()) {
+                    // process Cookies and Headers for VERSION_1
+                    case VERSION_1:
+                    case VERSION_2: {
+                        // noop
+                    }
+                    break;
+                    // process Cookies and Headers for VERSION_2
+                    // - transaction-scoped requests:
+                    //   - add a Cookie with the server session ID + route
+                    //   - add a stickiness header
+                    // - SFSB requests:
+                    //   - add a Cookie with the server session ID + route
+                    //   - add a stickiness header if bean not replicated (i.e. if strong affinity not instanceof NodeAffinity)
+                    // - SLSB requests which have ClusterAffinity
+                    //   : need to send back updated strong affinity?
+                    case LATEST: {
+                        // the jboss.node.name is used as a route (appended automatically) by HttpInvokerHostService
+                        // the same route needs to be used for stickiness node
+                        final String node = System.getProperty("jboss.node.name", "localhost");
+
+                        if (hasTransaction()) {
+                            // assert sessionAffinity != null : "transaction-scope invocations must have session affinity";
+
+                            // add a Cookie for the load balancer, no Cookie attributes required,as this will not be read by a browser
+                            HttpStickinessHelper.addUnencodedSessionID(exchange, sessionAffinity);
+
+                            // all transactional requests are sticky
+                            HttpStickinessHelper.addStrictStickinessHost(exchange, node);
+                            HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
+
+                        } else if (getEJBLocator() instanceof StatefulEJBLocator) {
+                            // assert sessionAffinity != null : "SFSB invocations must have session affinity";
+
+                             // add a Cookie for the load balancer, no Cookie attributes required,as this will not be read by a browser
+                            HttpStickinessHelper.addUnencodedSessionID(exchange, sessionAffinity);
+
+                            // add strict stickiness header if non-replicated ( strongAffinity == NodeAffinity)
+                            if (getStrongAffinity() instanceof NodeAffinity) {
+                                HttpStickinessHelper.addStrictStickinessHost(exchange, node);
+                                HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
+                            }
+                        } else if (getEJBLocator() instanceof StatelessEJBLocator) {
+                            assert sessionAffinity == null : "SLSB invocations must not have session affinity";
+
+                            if (getStrongAffinity() instanceof ClusterAffinity) {
+                                // how to return an updated strong affinity value?
+                            }
+                        }
+                    }
+                    break;
+                }
+                // set the ContentType
                 exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE.toString());
-//                                    if (output.getSessionAffinity() != null) {
-//                                        exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
-//                                    }
+
+                // marshal the Response payload
                 OutputStream outputStream = exchange.getOutputStream();
                 final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
+
                 // start the marshaller
                 marshaller.start(byteOutput);
                 marshaller.writeObject(result);
@@ -431,7 +597,6 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
             if (classResolverFilter != null && classResolverFilter.apply(className) != Boolean.TRUE) {
                 throw EjbHttpClientMessages.MESSAGES.cannotResolveFilteredClass(className);
             }
-
         }
     }
 }

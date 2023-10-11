@@ -78,4 +78,6 @@ interface HttpClientMessages extends BasicLogger {
     @Message(id = 14, value = "JavaEE to JakartaEE backward compatibility layer have been installed")
     void javaeeToJakartaeeBackwardCompatibilityLayerInstalled();
 
+    @Message(id = 15, value = "Failed to acquire backend server")
+    RuntimeException failedToAcquireBackendServer(@Cause Throwable e);
 }

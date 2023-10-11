@@ -23,8 +23,9 @@ import java.util.concurrent.ExecutorService;
 import javax.transaction.xa.Xid;
 
 import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.httpclient.common.HandlerVersion;
+import org.wildfly.httpclient.common.VersionedHttpHandler;
 import org.wildfly.transaction.client.SimpleXid;
-import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.AttachmentKey;
 
@@ -33,13 +34,13 @@ import io.undertow.util.AttachmentKey;
  *
  * @author Stuart Douglas
  */
-public abstract class RemoteHTTPHandler implements HttpHandler {
-
+public abstract class RemoteHTTPHandler extends VersionedHttpHandler {
     private final ExecutorService executorService;
 
     private static final AttachmentKey<ExecutorService> EXECUTOR = AttachmentKey.create(ExecutorService.class);
 
-    public RemoteHTTPHandler(ExecutorService executorService) {
+    public RemoteHTTPHandler(HandlerVersion version, ExecutorService executorService) {
+        super(version);
         this.executorService = executorService;
     }
 

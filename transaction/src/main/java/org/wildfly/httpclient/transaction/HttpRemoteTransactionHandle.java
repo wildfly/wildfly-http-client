@@ -18,12 +18,14 @@
 
 package org.wildfly.httpclient.transaction;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
 import io.undertow.util.Methods;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SimpleTransactionControl;
 import org.xnio.IoUtils;
@@ -50,16 +52,19 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
  * Represents a remote transaction that is managed over HTTP protocol.
  *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
+ * @author Richard Achmatowicz
  */
 class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
+    private final HandlerVersion version;
     private final HttpTargetContext targetContext;
     private final AtomicInteger statusRef = new AtomicInteger(Status.STATUS_ACTIVE);
     private final Xid id;
     private final SSLContext sslContext;
     private final AuthenticationConfiguration authenticationConfiguration;
 
-    HttpRemoteTransactionHandle(final Xid id, final HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+    HttpRemoteTransactionHandle(final HandlerVersion version, final Xid id, final HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+        this.version = version;
         this.id = id;
         this.targetContext = targetContext;
         this.sslContext = sslContext;
@@ -93,25 +98,29 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
                             targetContext.getProtocolVersion() + UT_COMMIT_PATH);
             cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
             cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
-            targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeInt(id.getFormatId());
-                final byte[] gtid = id.getGlobalTransactionId();
-                marshaller.writeInt(gtid.length);
-                marshaller.write(gtid);
-                final byte[] bq = id.getBranchQualifier();
-                marshaller.writeInt(bq.length);
-                marshaller.write(bq);
-                marshaller.finish();
-                output.close();
-            }, (input, response, closable) -> {
-                try {
-                    result.complete(null);
-                } finally {
-                    IoUtils.safeClose(closable);
-                }
-            }, result::completeExceptionally, null, null);
+            targetContext.sendRequest(cr, sslContext, authenticationConfiguration,
+                    output -> {
+                        Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
+                        marshaller.start(Marshalling.createByteOutput(output));
+                        marshaller.writeInt(id.getFormatId());
+                        final byte[] gtid = id.getGlobalTransactionId();
+                        marshaller.writeInt(gtid.length);
+                        marshaller.write(gtid);
+                        final byte[] bq = id.getBranchQualifier();
+                        marshaller.writeInt(bq.length);
+                        marshaller.write(bq);
+                        marshaller.finish();
+                        output.close();
+                    },
+                    null,
+                    (input, response, closable) -> {
+                        try {
+                            result.complete(null);
+                        } finally {
+                            IoUtils.safeClose(closable);
+                        }
+                    },
+                    result::completeExceptionally, null, null);
 
             try {
                 result.get();
@@ -163,25 +172,29 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
                             + UT_ROLLBACK_PATH);
             cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
             cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
-            targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeInt(id.getFormatId());
-                final byte[] gtid = id.getGlobalTransactionId();
-                marshaller.writeInt(gtid.length);
-                marshaller.write(gtid);
-                final byte[] bq = id.getBranchQualifier();
-                marshaller.writeInt(bq.length);
-                marshaller.write(bq);
-                marshaller.finish();
-                output.close();
-            }, (input, response, closeable) -> {
-                try {
-                    result.complete(null);
-                } finally {
-                    IoUtils.safeClose(closeable);
-                }
-            }, result::completeExceptionally, null, null);
+            targetContext.sendRequest(cr, sslContext, authenticationConfiguration,
+                    output -> {
+                        Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
+                        marshaller.start(Marshalling.createByteOutput(output));
+                        marshaller.writeInt(id.getFormatId());
+                        final byte[] gtid = id.getGlobalTransactionId();
+                        marshaller.writeInt(gtid.length);
+                        marshaller.write(gtid);
+                        final byte[] bq = id.getBranchQualifier();
+                        marshaller.writeInt(bq.length);
+                        marshaller.write(bq);
+                        marshaller.finish();
+                        output.close();
+                    },
+                    new RemoteTransactionStickinessHandler(),
+                    (input, response, closeable) -> {
+                        try {
+                            result.complete(null);
+                        } finally {
+                            IoUtils.safeClose(closeable);
+                        }
+                    },
+                    result::completeExceptionally, null, null);
 
             try {
                 result.get();
@@ -236,4 +249,22 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
         }
         return null;
     }
+
+    /*
+     * This class manages the relationship between a remote transaction and
+     * the stickiness requirements of session beans resulting from invocation in transaction scope.
+     */
+    public static class RemoteTransactionStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+
+        @Override
+        public void prepareRequest(ClientRequest request) {
+
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+
+        }
+    }
+
 }

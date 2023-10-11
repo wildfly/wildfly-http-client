@@ -22,11 +22,10 @@ import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
-import io.undertow.server.handlers.Cookie;
 import io.undertow.util.AbstractAttachable;
-import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.InputStreamByteInput;
@@ -46,13 +45,14 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.AccessController;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
 
@@ -60,6 +60,7 @@ import java.util.zip.GZIPInputStream;
  * Http target context used by client side.
  *
  * @author Stuart Douglas
+ * @author <a href="mailto:rachmato@redhat.com">Richard Achmatowicz</a>
  */
 public class HttpTargetContext extends AbstractAttachable {
 
@@ -70,19 +71,15 @@ public class HttpTargetContext extends AbstractAttachable {
         AUTH_CONTEXT_CLIENT = AccessController.doPrivileged((PrivilegedAction<AuthenticationContextConfigurationClient>) () -> new AuthenticationContextConfigurationClient());
     }
 
-
     private static final String EXCEPTION_TYPE = "application/x-wf-jbmar-exception";
-
+    private static final HttpString BACKEND_HEADER = new HttpString("Backend");
     private static final String JSESSIONID = "JSESSIONID";
 
     private final HttpConnectionPool connectionPool;
     private final boolean eagerlyAcquireAffinity;
-    private volatile CountDownLatch sessionAffinityLatch = new CountDownLatch(1);
-    private volatile String sessionId;
     private final URI uri;
     private final AuthenticationContext initAuthenticationContext;
 
-    private final AtomicBoolean affinityRequestSent = new AtomicBoolean();
     private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
 
     private static ClassLoader getContextClassLoader() {
@@ -108,7 +105,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
     void init() {
         if (eagerlyAcquireAffinity) {
-            acquireAffinitiy(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
+            // this is now a noop as we can't associate affinity to a single backend server with the target context
         }
     }
 
@@ -120,45 +117,58 @@ public class HttpTargetContext extends AbstractAttachable {
         return connectionPool.getProtocolVersion();
     }
 
-    private void acquireAffinitiy(AuthenticationConfiguration authenticationConfiguration) {
-        if (affinityRequestSent.compareAndSet(false, true)) {
-            acquireSessionAffinity(sessionAffinityLatch, authenticationConfiguration);
-        }
+    public URI acquireBackendServer() throws Exception {
+        return acquireBackendServer(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
     }
 
-
-    private void acquireSessionAffinity(CountDownLatch latch, AuthenticationConfiguration authenticationConfiguration) {
+    private URI acquireBackendServer(AuthenticationConfiguration authenticationConfiguration) throws Exception {
         ClientRequest clientRequest = new ClientRequest();
         clientRequest.setMethod(Methods.GET);
-        clientRequest.setPath(uri.getPath() + "/common/v1/affinity");
+        clientRequest.setPath(uri.getPath() + "/common/v1/backend");
         AuthenticationContext context = AuthenticationContext.captureCurrent();
         SSLContext sslContext;
         try {
             sslContext = AUTH_CONTEXT_CLIENT.getSSLContext(uri, context);
-        } catch (GeneralSecurityException e) {
-            latch.countDown();
-            HttpClientMessages.MESSAGES.failedToAcquireSession(e);
-            return;
+        } catch(GeneralSecurityException e) {
+            HttpClientMessages.MESSAGES.failedToAcquireBackendServer(e);
+            return null;
         }
-        sendRequest(clientRequest, sslContext, authenticationConfiguration, null, null, (e) -> {
-            latch.countDown();
-            HttpClientMessages.MESSAGES.failedToAcquireSession(e);
-        }, null, latch::countDown);
+
+        // returns a URI of the form <scheme>://<host>:<port>?name=<jboss.node.name>
+        // this permits having access to *both* the IP:port and the hostname identifiers for the server
+        CompletableFuture<URI> result = new CompletableFuture<>();
+        sendRequest(clientRequest, sslContext, authenticationConfiguration,
+                null,
+                null,
+                ((resultStream, response, closeable) -> {
+                    HeaderValues backends = response.getResponseHeaders().get(BACKEND_HEADER);
+                    if (backends == null) {
+                        result.completeExceptionally(HttpClientMessages.MESSAGES.failedToAcquireBackendServer(new Exception("Missing backend header on response")));
+                    }
+                    try {
+                        String backendString = backends.getFirst();
+                        URI backendURI = new URI(backendString);
+                        result.complete(backendURI);
+                    } catch(URISyntaxException use) {
+                        result.completeExceptionally(HttpClientMessages.MESSAGES.failedToAcquireBackendServer(use));
+                    } finally {
+                        IoUtils.safeClose(closeable);
+                    }
+                }),
+                result::completeExceptionally, null, null);
+        return result.get();
     }
 
-    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
-        sendRequest(request, sslContext, authenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, false);
+    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpStickinessHandler httpStickinessHandler, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
+        sendRequest(request, sslContext, authenticationConfiguration, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler, expectedResponse, completedTask, false);
     }
 
-    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
-        if (sessionId != null) {
-            request.getRequestHeaders().add(Headers.COOKIE, JSESSIONID + "=" + sessionId);
-        }
+    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpStickinessHandler httpStickinessHandler, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
         final ClassLoader tccl = getContextClassLoader();
-        connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
+        connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
     }
 
-    public void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
+    public void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpStickinessHandler httpStickinessHandler, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
         try {
             final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
 
@@ -183,220 +193,17 @@ public class HttpTargetContext extends AbstractAttachable {
             if (request.getRequestHeaders().contains(Headers.CONTENT_TYPE)) {
                 request.getRequestHeaders().put(Headers.TRANSFER_ENCODING, Headers.CHUNKED.toString());
             }
-            connection.sendRequest(request, new ClientCallback<ClientExchange>() {
-                @Override
-                public void completed(ClientExchange result) {
-                    result.setResponseListener(new ClientCallback<ClientExchange>() {
-                        @Override
-                        public void completed(ClientExchange result) {
-                            connection.getConnection().getWorker().execute(() -> {
-                                ClientResponse response = result.getResponse();
-                                if (!authAdded || connection.getAuthenticationContext().isStale(result)) {
-                                    handleSessionAffinity(request, response);
-                                    if (connection.getAuthenticationContext().handleResponse(response)) {
-                                        URI uri = connection.getUri();
-                                        connection.done(false);
-                                        final AtomicBoolean done = new AtomicBoolean();
-                                        ChannelListener<StreamSourceChannel> listener = ChannelListeners.drainListener(Long.MAX_VALUE, channel -> {
-                                            done.set(true);
-                                            connectionPool.getConnection((connection) -> {
-                                                if (connection.getAuthenticationContext().prepareRequest(uri, request, finalAuthenticationConfiguration)) {
-                                                    //retry the invocation
-                                                    sendRequestInternal(connection, request, finalAuthenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
-                                                } else {
-                                                    failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed());
-                                                    connection.done(true);
-                                                }
-                                            }, failureHandler::handleFailure, false, finalSslContext);
 
-                                        }, (channel, exception) -> failureHandler.handleFailure(exception));
-                                        listener.handleEvent(result.getResponseChannel());
-                                        if(!done.get()) {
-                                            result.getResponseChannel().getReadSetter().set(listener);
-                                            result.getResponseChannel().resumeReads();
-                                        }
-                                        return;
-                                    }
-                                }
+            final ClientSendCallback clientSendCallback = new ClientSendCallback(connection, request, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler,
+                    expectedResponse, completedTask, allowNoContent, authAdded, finalAuthenticationConfiguration, finalSslContext, classLoader);
 
-                                ContentType type = ContentType.parse(response.getResponseHeaders().getFirst(Headers.CONTENT_TYPE));
-                                final boolean ok;
-                                final boolean isException;
-                                if (type == null) {
-                                    ok = expectedResponse == null || (allowNoContent && response.getResponseCode() == StatusCodes.NO_CONTENT);
-                                    isException = false;
-                                } else {
-                                    if (type.getType().equals(EXCEPTION_TYPE)) {
-                                        ok = true;
-                                        isException = true;
-                                    } else if (expectedResponse == null) {
-                                        ok = false;
-                                        isException = false;
-                                    } else {
-                                        ok = expectedResponse.getType().equals(type.getType()) && expectedResponse.getVersion() >= type.getVersion();
-                                        isException = false;
-                                    }
-                                }
-
-                                if (!ok) {
-                                    if (response.getResponseCode() == 401 && !isLegacyAuthenticationFailedException()) {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed(response));
-                                    } else if (response.getResponseCode() >= 400) {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
-                                    } else {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseType(type));
-                                    }
-                                    //close the connection to be safe
-                                    connection.done(true);
-                                    return;
-                                }
-                                try {
-                                    handleSessionAffinity(request, response);
-
-                                    if (isException) {
-                                        final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
-                                        try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
-                                            InputStream in = inputStream;
-                                            String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
-                                            if (encoding != null) {
-                                                String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                if (Headers.GZIP.toString().equals(lowerEncoding)) {
-                                                    in = new GZIPInputStream(in);
-                                                } else if (!lowerEncoding.equals(Headers.IDENTITY.toString())) {
-                                                    throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
-                                                }
-                                            }
-                                            unmarshaller.start(new InputStreamByteInput(in));
-                                            Throwable exception = (Throwable) unmarshaller.readObject();
-                                            Map<String, Object> attachments = readAttachments(unmarshaller);
-                                            int read = in.read();
-                                            if (read != -1) {
-                                                HttpClientMessages.MESSAGES.debugf("Unexpected data when reading exception from %s", response);
-                                                connection.done(true);
-                                            } else {
-                                                IoUtils.safeClose(inputStream);
-                                                connection.done(false);
-                                            }
-                                            failureHandler.handleFailure(exception);
-                                        }
-                                    } else if (response.getResponseCode() >= 400) {
-                                        //unknown error
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
-                                        //close the connection to be safe
-                                        connection.done(true);
-
-                                    } else {
-                                        if (httpResultHandler != null) {
-                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
-                                            InputStream inputStream = in;
-                                            Closeable doneCallback = () -> {
-                                                IoUtils.safeClose(in);
-                                                if (completedTask != null) {
-                                                    completedTask.run();
-                                                }
-                                                connection.done(false);
-                                            };
-                                            if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
-                                                IoUtils.safeClose(in);
-                                                httpResultHandler.handleResult(null, response, doneCallback);
-                                            } else {
-                                                String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
-                                                if (encoding != null) {
-                                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                    if (Headers.GZIP.toString().equals(lowerEncoding)) {
-                                                        inputStream = new GZIPInputStream(inputStream);
-                                                    } else if (!lowerEncoding.equals(Headers.IDENTITY.toString())) {
-                                                        throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
-                                                    }
-                                                }
-                                                httpResultHandler.handleResult(inputStream, response, doneCallback);
-                                            }
-                                        } else {
-                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
-                                            IoUtils.safeClose(in);
-                                            if (completedTask != null) {
-                                                completedTask.run();
-                                            }
-                                            connection.done(false);
-                                        }
-                                    }
-
-                                } catch (Exception e) {
-                                    try {
-                                        failureHandler.handleFailure(e);
-                                    } finally {
-                                        connection.done(true);
-                                    }
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void failed(IOException e) {
-                            try {
-                                failureHandler.handleFailure(e);
-                            } finally {
-                                connection.done(true);
-                            }
-                        }
-                    });
-
-                    if (httpMarshaller != null) {
-                        //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
-                        connection.getConnection().getWorker().execute(() -> {
-                            try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
-
-                                // marshall the locator and method params
-                                // start the marshaller
-                                httpMarshaller.marshall(outputStream);
-
-                            } catch (Exception e) {
-                                try {
-                                    failureHandler.handleFailure(e);
-                                } finally {
-                                    connection.done(true);
-                                }
-                            }
-                        });
-                    }
-                }
-
-                @Override
-                public void failed(IOException e) {
-                    try {
-                        failureHandler.handleFailure(e);
-                    } finally {
-                        connection.done(true);
-                    }
-                }
-            });
+            connection.sendRequest(request, clientSendCallback) ;
         } catch (Throwable e) {
             try {
                 failureHandler.handleFailure(e);
             } finally {
                 connection.done(true);
             }
-        }
-    }
-
-    private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
-        //handle session affinity
-        HeaderValues cookies = response.getResponseHeaders().get(Headers.SET_COOKIE);
-        if (cookies != null) {
-            for (String cookie : cookies) {
-                Cookie c = Cookies.parseSetCookieHeader(cookie);
-                if (c.getName().equals(JSESSIONID)) {
-                    HttpClientMessages.MESSAGES.debugf("%s Cookie found in Set-Cookie header in the response. cookie name = [%s], cookie value = [%s], cookie path = [%s]", JSESSIONID, c.getName(), c.getValue(), c.getPath());
-                    String path = c.getPath();
-                    if (path == null || path.isEmpty() || request.getPath().startsWith(path)) {
-                        HttpClientMessages.MESSAGES.debugf("Use sessionId %s as a request cookie for session affinity", c.getValue());
-                        setSessionId(c.getValue());
-                    }
-                }
-            }
-        }
-        if (getSessionId() != null) {
-            request.getRequestHeaders().put(Headers.COOKIE, JSESSIONID + "=" + getSessionId());
         }
     }
 
@@ -424,41 +231,8 @@ public class HttpTargetContext extends AbstractAttachable {
         return connectionPool;
     }
 
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    void setSessionId(String sessionId) {
-        this.sessionId = sessionId;
-    }
-
     public URI getUri() {
         return uri;
-    }
-
-    public void clearSessionId() {
-        awaitSessionId(true, null); //to prevent a race make sure we have one before we clear it
-        synchronized (this) {
-            CountDownLatch old = sessionAffinityLatch;
-            sessionAffinityLatch = new CountDownLatch(1);
-            old.countDown();
-            this.affinityRequestSent.set(false);
-            this.sessionId = null;
-        }
-    }
-
-    public String awaitSessionId(boolean required, AuthenticationConfiguration authConfig) {
-        if (required) {
-            acquireAffinitiy(authConfig);
-        }
-        if (affinityRequestSent.get()) {
-            try {
-                sessionAffinityLatch.await();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return sessionId;
     }
 
     private boolean isLegacyAuthenticationFailedException() {
@@ -480,5 +254,312 @@ public class HttpTargetContext extends AbstractAttachable {
 
     public interface HttpFailureHandler {
         void handleFailure(Throwable throwable);
+    }
+
+    public interface HttpStickinessHandler {
+        void prepareRequest(ClientRequest request) throws Exception ;
+        void processResponse(ClientExchange result) throws Exception ;
+    }
+
+    /*
+     * Callback used by ConnectionPool.sendRequest to handle either a successful or failed request send operation.
+     */
+    private final class ClientSendCallback implements ClientCallback<ClientExchange> {
+        private HttpConnectionPool.ConnectionHandle connection;
+        private ClientRequest request;
+        private HttpMarshaller httpMarshaller;
+        private HttpStickinessHandler httpStickinessHandler;
+        private HttpResultHandler httpResultHandler;
+        private HttpFailureHandler failureHandler;
+        private ContentType expectedResponse;
+        private Runnable completedTask;
+        private boolean allowNoContent;
+
+        private boolean authAdded;
+        private AuthenticationConfiguration finalAuthenticationConfiguration;
+        private SSLContext finalSslContext;
+        private ClassLoader classLoader;
+
+        public ClientSendCallback(HttpConnectionPool.ConnectionHandle connection, ClientRequest request, HttpMarshaller httpMarshaller, HttpStickinessHandler httpStickinessHandler, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean authAdded, AuthenticationConfiguration finalAuthenticationConfiguration, SSLContext finalSslContext, ClassLoader classLoader) {
+            this.connection = connection;
+            this.request = request;
+            this.httpMarshaller = httpMarshaller;
+            this.httpStickinessHandler = httpStickinessHandler;
+            this.httpResultHandler = httpResultHandler;
+            this.failureHandler = failureHandler;
+            this.expectedResponse = expectedResponse;
+            this.completedTask = completedTask;
+            this.allowNoContent = allowNoContent;
+            this.authAdded = authAdded;
+            this.finalAuthenticationConfiguration = finalAuthenticationConfiguration;
+            this.finalSslContext = finalSslContext;
+            this.classLoader = classLoader;
+        }
+
+        /**
+         * Called upon successful send of an HTTP request.
+         * @param result the resulting ClientExchange instance
+         */
+        @Override
+        public void completed(ClientExchange result) {
+            // set up the callback to process HTTP responses
+            result.setResponseListener(new ClientReceiveCallback(connection, request, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler,
+                    expectedResponse, completedTask, allowNoContent, authAdded, finalAuthenticationConfiguration, finalSslContext, classLoader));
+
+            // set up stickiness metadata for this request
+            if (httpStickinessHandler != null) {
+                try {
+                    httpStickinessHandler.prepareRequest(request);
+                } catch(Exception e) {
+                    try {
+                        failureHandler.handleFailure(e);
+                    } finally {
+                        connection.done(true);
+                    }
+                }
+            }
+
+            if (httpMarshaller != null) {
+                //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
+                connection.getConnection().getWorker().execute(() -> {
+                    try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
+
+                        // marshall the locator and method params
+                         httpMarshaller.marshall(outputStream);
+
+                    } catch (Exception e) {
+                        try {
+                            failureHandler.handleFailure(e);
+                        } finally {
+                            connection.done(true);
+                        }
+                    }
+                });
+            }
+        }
+
+        /**
+         * Called upon failed send of an HTTP request.
+         * @param e the IOException which caused the failure
+         */
+        @Override
+        public void failed(IOException e) {
+            try {
+                failureHandler.handleFailure(e);
+            } finally {
+                connection.done(true);
+            }
+        }
+    }
+
+    /*
+     * Callback used by ConnectionPool.sendRequest to handle either a successful or failed response receive operation.
+     */
+    private final class ClientReceiveCallback implements ClientCallback<ClientExchange> {
+        private HttpConnectionPool.ConnectionHandle connection;
+        private ClientRequest request;
+        private HttpMarshaller httpMarshaller;
+        private HttpStickinessHandler httpStickinessHandler;
+        private HttpResultHandler httpResultHandler;
+        private HttpFailureHandler failureHandler;
+        private ContentType expectedResponse;
+        private Runnable completedTask;
+        private boolean allowNoContent;
+
+        private boolean authAdded;
+        private AuthenticationConfiguration finalAuthenticationConfiguration;
+        private SSLContext finalSslContext;
+        private ClassLoader classLoader;
+
+        public ClientReceiveCallback(HttpConnectionPool.ConnectionHandle connection, ClientRequest request,
+                                     HttpMarshaller httpMarshaller, HttpStickinessHandler httpStickinessHandler, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler,
+                                     ContentType expectedResponse, Runnable completedTask, boolean allowNoContent,
+                                     boolean authAdded, AuthenticationConfiguration finalAuthenticationConfiguration, SSLContext finalSslContext, ClassLoader classLoader) {
+            this.connection = connection;
+            this.request = request;
+            this.httpMarshaller = httpMarshaller;
+            this.httpStickinessHandler = httpStickinessHandler;
+            this.httpResultHandler = httpResultHandler;
+            this.failureHandler = failureHandler;
+            this.expectedResponse = expectedResponse;
+            this.completedTask = completedTask;
+            this.allowNoContent = allowNoContent;
+            this.authAdded = authAdded;
+            this.finalAuthenticationConfiguration = finalAuthenticationConfiguration;
+            this.finalSslContext = finalSslContext;
+            this.classLoader = classLoader;
+        }
+
+        /**
+         * Called upon successful receipt of an HTTP rewponse.
+         * @param result the resulting ClientExchange instance
+         */
+        @Override
+        public void completed(ClientExchange result) {
+            connection.getConnection().getWorker().execute(() -> {
+                ClientResponse response = result.getResponse();
+                if (!authAdded || connection.getAuthenticationContext().isStale(result)) {
+                    if (connection.getAuthenticationContext().handleResponse(response)) {
+                        URI uri = connection.getUri();
+                        connection.done(false);
+                        final AtomicBoolean done = new AtomicBoolean();
+                        ChannelListener<StreamSourceChannel> listener = ChannelListeners.drainListener(Long.MAX_VALUE, channel -> {
+                            done.set(true);
+                            connectionPool.getConnection((connection) -> {
+                                if (connection.getAuthenticationContext().prepareRequest(uri, request, finalAuthenticationConfiguration)) {
+                                    //retry the invocation
+                                    sendRequestInternal(connection, request, finalAuthenticationConfiguration, httpMarshaller, httpStickinessHandler, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
+                                } else {
+                                    failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed());
+                                    connection.done(true);
+                                }
+                            }, failureHandler::handleFailure, false, finalSslContext);
+
+                        }, (channel, exception) -> failureHandler.handleFailure(exception));
+                        listener.handleEvent(result.getResponseChannel());
+                        if(!done.get()) {
+                            result.getResponseChannel().getReadSetter().set(listener);
+                            result.getResponseChannel().resumeReads();
+                        }
+                        return;
+                    }
+                }
+
+                ContentType type = ContentType.parse(response.getResponseHeaders().getFirst(Headers.CONTENT_TYPE));
+                final boolean ok;
+                final boolean isException;
+                if (type == null) {
+                    ok = expectedResponse == null || (allowNoContent && response.getResponseCode() == StatusCodes.NO_CONTENT);
+                    isException = false;
+                } else {
+                    if (type.getType().equals(EXCEPTION_TYPE)) {
+                        ok = true;
+                        isException = true;
+                    } else if (expectedResponse == null) {
+                        ok = false;
+                        isException = false;
+                    } else {
+                        ok = expectedResponse.getType().equals(type.getType()) && expectedResponse.getVersion() >= type.getVersion();
+                        isException = false;
+                    }
+                }
+
+                if (!ok) {
+                    if (response.getResponseCode() == 401 && !isLegacyAuthenticationFailedException()) {
+                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed(response));
+                    } else if (response.getResponseCode() >= 400) {
+                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
+                    } else {
+                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseType(type));
+                    }
+                    //close the connection to be safe
+                    connection.done(true);
+                    return;
+                }
+                try {
+                    if (isException) {
+                        final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
+                        try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
+                            InputStream in = inputStream;
+                            String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
+                            if (encoding != null) {
+                                String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+                                if (Headers.GZIP.toString().equals(lowerEncoding)) {
+                                    in = new GZIPInputStream(in);
+                                } else if (!lowerEncoding.equals(Headers.IDENTITY.toString())) {
+                                    throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
+                                }
+                            }
+                            unmarshaller.start(new InputStreamByteInput(in));
+                            Throwable exception = (Throwable) unmarshaller.readObject();
+                            Map<String, Object> attachments = readAttachments(unmarshaller);
+                            int read = in.read();
+                            if (read != -1) {
+                                HttpClientMessages.MESSAGES.debugf("Unexpected data when reading exception from %s", response);
+                                connection.done(true);
+                            } else {
+                                IoUtils.safeClose(inputStream);
+                                connection.done(false);
+                            }
+                            failureHandler.handleFailure(exception);
+                        }
+                    } else if (response.getResponseCode() >= 400) {
+                        //unknown error
+                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
+                        //close the connection to be safe
+                        connection.done(true);
+
+                    } else {
+
+                        // set up stickiness metadata for this response
+                        if (httpStickinessHandler != null) {
+                            try {
+                                httpStickinessHandler.processResponse(result);
+                            } catch(Exception e) {
+                                try {
+                                    failureHandler.handleFailure(e);
+                                } finally {
+                                    connection.done(true);
+                                }
+                            }
+                        }
+
+                        if (httpResultHandler != null) {
+                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
+                            InputStream inputStream = in;
+                            Closeable doneCallback = () -> {
+                                IoUtils.safeClose(in);
+                                if (completedTask != null) {
+                                    completedTask.run();
+                                }
+                                connection.done(false);
+                            };
+                            if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
+                                IoUtils.safeClose(in);
+                                httpResultHandler.handleResult(null, response, doneCallback);
+                            } else {
+                                String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
+                                if (encoding != null) {
+                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+                                    if (Headers.GZIP.toString().equals(lowerEncoding)) {
+                                        inputStream = new GZIPInputStream(inputStream);
+                                    } else if (!lowerEncoding.equals(Headers.IDENTITY.toString())) {
+                                        throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
+                                    }
+                                }
+                                httpResultHandler.handleResult(inputStream, response, doneCallback);
+                            }
+                        } else {
+                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
+                            IoUtils.safeClose(in);
+                            if (completedTask != null) {
+                                completedTask.run();
+                            }
+                            connection.done(false);
+                        }
+                    }
+
+                } catch (Exception e) {
+                    try {
+                        failureHandler.handleFailure(e);
+                    } finally {
+                        connection.done(true);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Called upon failed receipt of an HTTP response.
+         * @param e the IOException which caused the failure
+         */
+        @Override
+        public void failed(IOException e) {
+            try {
+                failureHandler.handleFailure(e);
+            } finally {
+                connection.done(true);
+            }
+        }
     }
 }

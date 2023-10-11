@@ -37,6 +37,8 @@ import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.httpclient.common.NoFlushByteOutput;
+import org.wildfly.httpclient.common.HandlerVersion;
+import org.wildfly.httpclient.common.VersionedHttpHandler;
 
 import javax.naming.Binding;
 import javax.naming.Context;
@@ -71,6 +73,7 @@ import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
  * HTTP service that handles naming invocations.
  *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 public class HttpRemoteNamingService {
 
@@ -95,23 +98,35 @@ public class HttpRemoteNamingService {
 
 
     public HttpHandler createHandler() {
-        RoutingHandler routingHandler = new RoutingHandler();
-        final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
-        routingHandler.add(Methods.POST, LOOKUP_PATH + nameParamPathSuffix, new LookupHandler());
-        routingHandler.add(Methods.GET, LOOKUP_LINK_PATH + nameParamPathSuffix, new LookupLinkHandler());
-        routingHandler.add(Methods.PUT, BIND_PATH + nameParamPathSuffix, new BindHandler());
-        routingHandler.add(Methods.PATCH, REBIND_PATH + nameParamPathSuffix, new RebindHandler());
-        routingHandler.add(Methods.DELETE, UNBIND_PATH + nameParamPathSuffix, new UnbindHandler());
-        routingHandler.add(Methods.DELETE, DESTROY_SUBCONTEXT_PATH + nameParamPathSuffix, new DestroySubcontextHandler());
-        routingHandler.add(Methods.GET, LIST_PATH + nameParamPathSuffix, new ListHandler());
-        routingHandler.add(Methods.GET, LIST_BINDINGS_PATH + nameParamPathSuffix, new ListBindingsHandler());
-        routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler());
-        routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler());
-        return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
+        // create a composite handler for each protocol version
+        BlockingHandler[] handlers = new BlockingHandler[HandlerVersion.values().length];
+
+        for (HandlerVersion version : HandlerVersion.values()) {
+            RoutingHandler routingHandler = new RoutingHandler();
+            final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
+            routingHandler.add(Methods.POST, LOOKUP_PATH + nameParamPathSuffix, new LookupHandler(version));
+            routingHandler.add(Methods.GET, LOOKUP_LINK_PATH + nameParamPathSuffix, new LookupLinkHandler(version));
+            routingHandler.add(Methods.PUT, BIND_PATH + nameParamPathSuffix, new BindHandler(version));
+            routingHandler.add(Methods.PATCH, REBIND_PATH + nameParamPathSuffix, new RebindHandler(version));
+            routingHandler.add(Methods.DELETE, UNBIND_PATH + nameParamPathSuffix, new UnbindHandler(version));
+            routingHandler.add(Methods.DELETE, DESTROY_SUBCONTEXT_PATH + nameParamPathSuffix, new DestroySubcontextHandler(version));
+            routingHandler.add(Methods.GET, LIST_PATH + nameParamPathSuffix, new ListHandler(version));
+            routingHandler.add(Methods.GET, LIST_BINDINGS_PATH + nameParamPathSuffix, new ListBindingsHandler(version));
+            routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler(version));
+            routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler(version));
+
+            int versionIndex = version.getVersion() - HandlerVersion.EARLIEST.getVersion();
+            handlers[versionIndex] = new BlockingHandler(new ElytronIdentityHandler(routingHandler));
+        }
+        return httpServiceConfig.wrap(handlers);
     }
 
 
-    private abstract class NameHandler implements HttpHandler {
+    private abstract class NameHandler extends VersionedHttpHandler {
+
+        public NameHandler(HandlerVersion version) {
+            super(version);
+        }
 
         @Override
         public final void handleRequest(HttpServerExchange exchange) throws Exception {
@@ -139,6 +154,10 @@ public class HttpRemoteNamingService {
 
     private final class LookupHandler extends NameHandler {
 
+        public LookupHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             return localContext.lookup(name);
@@ -147,6 +166,10 @@ public class HttpRemoteNamingService {
 
     private final class LookupLinkHandler extends NameHandler {
 
+        public LookupLinkHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             return localContext.lookupLink(name);
@@ -154,6 +177,11 @@ public class HttpRemoteNamingService {
     }
 
     private class CreateSubContextHandler extends NameHandler {
+
+        public CreateSubContextHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             return localContext.createSubcontext(name);
@@ -161,6 +189,11 @@ public class HttpRemoteNamingService {
     }
 
     private class UnbindHandler extends NameHandler {
+
+        public UnbindHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             localContext.unbind(name);
@@ -169,6 +202,11 @@ public class HttpRemoteNamingService {
     }
 
     private class ListBindingsHandler extends NameHandler {
+
+        public ListBindingsHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             final NamingEnumeration<Binding> namingEnumeration = localContext.listBindings(name);
@@ -177,6 +215,11 @@ public class HttpRemoteNamingService {
     }
 
     private class RenameHandler extends NameHandler {
+
+        public RenameHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             Deque<String> newName = exchange.getQueryParameters().get(NEW_QUERY_PARAMETER);
@@ -196,6 +239,11 @@ public class HttpRemoteNamingService {
     }
 
     private class DestroySubcontextHandler extends NameHandler {
+
+        public DestroySubcontextHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             localContext.destroySubcontext(name);
@@ -204,6 +252,11 @@ public class HttpRemoteNamingService {
     }
 
     private class ListHandler extends NameHandler {
+
+        public ListHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             final NamingEnumeration<NameClassPair> namingEnumeration = localContext.list(name);
@@ -213,6 +266,10 @@ public class HttpRemoteNamingService {
 
     private class RebindHandler extends BindHandler {
 
+        public RebindHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected void doOperation(String name, Object object) throws NamingException {
             localContext.rebind(name, object);
@@ -220,6 +277,11 @@ public class HttpRemoteNamingService {
     }
 
     private class BindHandler extends NameHandler {
+
+        public BindHandler(HandlerVersion version) {
+            super(version);
+        }
+
         @Override
         protected final Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));

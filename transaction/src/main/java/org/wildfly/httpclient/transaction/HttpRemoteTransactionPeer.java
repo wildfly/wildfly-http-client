@@ -24,6 +24,7 @@ import io.undertow.util.Methods;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
@@ -55,17 +56,22 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER
 import static org.wildfly.httpclient.transaction.TransactionConstants.XID_LIST;
 
 /**
+ * A versioned peer for controlling non-XA and XA transactions running on a target server.
+ *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
+    private final HandlerVersion version;
     private final HttpTargetContext targetContext;
     private final SSLContext sslContext;
     private final AuthenticationConfiguration authenticationConfiguration;
     private final AuthenticationContext authenticationContext;
 
-    public HttpRemoteTransactionPeer(HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+    public HttpRemoteTransactionPeer(HandlerVersion version, HttpTargetContext targetContext, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration) {
+        this.version = version;
         this.targetContext = targetContext;
         this.sslContext = sslContext;
         this.authenticationConfiguration = authenticationConfiguration;
@@ -75,7 +81,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     @Override
     public SubordinateTransactionControl lookupXid(Xid xid) throws XAException {
         try {
-            return new HttpSubordinateTransactionHandle(xid, targetContext, getSslContext(targetContext.getUri()), authenticationConfiguration);
+            return new HttpSubordinateTransactionHandle(version, xid, targetContext, getSslContext(targetContext.getUri()), authenticationConfiguration);
         } catch (GeneralSecurityException e) {
             XAException xaException = new XAException(XAException.XAER_RMFAIL);
             xaException.initCause(e);
@@ -105,30 +111,35 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
             throw xaException;
         }
 
-        targetContext.sendRequest(cr,  sslContext, authenticationConfiguration,null, (result, response, closeable) -> {
-            try {
-                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
-                unmarshaller.start(new InputStreamByteInput(result));
-                int length = unmarshaller.readInt();
-                Xid[] ret = new Xid[length];
-                for(int i = 0; i < length; ++ i) {
-                    int formatId = unmarshaller.readInt();
-                    int len = unmarshaller.readInt();
-                    byte[] globalId = new byte[len];
-                    unmarshaller.readFully(globalId);
-                    len = unmarshaller.readInt();
-                    byte[] branchId = new byte[len];
-                    unmarshaller.readFully(branchId);
-                    ret[i] = new SimpleXid(formatId, globalId, branchId);
-                }
-                xidList.complete(ret);
-                unmarshaller.finish();
-            } catch (Exception e) {
-                xidList.completeExceptionally(e);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, xidList::completeExceptionally, NEW_TRANSACTION, null);
+        targetContext.sendRequest(cr,  sslContext, authenticationConfiguration,
+                null,
+                new HttpSubordinateTransactionHandle.SubordinateTransactionStickinessHandler(),
+                (result, response, closeable) -> {
+                    try {
+                        Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
+                        unmarshaller.start(new InputStreamByteInput(result));
+                        int length = unmarshaller.readInt();
+                        Xid[] ret = new Xid[length];
+                        for (int i = 0; i < length; ++i) {
+                            int formatId = unmarshaller.readInt();
+                            int len = unmarshaller.readInt();
+                            byte[] globalId = new byte[len];
+                            unmarshaller.readFully(globalId);
+                            len = unmarshaller.readInt();
+                            byte[] branchId = new byte[len];
+                            unmarshaller.readFully(branchId);
+                            ret[i] = new SimpleXid(formatId, globalId, branchId);
+                        }
+                        xidList.complete(ret);
+                        unmarshaller.finish();
+                    } catch (Exception e) {
+                        xidList.completeExceptionally(e);
+                    } finally {
+                        IoUtils.safeClose(closeable);
+                    }
+                },
+                xidList::completeExceptionally, NEW_TRANSACTION, null);
+
         try {
             return xidList.get();
         } catch (InterruptedException e) {
@@ -164,29 +175,34 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
             throw new SystemException(e.getMessage());
         }
 
-        targetContext.sendRequest(cr, sslContext, authenticationConfiguration, null, (result, response, closeable) -> {
-            try {
-                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
-                unmarshaller.start(new InputStreamByteInput(result));
-                int formatId = unmarshaller.readInt();
-                int len = unmarshaller.readInt();
-                byte[] globalId = new byte[len];
-                unmarshaller.readFully(globalId);
-                len = unmarshaller.readInt();
-                byte[] branchId = new byte[len];
-                unmarshaller.readFully(branchId);
-                SimpleXid simpleXid = new SimpleXid(formatId, globalId, branchId);
-                beginXid.complete(simpleXid);
-                unmarshaller.finish();
-            } catch (Exception e) {
-                beginXid.completeExceptionally(e);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, beginXid::completeExceptionally, NEW_TRANSACTION, null);
+        targetContext.sendRequest(cr, sslContext, authenticationConfiguration,
+                null,
+                new HttpRemoteTransactionHandle.RemoteTransactionStickinessHandler(),
+                (result, response, closeable) -> {
+                    try {
+                        Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
+                        unmarshaller.start(new InputStreamByteInput(result));
+                        int formatId = unmarshaller.readInt();
+                        int len = unmarshaller.readInt();
+                        byte[] globalId = new byte[len];
+                        unmarshaller.readFully(globalId);
+                        len = unmarshaller.readInt();
+                        byte[] branchId = new byte[len];
+                        unmarshaller.readFully(branchId);
+                        SimpleXid simpleXid = new SimpleXid(formatId, globalId, branchId);
+                        beginXid.complete(simpleXid);
+                        unmarshaller.finish();
+                    } catch (Exception e) {
+                        beginXid.completeExceptionally(e);
+                    } finally {
+                        IoUtils.safeClose(closeable);
+                    }
+                },
+                beginXid::completeExceptionally, NEW_TRANSACTION, null);
+
         try {
             Xid xid = beginXid.get();
-            return new HttpRemoteTransactionHandle(xid, targetContext, sslContext, authenticationConfiguration);
+            return new HttpRemoteTransactionHandle(version, xid, targetContext, sslContext, authenticationConfiguration);
 
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -212,4 +228,6 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
             return sslContext;
         }
     }
+
+
 }

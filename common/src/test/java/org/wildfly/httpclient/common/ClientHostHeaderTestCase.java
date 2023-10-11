@@ -59,13 +59,16 @@ public class ClientHostHeaderTestCase {
 
         CountDownLatch latch = new CountDownLatch(1);
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(new URI(HTTPTestServer.getDefaultServerURL()));
-        context.sendRequest(request, null, AuthenticationConfiguration.empty(), null,
+        context.sendRequest(request, null, AuthenticationConfiguration.empty(),
+                null,
+                null,
                 new HttpTargetContext.HttpResultHandler() {
                     @Override
                     public void handleResult(InputStream result, ClientResponse response, Closeable doneCallback) {
                         latch.countDown();
                     }
-                }, new HttpTargetContext.HttpFailureHandler() {
+                },
+                new HttpTargetContext.HttpFailureHandler() {
                     @Override
                     public void handleFailure(Throwable throwable) {
                         log.log(Level.SEVERE, "Request handling failed with exception", throwable);

@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2022 Red Hat, Inc., and individual contributors
+ * Copyright 2023 Red Hat, Inc., and individual contributors
  * as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,26 +17,22 @@
  */
 package org.wildfly.httpclient.common;
 
-/**
- * Protocol version constants.
+import io.undertow.server.HttpHandler;
+
+/*
+ * An HttpHandler which carries a version.
  *
- * @author Flavia Rainone
+ * @author Richard Achmatowicz
  */
-public class Protocol {
+public abstract class VersionedHttpHandler implements HttpHandler {
 
-    // the last version compatible with javax ee namespace
-    static final int JAVAEE_PROTOCOL_VERSION = 1;
-    // the first version compatible with jakarta ee namespace
-    static final int JAKARTAEE_PROTOCOL_VERSION = 2;
-    // version one path
-    static final String VERSION_ONE_PATH = "/v1";
-    // version two path
-    static final String VERSION_TWO_PATH = "/v2";
-    // version path prefix
-    public static final String VERSION_PATH="/v";
-    // latest protocol version
-    public static int LATEST = 3;
+    private HandlerVersion version ;
 
-    private Protocol() {
+    public VersionedHttpHandler(HandlerVersion version) {
+        this.version = version;
+    }
+
+    public HandlerVersion getVersion() {
+        return version;
     }
 }

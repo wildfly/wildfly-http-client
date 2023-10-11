@@ -20,8 +20,6 @@ package org.wildfly.httpclient.common;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 
-import java.util.function.Function;
-
 /**
  * Mode configuration for http services.
  * <p>
@@ -30,12 +28,12 @@ import java.util.function.Function;
  *
  * @author Flavia Rainone
  */
-public enum HttpServiceConfig {
+public class HttpServiceConfig {
 
     /**
      * Default configuration. Used by both EE namespace interoperable and non-interoperable servers
      */
-    DEFAULT (EENamespaceInteroperability::createInteroperabilityHandler, EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
+    private static final HttpServiceConfig INSTANCE = new HttpServiceConfig (EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
 
     /**
      * Returns the default configuration.
@@ -43,29 +41,59 @@ public enum HttpServiceConfig {
      * @return the configuration for http services
      */
     public static HttpServiceConfig getInstance() {
-        return DEFAULT;
+        return INSTANCE;
     }
 
-    private final Function<HttpHandler, HttpHandler> handlerWrapper;
     private final HttpMarshallerFactoryProvider marshallerFactoryProvider;
 
-    HttpServiceConfig(Function<HttpHandler, HttpHandler> handlerWrapper, HttpMarshallerFactoryProvider marshallerFactoryProvider) {
-        this.handlerWrapper = handlerWrapper;
+    HttpServiceConfig(HttpMarshallerFactoryProvider marshallerFactoryProvider) {
         this.marshallerFactoryProvider = marshallerFactoryProvider;
     }
 
     /**
      * Wraps the http service handler. Should be applied to all http handlers configured by
      * a http service.
+     * <br>
+     * The resulting handler is compatible with EE namespace interoperability and accepts
+     * {@code javax} namespace requests at the path prefix {@code "/v1"}, while {@code jakarta}
+     * namespace requests are received at the path prefix {@code "/v2"}. Both requests are
+     * forwarded to {@code handler}, but in case of {@code "/v1"} the {@code javax} namespace
+     * is converted to {@code jakarta}.
      *
      * @param handler responsible for handling the HTTP service requests directed to a specific
-     *                URI
+     *                URI. This handler must operate on {@code jakarta} namespace.
      * @return the HttpHandler that should be provided to Undertow and associated with the HTTP
      *         service URI. The resulting handler is a wrapper that will add any necessary actions
      *         before invoking the inner {@code handler}.
      */
     public HttpHandler wrap(HttpHandler handler) {
-        return handlerWrapper.apply(handler);
+        return EENamespaceInteroperability.createInteroperabilityHandler(handler);
+    }
+
+    /**
+     * Wraps a multi-version series of handlers. Each handler represents a version of the same operation
+     * provided by a HTTP service.
+     * <br>
+     * The resulting handler receives {@code javax} namespace requests at the path prefix {@code "/v1"},
+     * translates them to {@code jakarta namespace} and forwards them to {@code multiVersionedHandlers[0]}.
+     * The subsequent handlers in the {@code multiVersionedHandlers} array are mapped to path {@code "/v2"},
+     * {@code "/v3"} and so on.
+     * <br>
+     * Use this method when the http service supports more than one version of an HTTP Handler. This will be
+     * the case as http handlers evolve to incorporate new features and fixes that change the particular
+     * protocol format used by the HTTP handler for the specific operation it represents.
+     *
+     * @param multiVersionedHandlers responsible for handling the HTTP service requests directed to a specific
+     *                               URI. The handlers must be in crescent protocol number order, i.e., in the
+     *                               sequence corresponding to {@code "/v2"}, {@code "/v3}, {@code "/v4"}. All
+     *                               the handlers must be compatible with requests in the Jakarta namespace.
+     *
+     * @return the HttpHandler that should be provided to Undertow and associated with the HTTP
+     *         service URI. The resulting handler is a wrapper that will take care of protocol
+     *         versioning to invoke the appropriate handler
+     */
+    public HttpHandler wrap(HttpHandler... multiVersionedHandlers) {
+        return EENamespaceInteroperability.createInteroperabilityHandler(multiVersionedHandlers);
     }
 
     /**

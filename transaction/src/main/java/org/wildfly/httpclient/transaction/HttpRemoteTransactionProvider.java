@@ -26,19 +26,23 @@ import java.net.URI;
 import javax.net.ssl.SSLContext;
 import jakarta.transaction.SystemException;
 
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.RemoteTransactionPeer;
 import org.wildfly.transaction.client.spi.RemoteTransactionProvider;
 
 /**
+  * A class which provides a versioned peer for controlling non-XA and XA transactions on a target server.
+ *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 public class HttpRemoteTransactionProvider implements RemoteTransactionProvider {
 
     @Override
     public RemoteTransactionPeer getPeerHandle(final URI uri, final SSLContext sslContext, final AuthenticationConfiguration authenticationConfiguration) throws SystemException {
-        return new HttpRemoteTransactionPeer(WildflyHttpContext.getCurrent().getTargetContext(uri), sslContext, authenticationConfiguration);
+        return new HttpRemoteTransactionPeer(HandlerVersion.LATEST, WildflyHttpContext.getCurrent().getTargetContext(uri), sslContext, authenticationConfiguration);
     }
 
     @Override

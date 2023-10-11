@@ -25,7 +25,9 @@ import io.undertow.server.session.SecureRandomSessionIdGenerator;
 import io.undertow.server.session.SessionIdGenerator;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
+import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.EJBIdentifier;
+import org.jboss.ejb.client.NodeAffinity;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.SessionOpenRequest;
@@ -37,6 +39,8 @@ import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -56,12 +60,12 @@ import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
 import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
 
 /**
- * Http handler for open session requests.
+ * A server-side handler for processing EJB client session open requests
  *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 class HttpSessionOpenHandler extends RemoteHTTPHandler {
-
 
     private final Association association;
     private final ExecutorService executorService;
@@ -69,16 +73,27 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
     private final LocalTransactionContext localTransactionContext;
     private final HttpServiceConfig httpServiceConfig;
 
-    HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
-        super(executorService);
+    // a fixed HTTP session ID to use in Cookies from this handler
+    private final String serverSessionID ;
+
+    HttpSessionOpenHandler(HandlerVersion version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
+        super(version, executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
         this.httpServiceConfig = httpServiceConfig;
+        this.serverSessionID = sessionIdGenerator.createSessionId();
     }
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
+        EjbHttpClientMessages.MESSAGES.infof("HttpSessionOpenHandler: running handler version %s to process request", getVersion().getVersion());
+
+        // debug
+        HttpStickinessHelper.dumpRequestCookies(exchange);
+        HttpStickinessHelper.dumpRequestHeaders(exchange);
+
+        // validate content type of payload
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
         if (contentType == null || contentType.getVersion() != 1 || !SESSION_OPEN.getType().equals(contentType.getType())) {
@@ -86,6 +101,8 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
             EjbHttpClientMessages.MESSAGES.debugf("Bad content type %s", ct);
             return;
         }
+
+        // parse request path
         String relativePath = exchange.getRelativePath();
         if(relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
@@ -100,14 +117,35 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
         final String distinct = handleDash(parts[2]);
         final String bean = parts[3];
 
-        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
-        String sessionAffinity = null;
-        if (cookie != null) {
-            sessionAffinity = cookie.getValue();
+        // process Cookies and Headers
+        switch (getVersion()) {
+            /*
+             * Process Cookies and Headers for VERSION_1 handlers
+             * - TODO: this code is not used
+             */
+            case VERSION_1:
+            case VERSION_2: {
+                Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
+                String sessionAffinity = null;
+                if (cookie != null) {
+                    sessionAffinity = cookie.getValue();
+                }
+            }
+            break;
+            /*
+             * Process Cookies and Headers for VERSION_2 handlers
+             * - this session open request should have no associated Cookie (this only holds if we are ot in a txn)
+             */
+            case LATEST: {
+                assert !HttpStickinessHelper.hasEncodedSessionID(exchange) : "incoming session open request has unexpected Cookie";
+            }
+            break;
         }
 
 
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
+
+        // process request
         exchange.dispatch(executorService, () -> {
             final ReceivedTransaction txConfig;
             try {
@@ -136,6 +174,27 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
             }
 
             association.receiveSessionOpenRequest(new SessionOpenRequest() {
+                Affinity strongAffinity ;
+                Affinity weakAffinity;
+
+                /*
+                 * The Association processing will cause this field to be updated before convertToStateful() is called.
+                 */
+                @Override
+                public void updateStrongAffinity(Affinity affinity) {
+                    SessionOpenRequest.super.updateStrongAffinity(affinity);
+                    this.strongAffinity = affinity;
+                }
+
+                /*
+                 * The Association processing will cause this field to be updated before convertToStateful() is called.
+                 */
+                @Override
+                public void updateWeakAffinity(Affinity affinity) {
+                    SessionOpenRequest.super.updateWeakAffinity(affinity);
+                    this.weakAffinity = affinity;
+                }
+
                 @Override
                 public boolean hasTransaction() {
                     return txConfig != null;
@@ -160,7 +219,6 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                 public Executor getRequestExecutor() {
                     return executorService != null ? executorService : exchange.getIoThread().getWorker();
                 }
-
 
                 @Override
                 public String getProtocol() {
@@ -210,15 +268,39 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                 @Override
                 public void convertToStateful(@NotNull SessionID sessionId) throws IllegalArgumentException, IllegalStateException {
 
-                    Cookie sessionCookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
-                    if (sessionCookie == null) {
-                        String rootPath = exchange.getResolvedPath();
-                        int ejbIndex = rootPath.lastIndexOf("/ejb");
-                        if (ejbIndex > 0) {
-                            rootPath = rootPath.substring(0, ejbIndex);
+                    switch (getVersion()) {
+                        // process Cookies and Headers for VERSION_1, VERSION_2
+                        // - ensure that every session open request has a Cookie tied to this node
+                        case VERSION_1:
+                        case VERSION_2: {
+                            Cookie sessionCookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
+                            if (sessionCookie == null) {
+                                String rootPath = exchange.getResolvedPath();
+                                int ejbIndex = rootPath.lastIndexOf("/ejb");
+                                if (ejbIndex > 0) {
+                                    rootPath = rootPath.substring(0, ejbIndex);
+                                }
+                                exchange.getResponseCookies().put(JSESSIONID_COOKIE_NAME, new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
+                            }
                         }
+                        break;
+                        // process Cookies and Headers for LATEST
+                        // - add a Cookie with the server session ID + route
+                        // - add a stickiness header if bean not replicated (i.e. if strong affinity not instanceof NodeAffinity)
+                        case LATEST: {
+                            final String node = System.getProperty("jboss.node.name", "localhost");
 
-                        exchange.getResponseCookies().put(JSESSIONID_COOKIE_NAME, new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
+                            // add a Cookie for the load balancer, no Cookie attributes required,as this will not be read by a browser
+                            // the correct route will be appended by the Host (see HttpInvokerHostService)
+                            HttpStickinessHelper.addUnencodedSessionID(exchange,serverSessionID);
+
+                            // add strict stickiness header if required (i.e. when session state is not replicated or we are in a transaction)
+                            if (strongAffinity instanceof NodeAffinity || hasTransaction()) {
+                                HttpStickinessHelper.addStrictStickinessHost(exchange, node);
+                                HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
+                            }
+                        }
+                        break;
                     }
 
                     exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE_NEW_SESSION.toString());
@@ -232,8 +314,8 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                 public <C> C getProviderInterface(Class<C> providerInterfaceType) {
                     return null;
                 }
-            });
-        });
+            }); // convertToStateful
+        }); // process request in executor
     }
 
     private static String handleDash(String s) {

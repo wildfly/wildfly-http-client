@@ -303,49 +303,52 @@ public class HttpRootContext extends AbstractContext {
             throw e2;
         }
         final ClassLoader tccl = getContextClassLoader();
-        targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, null, (input, response, closeable) -> {
-            try {
-                if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
-                    result.complete(new HttpRemoteContext(HttpRootContext.this, name.toString()));
-                    IoUtils.safeClose(input);
-                    return;
-                }
-
-                httpNamingProvider.performExceptionAction((a, b) -> {
-
-                    Exception exception = null;
-                    Object returned = null;
-                    ClassLoader old = setContextClassLoader(tccl);
+        targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration,
+                null,
+                null,
+                (input, response, closeable) -> {
                     try {
-                        final Unmarshaller unmarshaller = createUnmarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
-                        unmarshaller.start(new InputStreamByteInput(input));
-                        returned = unmarshaller.readObject();
-                        // finish unmarshalling
-                        if (unmarshaller.read() != -1) {
-                            exception = HttpNamingClientMessages.MESSAGES.unexpectedDataInResponse();
+                        if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
+                            result.complete(new HttpRemoteContext(HttpRootContext.this, name.toString()));
+                            IoUtils.safeClose(input);
+                            return;
                         }
-                        unmarshaller.finish();
+                        httpNamingProvider.performExceptionAction((a, b) -> {
 
-                        if (response.getResponseCode() >= 400) {
-                            exception = (Exception) returned;
-                        }
+                            Exception exception = null;
+                            Object returned = null;
+                            ClassLoader old = setContextClassLoader(tccl);
+                            try {
+                                final Unmarshaller unmarshaller = createUnmarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
+                                unmarshaller.start(new InputStreamByteInput(input));
+                                returned = unmarshaller.readObject();
+                                // finish unmarshalling
+                                if (unmarshaller.read() != -1) {
+                                    exception = HttpNamingClientMessages.MESSAGES.unexpectedDataInResponse();
+                                }
+                                unmarshaller.finish();
 
-                    } catch (Exception e) {
-                        exception = e;
+                                if (response.getResponseCode() >= 400) {
+                                    exception = (Exception) returned;
+                                }
+
+                            } catch (Exception e) {
+                                exception = e;
+                            } finally {
+                                setContextClassLoader(old);
+                            }
+                            if (exception != null) {
+                                result.completeExceptionally(exception);
+                            } else {
+                                result.complete(returned);
+                            }
+                            return null;
+                        }, null, null);
                     } finally {
-                        setContextClassLoader(old);
+                        IoUtils.safeClose(closeable);
                     }
-                    if (exception != null) {
-                        result.completeExceptionally(exception);
-                    } else {
-                        result.complete(returned);
-                    }
-                    return null;
-                }, null, null);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, result::completeExceptionally, VALUE, null, true);
+                },
+                result::completeExceptionally, VALUE, null, true);
 
         try {
             return result.get();
@@ -432,21 +435,25 @@ public class HttpRootContext extends AbstractContext {
             e2.initCause(e);
             throw e2;
         }
-        targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, output -> {
-            if (object != null) {
-                Marshaller marshaller = createMarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeObject(object);
-                marshaller.finish();
-            }
-            output.close();
-        }, (input, response, closeable) -> {
-            try {
-                result.complete(null);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, result::completeExceptionally, null, null);
+        targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration,
+                output -> {
+                    if (object != null) {
+                        Marshaller marshaller = createMarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
+                        marshaller.start(Marshalling.createByteOutput(output));
+                        marshaller.writeObject(object);
+                        marshaller.finish();
+                    }
+                    output.close();
+                },
+                null,
+                (input, response, closeable) -> {
+                    try {
+                        result.complete(null);
+                    } finally {
+                        IoUtils.safeClose(closeable);
+                    }
+                },
+                result::completeExceptionally, null, null);
 
         try {
             result.get();

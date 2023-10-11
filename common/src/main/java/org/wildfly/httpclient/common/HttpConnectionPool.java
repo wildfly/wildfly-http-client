@@ -170,9 +170,11 @@ public class HttpConnectionPool implements Closeable {
         try {
 
             final SSLContext context = sslContext;
+            System.out.println("HttpConnectionPool: use UndertowClient to create connection, thread = " + Thread.currentThread().getName());
             UndertowClient.getInstance().connect(new ClientCallback<ClientConnection>() {
                 @Override
                 public void completed(ClientConnection result) {
+                    System.out.println("HttpConnectionPool: use connection to process handler, thread = " + Thread.currentThread().getName());
                     result.getCloseSetter().set((ChannelListener<ClientConnection>) connections::remove);
                     ClientConnectionHolder clientConnectionHolder = createClientConnectionHolder(result, hostPoolAddress.getURI(), context);
                     clientConnectionHolder.tryAcquire(); //aways suceeds

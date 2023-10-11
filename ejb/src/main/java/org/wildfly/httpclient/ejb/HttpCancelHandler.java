@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.CancelHandle;
 import org.wildfly.httpclient.common.ContentType;
+import org.wildfly.httpclient.common.HandlerVersion;
 import org.wildfly.transaction.client.LocalTransactionContext;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.Cookie;
@@ -33,7 +34,10 @@ import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
 
 /**
+ * A server-side handler for processing EJB client cancel operations.
+ *
  * @author Stuart Douglas
+ * @author Richard Achmatowicz
  */
 class HttpCancelHandler extends RemoteHTTPHandler {
 
@@ -42,8 +46,8 @@ class HttpCancelHandler extends RemoteHTTPHandler {
     private final LocalTransactionContext localTransactionContext;
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
 
-    HttpCancelHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
-        super(executorService);
+    HttpCancelHandler(HandlerVersion version, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
+        super(version, executorService);
         this.association = association;
         this.executorService = executorService;
         this.localTransactionContext = localTransactionContext;
@@ -52,6 +56,8 @@ class HttpCancelHandler extends RemoteHTTPHandler {
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
+
+        // validate content type of payload
         String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
         ContentType contentType = ContentType.parse(ct);
         if (contentType != null) {
@@ -60,6 +66,7 @@ class HttpCancelHandler extends RemoteHTTPHandler {
             return;
         }
 
+        // parse request path
         String relativePath = exchange.getRelativePath();
         if (relativePath.startsWith("/")) {
             relativePath = relativePath.substring(1);
@@ -75,6 +82,9 @@ class HttpCancelHandler extends RemoteHTTPHandler {
         final String bean = parts[3];
         String invocationId = parts[4];
         boolean cancelIdRunning = Boolean.parseBoolean(parts[5]);
+
+        // process Cookies and Headers
+        // TODO: cancellation requires that a Cookie be present
         Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
         final InvocationIdentifier identifier;
@@ -85,6 +95,8 @@ class HttpCancelHandler extends RemoteHTTPHandler {
             EjbHttpClientMessages.MESSAGES.debugf("Exchange %s did not include both session id and invocation id in cancel request", exchange);
             return;
         }
+
+        // process request
         CancelHandle handle = cancellationFlags.remove(identifier);
         if (handle != null) {
             handle.cancel(cancelIdRunning);
