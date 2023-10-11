@@ -47,13 +47,19 @@ public class LocalContext implements Context {
         this.readOnly = readOnly;
     }
 
+    private void dumpContext() {
+        HttpNamingClientMessages.MESSAGES.infof("dump LocalContext: context = %s", bindings);
+    }
+
     @Override
     public Object lookup(Name name) throws NamingException {
+        dumpContext();
         return lookup(name.toString());
     }
 
     @Override
     public Object lookup(String name) throws NamingException {
+        dumpContext();
         Object res = bindings.get(name);
         if (res == null) {
             throw new NameNotFoundException();
@@ -63,11 +69,13 @@ public class LocalContext implements Context {
 
     @Override
     public void bind(Name name, Object obj) throws NamingException {
+        dumpContext();
         bind(name.toString(), obj);
     }
 
     @Override
     public void bind(String name, Object obj) throws NamingException {
+        dumpContext();
         if (readOnly) {
             throw new OperationNotSupportedException("bind is read-only");
         }
@@ -79,11 +87,13 @@ public class LocalContext implements Context {
 
     @Override
     public void rebind(Name name, Object obj) throws NamingException {
+        dumpContext();
         rebind(name.toString(), obj);
     }
 
     @Override
     public void rebind(String name, Object obj) throws NamingException {
+        dumpContext();
         if (readOnly) {
             throw new OperationNotSupportedException("rebind is read-only");
         }
@@ -92,11 +102,13 @@ public class LocalContext implements Context {
 
     @Override
     public void unbind(Name name) throws NamingException {
+        dumpContext();
         unbind(name.toString());
     }
 
     @Override
     public void unbind(String name) throws NamingException {
+        dumpContext();
         if (readOnly) {
             throw new OperationNotSupportedException("unbind is read-only");
         }
@@ -108,11 +120,13 @@ public class LocalContext implements Context {
 
     @Override
     public void rename(Name oldName, Name newName) throws NamingException {
+        dumpContext();
         rename(oldName.toString(), newName.toString());
     }
 
     @Override
     public void rename(String oldName, String newName) throws NamingException {
+        dumpContext();
         if (readOnly) {
             throw new OperationNotSupportedException("rename is read-only");
         }
@@ -125,11 +139,13 @@ public class LocalContext implements Context {
 
     @Override
     public NamingEnumeration<NameClassPair> list(Name name) throws NamingException {
+        dumpContext();
         return list(name.toString());
     }
 
     @Override
     public NamingEnumeration<NameClassPair> list(String name) throws NamingException {
+        dumpContext();
         final Iterator<String> iterator = bindings.keySet().iterator();
         return new NamingEnumeration<NameClassPair>() {
             public NameClassPair next() {
@@ -156,11 +172,13 @@ public class LocalContext implements Context {
 
     @Override
     public NamingEnumeration<Binding> listBindings(Name name) throws NamingException {
+        dumpContext();
         return listBindings(name.toString());
     }
 
     @Override
     public NamingEnumeration<Binding> listBindings(String name) throws NamingException {
+        dumpContext();
         final Iterator<String> iterator = bindings.keySet().iterator();
         return new NamingEnumeration<Binding>() {
             public Binding next() {
@@ -187,11 +205,13 @@ public class LocalContext implements Context {
 
     @Override
     public void destroySubcontext(Name name) throws NamingException {
+        dumpContext();
         destroySubcontext(name.toString());
     }
 
     @Override
     public void destroySubcontext(String name) throws NamingException {
+        dumpContext();
         if (readOnly) {
             throw new OperationNotSupportedException("destroySubcontext is read-only");
         }
@@ -207,11 +227,13 @@ public class LocalContext implements Context {
 
     @Override
     public Context createSubcontext(Name name) throws NamingException {
+        dumpContext();
         return createSubcontext(name.toString());
     }
 
     @Override
     public Context createSubcontext(String name) throws NamingException {
+        dumpContext();
         if (readOnly) {
             throw new OperationNotSupportedException("createSubcontext is read-only");
         }
@@ -225,6 +247,7 @@ public class LocalContext implements Context {
 
     @Override
     public Object lookupLink(Name name) throws NamingException {
+        dumpContext();
         return lookupLink(name.toString());
     }
 

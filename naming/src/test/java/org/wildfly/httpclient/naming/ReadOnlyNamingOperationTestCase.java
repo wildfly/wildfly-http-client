@@ -62,15 +62,18 @@ public class ReadOnlyNamingOperationTestCase {
 
     @Test
     public void testReadOnlyReBind() throws Exception {
+        HttpNamingClientMessages.MESSAGES.info("========= testReadOnlyRebind: start =========");
         InitialContext ic = createContext();
         try {
             ic.rebind("name", "value");
             Assert.fail("should fail");
         } catch (Exception e) {
+            HttpNamingClientMessages.MESSAGES.info("result: got exception: " + e);
             Assert.assertTrue(e instanceof NamingException);
             Assert.assertEquals("rebind is read-only", e.getMessage());
         } finally {
             ic.close();
+            HttpNamingClientMessages.MESSAGES.info("========= testReadOnlyRebind: stop =========");
         }
     }
 

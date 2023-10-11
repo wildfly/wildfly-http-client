@@ -29,6 +29,7 @@ import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.server.handlers.CanonicalPathHandler;
 import io.undertow.server.handlers.PathHandler;
+import io.undertow.server.handlers.RequestDumpingHandler;
 import io.undertow.server.handlers.error.SimpleErrorPageHandler;
 import io.undertow.util.NetworkUtils;
 import org.junit.runner.Description;
@@ -274,6 +275,7 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         root = new AuthenticationCallHandler(root);
         root = new SimpleErrorPageHandler(root);
         root = new CanonicalPathHandler(root);
+        root = new RequestDumpingHandler(root);
         return root;
     }
 

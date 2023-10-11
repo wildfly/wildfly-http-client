@@ -56,8 +56,9 @@ public class SimpleNamingOperationTestCase {
         HTTPTestServer.registerServicesHandler("naming", new HttpRemoteNamingService(new LocalContext(false), DEFAULT_CLASS_FILTER).createHandler());
     }
 
-    @Test @Ignore // FIXME WEJBHTTP-37
+    @Test //@Ignore // FIXME WEJBHTTP-37
     public void testJNDIlookup() throws NamingException {
+        HttpNamingClientMessages.MESSAGES.info("========= testJNDILookup: start =========");
         InitialContext ic = createContext();
         Object result = ic.lookup("test");
         Assert.assertEquals("test value", result);
@@ -68,10 +69,12 @@ public class SimpleNamingOperationTestCase {
             Assert.fail();
         } catch (NameNotFoundException expected) {
         }
+        HttpNamingClientMessages.MESSAGES.info("========= testJNDILookup: stop =========");
     }
 
-    @Test @Ignore // FIXME WEJBHTTP-37
+    @Test //@Ignore // FIXME WEJBHTTP-37
     public void testJNDIlookupTimeoutTestCase() throws NamingException, InterruptedException {
+        HttpNamingClientMessages.MESSAGES.info("========= testJNDILookupTimeoutTestCase: start =========");
         InitialContext ic = createContext();
         Object result = ic.lookup("test");
         Assert.assertEquals("test value", result);
@@ -80,10 +83,12 @@ public class SimpleNamingOperationTestCase {
         Thread.sleep(1500);
         result = ic.lookup("comp/UserTransaction");
         Assert.assertEquals("transaction", result);
+        HttpNamingClientMessages.MESSAGES.info("========= testJNDILookupTimeoutTestCase: stop =========");
     }
 
     @Test
     public void testJNDIBindings() throws NamingException {
+        HttpNamingClientMessages.MESSAGES.info("========= testJNDIBindings: start =========");
         InitialContext ic = createContext();
         try {
             ic.lookup("bound");
@@ -101,11 +106,13 @@ public class SimpleNamingOperationTestCase {
 //            Assert.fail();
 //        } catch (NameNotFoundException e) {}
 //        Assert.assertEquals("test binding 2", ic.lookup("bound2"));
+        HttpNamingClientMessages.MESSAGES.info("========= testJNDIBindings: stop =========");
 
     }
 
     @Test
     public void testUnmarshallingFilter() throws NamingException {
+        HttpNamingClientMessages.MESSAGES.info("========= testUnmarshallingFilter: start =========");
         InitialContext ic = createContext();
         try {
             ic.lookup("unmarshal");
@@ -128,7 +135,7 @@ public class SimpleNamingOperationTestCase {
         }
         ic.rebind("unmarshal", new IllegalStateException());
         Assert.assertEquals(IllegalStateException.class, ic.lookup("unmarshal").getClass());
-
+        HttpNamingClientMessages.MESSAGES.info("========= testUnmarshallingFilter: start =========");
     }
 
     private InitialContext createContext() throws NamingException {
@@ -140,6 +147,7 @@ public class SimpleNamingOperationTestCase {
 
     @Test
     public void testSimpleUnbind() throws Exception {
+        HttpNamingClientMessages.MESSAGES.info("========= testSimpleUnbind: start =========");
         InitialContext ic = createContext();
         Assert.assertEquals("test value", ic.lookup("test").toString());
         ic.unbind("test");
@@ -148,10 +156,12 @@ public class SimpleNamingOperationTestCase {
             Assert.fail("test is not available anymore");
         } catch (NameNotFoundException e) {
         }
+        HttpNamingClientMessages.MESSAGES.info("========= testSimpleUnbind: stop =========");
     }
 
     @Test
     public void testSimpleSubContext() throws Exception {
+        HttpNamingClientMessages.MESSAGES.info("========= testSimpleSubContext: start =========");
         InitialContext ic = createContext();
         ic.createSubcontext("subContext");
         Context subContext = (Context)ic.lookup("subContext");
@@ -162,37 +172,52 @@ public class SimpleNamingOperationTestCase {
             Assert.fail("subContext is not available anymore");
         } catch (NameNotFoundException e) {
         }
+        HttpNamingClientMessages.MESSAGES.info("========= testSimpleSubContext: stop =========");
     }
 
     @Test
     public void testSimpleRename() throws Exception {
+        HttpNamingClientMessages.MESSAGES.info("========= testSimpleRename: start =========");
         InitialContext ic = createContext();
+        HttpNamingClientMessages.MESSAGES.info("=== lookup:");
         Assert.assertEquals("test value", ic.lookup("test").toString());
+        delay(10) ;
+        HttpNamingClientMessages.MESSAGES.info("=== rename:");
         ic.rename("test", "testB");
+        HttpNamingClientMessages.MESSAGES.info("=== relookup:");
+        delay(10) ;
         try {
             ic.lookup("test");
             Assert.fail("test is not available anymore");
         } catch (NameNotFoundException e) {
+            HttpNamingClientMessages.MESSAGES.info("=== result: got exception: " + e);
         }
+        delay(10) ;
         Assert.assertEquals("test value", ic.lookup("testB").toString());
+        HttpNamingClientMessages.MESSAGES.info("=== testSimpleRename: stop ");
     }
 
     @Test   // WEJBHTTP-69
     public void testListCanBeSerialized() throws Exception {
+        HttpNamingClientMessages.MESSAGES.info("========= testListCanBeSerialized: start =========");
         InitialContext ic = createContext();
         NamingEnumeration<NameClassPair> list = ic.list("test");
         Assert.assertNotNull(list);
+        HttpNamingClientMessages.MESSAGES.info("========= testListCanBeSerialized: stop =========");
     }
 
     @Test   // WEJBHTTP-69
     public void testListBindingsCanBeSerialized() throws Exception {
+        HttpNamingClientMessages.MESSAGES.info("========= testBindingsCanBeSerialized: start =========");
         InitialContext ic = createContext();
         NamingEnumeration<Binding> list = ic.listBindings("test");
         Assert.assertNotNull(list);
+        HttpNamingClientMessages.MESSAGES.info("========= testBindingsCanBeSerialized: stop =========");
     }
 
     @Test
     public void testHttpNamingEjbObjectResolverHelper() throws NamingException {
+        HttpNamingClientMessages.MESSAGES.info("========= testHttpNamingEjbObjectResolverHelper: start =========");
         InitialContext ic = createContext();
         Assert.assertEquals(TestHttpNamingEjbObjectResolverHelper.create("readResolve->" + HTTPTestServer.getDefaultServerURL()),
                 ic.lookup("test-resolver-helper"));
@@ -200,5 +225,14 @@ public class SimpleNamingOperationTestCase {
         ic.rebind("test-resolver-helper", TestHttpNamingEjbObjectResolverHelper.create("test"));
         Assert.assertEquals(TestHttpNamingEjbObjectResolverHelper.create("writeReplace->" + HTTPTestServer.getDefaultServerURL()),
                 ic.lookup("test-resolver-helper"));
+        HttpNamingClientMessages.MESSAGES.info("========= testHttpNamingEjbObjectResolverHelper: stop =========");
+    }
+
+    private void delay(int ms) {
+        try {
+            Thread.sleep(ms);
+        } catch(java.lang.InterruptedException e) {
+            // noop
+        }
     }
 }
