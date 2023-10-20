@@ -255,7 +255,8 @@ public class HttpRemoteNamingService {
 
     private void doMarshall(HttpServerExchange exchange, Object result) throws IOException {
         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
-        Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
+        HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
+        Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
         marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream())));
         marshaller.writeObject(result);
         marshaller.finish();
