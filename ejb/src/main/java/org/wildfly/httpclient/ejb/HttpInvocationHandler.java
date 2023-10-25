@@ -129,7 +129,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
         String method = parts[6];
         String[] parameterTypeNames = new String[parts.length - 7];
         System.arraycopy(parts, 7, parameterTypeNames, 0, parameterTypeNames.length);
-        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
+        Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
 
@@ -384,7 +384,7 @@ class HttpInvocationHandler extends RemoteHTTPHandler {
             try {
                 exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE.toString());
 //                                    if (output.getSessionAffinity() != null) {
-//                                        exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
+//                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
 //                                    }
                 OutputStream outputStream = exchange.getOutputStream();
                 final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));

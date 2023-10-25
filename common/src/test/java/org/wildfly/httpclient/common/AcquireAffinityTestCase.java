@@ -36,7 +36,7 @@ public class AcquireAffinityTestCase {
 
     @Test
     public void testAcquireAffinity() throws URISyntaxException {
-        HTTPTestServer.registerServicesHandler("common/v1/affinity", exchange -> exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", "foo")));
+        HTTPTestServer.registerServicesHandler("common/v1/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
 
         AuthenticationContext cc = AuthenticationContext.captureCurrent();
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(new URI(HTTPTestServer.getDefaultServerURL()));
