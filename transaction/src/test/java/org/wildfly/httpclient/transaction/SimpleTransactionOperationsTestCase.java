@@ -67,7 +67,7 @@ public class SimpleTransactionOperationsTestCase {
 
     @Before
     public void setup() {
-        HTTPTestServer.registerServicesHandler("common/v1/affinity", exchange -> exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", "foo")));
+        HTTPTestServer.registerServicesHandler("common/v1/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
         HTTPTestServer.registerServicesHandler("txn", new HttpRemoteTransactionService(new LocalTransactionContext(new LocalTransactionProvider() {
             @Override
             public TransactionManager getTransactionManager() {

@@ -75,7 +75,7 @@ class HttpCancelHandler extends RemoteHTTPHandler {
         final String bean = parts[3];
         String invocationId = parts[4];
         boolean cancelIdRunning = Boolean.parseBoolean(parts[5]);
-        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
+        Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
         final InvocationIdentifier identifier;
         if (invocationId != null && sessionAffinity != null) {

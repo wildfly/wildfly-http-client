@@ -100,12 +100,11 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
         final String distinct = handleDash(parts[2]);
         final String bean = parts[3];
 
-        Cookie cookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
+        Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
         String sessionAffinity = null;
         if (cookie != null) {
             sessionAffinity = cookie.getValue();
         }
-
 
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
         exchange.dispatch(executorService, () -> {
@@ -210,15 +209,14 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                 @Override
                 public void convertToStateful(@NotNull SessionID sessionId) throws IllegalArgumentException, IllegalStateException {
 
-                    Cookie sessionCookie = exchange.getRequestCookies().get(JSESSIONID_COOKIE_NAME);
+                    Cookie sessionCookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
                     if (sessionCookie == null) {
                         String rootPath = exchange.getResolvedPath();
                         int ejbIndex = rootPath.lastIndexOf("/ejb");
                         if (ejbIndex > 0) {
                             rootPath = rootPath.substring(0, ejbIndex);
                         }
-
-                        exchange.getResponseCookies().put(JSESSIONID_COOKIE_NAME, new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
+                        exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
                     }
 
                     exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE_NEW_SESSION.toString());

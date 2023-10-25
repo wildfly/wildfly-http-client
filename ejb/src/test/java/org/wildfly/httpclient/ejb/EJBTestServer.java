@@ -80,7 +80,7 @@ public class EJBTestServer extends HTTPTestServer {
                         try {
                             Object result = handler.handle(request, resolvedInvocation.getSessionAffinity(), out, invocationRequest.getMethodLocator(), handle, resolvedInvocation.getAttachments());
                             if (out.getSessionAffinity() != null) {
-                                resolvedInvocation.getExchange().getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", out.getSessionAffinity()));
+                                resolvedInvocation.getExchange().setResponseCookie(new CookieImpl("JSESSIONID", out.getSessionAffinity()));
                             }
                             request.writeInvocationResult(result);
                         } catch (Exception e) {

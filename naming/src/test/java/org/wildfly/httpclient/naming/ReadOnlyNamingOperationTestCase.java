@@ -35,7 +35,7 @@ public class ReadOnlyNamingOperationTestCase {
 
     @Before
     public void setup() {
-        HTTPTestServer.registerServicesHandler("/common/v1/affinity", exchange -> exchange.getResponseCookies().put("JSESSIONID", new CookieImpl("JSESSIONID", "foo")));
+        HTTPTestServer.registerServicesHandler("/common/v1/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
         HTTPTestServer.registerServicesHandler("/naming", new HttpRemoteNamingService(new LocalContext(true), f -> false).createHandler());
     }
 
