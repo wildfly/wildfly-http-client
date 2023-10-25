@@ -439,7 +439,7 @@ public class HttpRootContext extends AbstractContext {
                 marshaller.writeObject(object);
                 marshaller.finish();
             }
-            output.close();
+            IoUtils.safeClose(output);
         }, (input, response, closeable) -> {
             try {
                 result.complete(null);
