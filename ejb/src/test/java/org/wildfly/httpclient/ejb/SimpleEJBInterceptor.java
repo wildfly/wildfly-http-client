@@ -33,7 +33,7 @@ import org.jboss.ejb.client.EJBClientInvocationContext;
 public class SimpleEJBInterceptor implements EJBClientInterceptor {
 
     static final String KEY = "some integer";
-    static final Integer VALUE = new Integer(42);
+    static final Integer VALUE = Integer.valueOf(42);
 
     @Override
     public void handleInvocation(final EJBClientInvocationContext context) throws Exception {
