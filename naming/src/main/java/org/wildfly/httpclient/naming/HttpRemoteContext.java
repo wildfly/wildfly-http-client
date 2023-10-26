@@ -37,7 +37,7 @@ public class HttpRemoteContext implements Context {
 
     private final HttpRootContext rootContext;
     private final String rootName;
-    private final Hashtable<?, ?> environment;
+    private final Hashtable<Object, Object> environment;
 
     public HttpRemoteContext(HttpRootContext rootContext, String rootName) {
         this.rootContext = rootContext;
@@ -171,12 +171,12 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public Object addToEnvironment(String s, Object o) throws NamingException {
-        return ((Hashtable<Object, Object>)environment).put(s, o);
+        return environment.put(s, o);
     }
 
     @Override
     public Object removeFromEnvironment(String s) throws NamingException {
-        return ((Hashtable<Object, Object>)environment).remove(s);
+        return environment.remove(s);
     }
 
     @Override
