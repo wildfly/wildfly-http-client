@@ -35,7 +35,7 @@
     <packaging>pom</packaging>
 
     <properties>
-        <version.asciidoctor>1.5.2</version.asciidoctor>
+        <version.asciidoctor>2.2.4</version.asciidoctor>
     </properties>
 
     <build>
