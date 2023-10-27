@@ -22,7 +22,6 @@ import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.URIAffinity;
 import org.jboss.marshalling.ObjectResolver;
 
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -37,10 +36,11 @@ public final class HttpNamingServerObjectResolver implements ObjectResolver {
     }
 
     private URIAffinity createLocalURIAffinity(HttpServerExchange exchange) throws URISyntaxException {
-        InetSocketAddress localAddress = (InetSocketAddress) exchange.getConnection().getLocalAddress();
         StringBuilder uriStringBuilder = new StringBuilder();
-        uriStringBuilder.append(exchange.getRequestScheme()).append("://")
-                .append(localAddress.getHostName()).append(":").append(localAddress.getPort())
+        uriStringBuilder
+                .append(exchange.getRequestScheme())
+                .append("://")
+                .append(exchange.getHostAndPort())
                 .append("/wildfly-services");
         return new URIAffinity(new URI(uriStringBuilder.toString()));
     }
