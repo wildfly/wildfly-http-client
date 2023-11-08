@@ -24,24 +24,30 @@ import org.jboss.marshalling.ObjectResolver;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.StringTokenizer;
 
-public final class HttpNamingServerObjectResolver implements ObjectResolver {
+final class HttpNamingServerObjectResolver implements ObjectResolver {
+
+    private static final String PATH_DELIMITERS = "/\\";
     private URIAffinity selfNodeAffinity;
 
-    public HttpNamingServerObjectResolver(HttpServerExchange exchange) {
+    public HttpNamingServerObjectResolver(final HttpServerExchange exchange) {
         try {
             selfNodeAffinity = createLocalURIAffinity(exchange);
         } catch (URISyntaxException ignored) {
         }
     }
 
-    private URIAffinity createLocalURIAffinity(HttpServerExchange exchange) throws URISyntaxException {
+    private URIAffinity createLocalURIAffinity(final HttpServerExchange exchange) throws URISyntaxException {
+        final String requestPath = exchange.getRequestPath();
+        final StringTokenizer st = new StringTokenizer(requestPath, PATH_DELIMITERS);
+        final String connectorPath = st.nextToken();
         StringBuilder uriStringBuilder = new StringBuilder();
         uriStringBuilder
                 .append(exchange.getRequestScheme())
                 .append("://")
                 .append(exchange.getHostAndPort())
-                .append("/wildfly-services");
+                .append("/").append(connectorPath);
         return new URIAffinity(new URI(uriStringBuilder.toString()));
     }
 
