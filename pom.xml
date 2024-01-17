@@ -63,7 +63,7 @@
         <version.org.wildfly.client-config>1.0.1.Final</version.org.wildfly.client-config>
         <version.org.wildfly.common>1.7.0.Final</version.org.wildfly.common>
         <version.org.wildfly.naming.client>2.0.1.Final</version.org.wildfly.naming.client>
-        <version.org.wildfly.elytron>2.2.2.Final</version.org.wildfly.elytron>
+        <version.org.wildfly.elytron>2.2.3.Final</version.org.wildfly.elytron>
         <version.org.wildfly.elytron.web>4.0.0.Final</version.org.wildfly.elytron.web>
         <version.org.wildfly.transaction.client>3.0.2.Final</version.org.wildfly.transaction.client>
         <version.org.jboss.threads>2.4.0.Final</version.org.jboss.threads>
