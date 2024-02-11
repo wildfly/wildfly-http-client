@@ -219,7 +219,7 @@ class HttpEJBReceiver extends EJBReceiver {
                                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
                                     Set<String> returnedContextDataKeys = (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
                                     if(returnedContextDataKeys != null) {
-                                        clientInvocationContext.getContextData().keySet().removeAll(returnedContextDataKeys);
+                                        clientInvocationContext.getContextData().keySet().removeIf(k -> (!k.equals(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY)));
                                     }
 
                                     // If there are any attachments, add them to the client invocation's context data
