@@ -252,7 +252,7 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
                         .addHttpListener(getHostPort(), getHostAddress())
                         .addHttpsListener(getSSLHostPort(), getHostAddress(), createServerSslContext())
                         .setServerOption(UndertowOptions.REQUIRE_HOST_HTTP11, true)
-                        .setServerOption(UndertowOptions.NO_REQUEST_TIMEOUT, 1000)
+                        .setServerOption(UndertowOptions.NO_REQUEST_TIMEOUT, 1000000)
                         .setSocketOption(Options.SSL_CLIENT_AUTH_MODE, SslClientAuthMode.REQUIRED)
                         .setHandler(securityContextAssociationHandlerElytron())
                         .build();
