@@ -25,7 +25,7 @@
     <parent>
         <groupId>org.jboss</groupId>
         <artifactId>jboss-parent</artifactId>
-        <version>41</version>
+        <version>43</version>
     </parent>
 
     <groupId>org.wildfly.wildfly-http-client</groupId>
@@ -50,10 +50,10 @@
         <version.io.undertow>2.3.10.Final</version.io.undertow>
         <version.org.jboss.logging-tools>2.2.1.Final</version.org.jboss.logging-tools>
         <version.org.junit>4.13.2</version.org.junit>
-        <version.org.assertj>3.24.2</version.org.assertj>
+        <version.org.assertj>3.25.3</version.org.assertj>
         <version.org.jboss.logmanager>3.0.4.Final</version.org.jboss.logmanager>
         <version.xnio>3.8.12.Final</version.xnio>
-        <version.org.jboss.ejb-client>5.0.5.Final</version.org.jboss.ejb-client>
+        <version.org.jboss.ejb-client>5.0.6.Final</version.org.jboss.ejb-client>
         <version.org.wildfly.discovery>1.2.1.Final</version.org.wildfly.discovery>
         <version.jakarta.ejb.jakarta-ejb-api>4.0.1</version.jakarta.ejb.jakarta-ejb-api>
         <version.jakarta.transaction.jakarta-transaction-api>2.0.1</version.jakarta.transaction.jakarta-transaction-api>
@@ -63,9 +63,9 @@
         <version.org.wildfly.client-config>1.0.1.Final</version.org.wildfly.client-config>
         <version.org.wildfly.common>1.7.0.Final</version.org.wildfly.common>
         <version.org.wildfly.naming.client>2.0.1.Final</version.org.wildfly.naming.client>
-        <version.org.wildfly.elytron>2.2.2.Final</version.org.wildfly.elytron>
+        <version.org.wildfly.elytron>2.3.0.Final</version.org.wildfly.elytron>
         <version.org.wildfly.elytron.web>4.0.0.Final</version.org.wildfly.elytron.web>
-        <version.org.wildfly.transaction.client>3.0.2.Final</version.org.wildfly.transaction.client>
+        <version.org.wildfly.transaction.client>3.0.4.Final</version.org.wildfly.transaction.client>
         <version.org.jboss.threads>2.4.0.Final</version.org.jboss.threads>
         <version.org.kohsuke.metainf-services>1.11</version.org.kohsuke.metainf-services>
         <maven.repository.url>https://repository.jboss.org/nexus/content/groups/public/</maven.repository.url>
