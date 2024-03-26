@@ -394,7 +394,7 @@
                             <goals><goal>test</goal></goals>
                             <configuration>
                                 <systemPropertyVariables>
-                                    <org.wildfly.ee.interoperable>true</org.wildfly.ee.interoperable>
+                                    <org.wildfly.ee.namespace.interop>true</org.wildfly.ee.namespace.interop>
                                 </systemPropertyVariables>
                                 <reportsDirectory>${project.build.directory}/surefire-ee-interoperable-reports</reportsDirectory>
                             </configuration>
