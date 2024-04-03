@@ -39,6 +39,7 @@ import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.model.InitializationError;
 import org.wildfly.elytron.web.undertow.server.ElytronContextAssociationHandler;
+import org.wildfly.httpclient.common.EENamespaceInteroperability.EENamespaceInteroperabilityProtocolVersionHandler;
 import org.wildfly.security.WildFlyElytronProvider;
 import org.wildfly.security.auth.permission.LoginPermission;
 import org.wildfly.security.auth.realm.SimpleMapBackedSecurityRealm;
@@ -142,6 +143,15 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         return getDefaultSSLRootServerURL() + WILDFLY_SERVICES;
     }
 
+    /**
+     * This method returns the version string (e.g. /v1, /v2, etc) that represents the latest version of the
+     * server's EJB/HTTP, Naming/HTTP and Transaction/HTTP handler. Convenience method for testsuite use only.
+     * @return the version path string
+     */
+    public static String getServerHandlerVersion() {
+        return Protocol.VERSION_PATH + Protocol.LATEST;
+    }
+
     public HTTPTestServer(Class<?> klass) throws InitializationError {
         super(klass);
     }
@@ -188,12 +198,12 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         return worker;
     }
 
-    private HttpHandler securityContextAssociationHandlerElytron() {
+    private HttpHandler securityContextAssociationHandlerElytron(HttpHandler handler) {
         ElytronContextAssociationHandler.Builder builder = ElytronContextAssociationHandler.builder();
         builder.setAuthenticationMode(AuthenticationMode.PRO_ACTIVE)
                 .setSecurityDomain(getSecurityDomain())
                 .setMechanismSupplier(this::authenticationMechanisms)
-                .setNext(getRootHandler());
+                .setNext(handler);
         return builder.build();
     }
 
@@ -255,7 +265,7 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
                         .setServerOption(UndertowOptions.REQUIRE_HOST_HTTP11, true)
                         .setServerOption(UndertowOptions.NO_REQUEST_TIMEOUT, 1000)
                         .setSocketOption(Options.SSL_CLIENT_AUTH_MODE, SslClientAuthMode.REQUIRED)
-                        .setHandler(securityContextAssociationHandlerElytron())
+                        .setHandler(getRootHandler())
                         .build();
                 undertow.start();
                 notifier.addListener(new RunListener() {
@@ -270,11 +280,21 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         }
     }
 
+
+    /**
+     * A chain of HttpHandler instances that every request must pass through, which sets up:
+     * - support for blocking requests
+     * - the security context and authentication
+     * - an interoperability protocol handler which ensures correct setting of the protocol version
+     * @return the composite HttpHandler instance passed to Undettow - the root handler
+     */
     protected HttpHandler getRootHandler() {
         HttpHandler root = new BlockingHandler(PATH_HANDLER);
         root = new AuthenticationCallHandler(root);
         root = new SimpleErrorPageHandler(root);
         root = new CanonicalPathHandler(root);
+        root = ((ElytronContextAssociationHandler) securityContextAssociationHandlerElytron(root));
+        root = new EENamespaceInteroperabilityProtocolVersionHandler(root);
         root = new RequestDumpingHandler(root);
         return root;
     }

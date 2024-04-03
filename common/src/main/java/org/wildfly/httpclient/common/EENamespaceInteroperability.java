@@ -58,6 +58,7 @@ import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
  *
  * @author Flavia Rainone
  * @author Richard Opalka
+ * @author Richard Achmatowicz
  */
 final class EENamespaceInteroperability {
     /**
@@ -215,7 +216,7 @@ final class EENamespaceInteroperability {
                     default:
                         // connection already set as Jakarta namespace, default factory can be used for marshalling
                         // (no transformation needed)
-                        request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
+                        // request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
                         request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
                 }
                 super.sendRequest(request, new ClientCallback<ClientExchange>() {
@@ -248,18 +249,27 @@ final class EENamespaceInteroperability {
                             // this method adds the factory to the request instead of response, this is more efficient
                             // we prevent adding when jakartaEE is already true and creating a new entry in the response attachment map
                             final ClientResponse response = result.getResponse();
-                            if (protocolVersion == -1) {
+                            final String versionHeaderValue = response.getResponseHeaders().getFirst(PROTOCOL_VERSION);
+                            final int serverProtocolVersion = versionHeaderValue == null ? 0 : Integer.valueOf(versionHeaderValue);
+
+                             if (protocolVersion == -1) {
                                 // we need to check for protocol version header to define the protocol version of the pool
-                                if (LATEST_VERSION.equals(response.getResponseHeaders().getFirst(PROTOCOL_VERSION))) {
-                                    // this indicates this is the first response server sends, set the protocol to 2
-                                    protocolVersion = Protocol.LATEST;
-                                    // overwrite previous attachment, no transformation is needed for this connection any more
-                                    result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                                } else {
+                                if (versionHeaderValue == null || serverProtocolVersion == 1) {
+                                    // legacy server
                                     protocolVersion = Protocol.JAVAEE_PROTOCOL_VERSION;
                                     //regarding marsh. factory key, do nothing, the connection is not Jakarta and the marshalling factory provider is already interoperable
+                                } else if (Protocol.LATEST <= serverProtocolVersion) {
+                                    // this indicates this is the first response server sends, set the protocol to 2
+                                    protocolVersion = Protocol.LATEST;
+                                    // overwrite previous attachment, no transformation is needed for this connection anymore
+                                    result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
+                                } else  {
+                                    // exception - client version greater than server version won't work
+                                    IOException e = HttpClientMessages.MESSAGES.protocolVersionIncompatibility(Protocol.LATEST, serverProtocolVersion);
+                                    responseListener.failed(e);
                                 }
-
+                                // remove the response header for the protocol version as we are finished with it
+                                response.getResponseHeaders().remove(PROTOCOL_VERSION);
                             } // else: do nothing, request already contains the default marshalling factory
                             responseListener.completed(result);
                         }
@@ -343,6 +353,24 @@ final class EENamespaceInteroperability {
     Server side EE namespace interoperability
      */
 
+    public static class EENamespaceInteroperabilityProtocolVersionHandler implements HttpHandler {
+
+        private final HttpHandler next;
+
+        EENamespaceInteroperabilityProtocolVersionHandler(HttpHandler next) {
+            this.next = next;
+        }
+
+        @Override
+        public void handleRequest(HttpServerExchange exchange) throws Exception {
+            // if a PROTOCOL_VERSION header is present, we need to respond with our protocol version
+            if (exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION) != null) {
+                exchange.getResponseHeaders().add(PROTOCOL_VERSION, LATEST_VERSION);
+            }
+            next.handleRequest(exchange);
+        }
+    }
+
     private static class EENamespaceInteroperabilityHandler implements HttpHandler {
 
         private final HttpHandler next;
@@ -353,9 +381,9 @@ final class EENamespaceInteroperability {
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
-            if (LATEST_VERSION.equals(exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION))) {
-                // respond that this end also supports version two
-                exchange.getResponseHeaders().add(PROTOCOL_VERSION, LATEST_VERSION);
+            // the first message, identified by its PROTOCOL_VERSION header, requires special handling depending on client being v1 or v2+
+            String clientVersion = exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION);
+            if (clientVersion != null && Integer.parseInt(clientVersion) >= Protocol.JAKARTAEE_PROTOCOL_VERSION) {
                 // transformation is required for unmarshalling because client is on EE namespace interoperable mode
                 exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
                 // no transformation required for marshalling, server is sending response in Jakarta

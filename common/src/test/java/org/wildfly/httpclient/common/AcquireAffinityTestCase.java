@@ -36,7 +36,9 @@ public class AcquireAffinityTestCase {
 
     @Test
     public void testAcquireAffinity() throws URISyntaxException {
-        HTTPTestServer.registerServicesHandler("common/v1/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
+        // when in interop mode, the first invocation will always be /v1
+        HTTPTestServer.registerServicesHandler("/common/v1/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
+        HTTPTestServer.registerServicesHandler("/common/v2/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
 
         AuthenticationContext cc = AuthenticationContext.captureCurrent();
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(new URI(HTTPTestServer.getDefaultServerURL()));

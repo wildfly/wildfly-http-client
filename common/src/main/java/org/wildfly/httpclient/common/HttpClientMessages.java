@@ -78,4 +78,6 @@ interface HttpClientMessages extends BasicLogger {
     @Message(id = 14, value = "JavaEE to JakartaEE backward compatibility layer have been installed")
     void javaeeToJakartaeeBackwardCompatibilityLayerInstalled();
 
+    @Message(id = 15, value = "Client protocol version %s is strictly greater than server protocol version %s")
+    IOException protocolVersionIncompatibility(int clientVersion, int serverVersion);
 }

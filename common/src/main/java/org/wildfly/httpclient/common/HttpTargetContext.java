@@ -108,6 +108,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
     void init() {
         if (eagerlyAcquireAffinity) {
+            HttpClientMessages.MESSAGES.debugf("Eagerly acquiring affinity");
             acquireAffinitiy(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
         }
     }
@@ -130,7 +131,8 @@ public class HttpTargetContext extends AbstractAttachable {
     private void acquireSessionAffinity(CountDownLatch latch, AuthenticationConfiguration authenticationConfiguration) {
         ClientRequest clientRequest = new ClientRequest();
         clientRequest.setMethod(Methods.GET);
-        clientRequest.setPath(uri.getPath() + "/common/v1/affinity");
+        // the request version required is determined by the HttpConnectionPool
+        clientRequest.setPath(uri.getPath() + "/common" + Protocol.VERSION_PATH + getProtocolVersion() + "/affinity");
         AuthenticationContext context = AuthenticationContext.captureCurrent();
         SSLContext sslContext;
         try {

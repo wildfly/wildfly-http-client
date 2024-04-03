@@ -66,6 +66,20 @@ public class EJBTestServer extends HTTPTestServer {
         EJBTestServer.handler = handler;
     }
 
+    /**
+     * A method to register the EJB/HTTP services handlers, which perform the following functions on the server side:
+     * - receiveInvocationRequest
+     * - receiveSessionOpenRequest
+     * - registerClusterTopologyListener
+     * - registerModuleAvailabilityListener
+     * These operations are performed in the context of an Association, responsible for part processing of the request.
+     *
+     * The invocation processing service requires two additional parts:
+     * - a handler, TestEJBHandler, which represents the invocation processing and returns the invocation result
+     * - an output, TestEJBOutput, holding the session affinity of the response
+     *
+     * @param servicesHandler
+     */
     @Override
     protected void registerPaths(PathHandler servicesHandler) {
         servicesHandler.addPrefixPath("/ejb", new EjbHttpService(new Association() {

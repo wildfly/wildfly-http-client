@@ -18,7 +18,7 @@
 
 package org.wildfly.httpclient.ejb;
 
-import io.undertow.util.Headers;
+import io.undertow.server.handlers.CookieImpl;
 import org.jboss.ejb.client.EJBClient;
 import org.jboss.ejb.client.EJBClientContext;
 import org.jboss.ejb.client.EJBClientInvocationContext;
@@ -30,6 +30,7 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.wildfly.httpclient.common.HTTPTestServer;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 
 import jakarta.ejb.ApplicationException;
@@ -56,7 +57,11 @@ public class SimpleInvocationTestCase {
 
     @Before
     public void before() {
-        EJBTestServer.registerServicesHandler("common/v1/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(Headers.SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
+        // when in interop mode, the first invocation will always be /v1
+        // this affinity represents the affinity assigned by the affinity mechanism, and not a specific invocation
+        HTTPTestServer.registerServicesHandler("/common/v1/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", HTTPTestServer.INITIAL_SESSION_AFFINITY)));
+        HTTPTestServer.registerServicesHandler("/common/v2/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", HTTPTestServer.INITIAL_SESSION_AFFINITY)));
+
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 10000; ++i) {
             sb.append("Hello World ");
@@ -68,6 +73,7 @@ public class SimpleInvocationTestCase {
     public void testSimpleInvocationViaURLAffinity() throws Exception {
         for (int i = 0; i < RETRIES; ++i) {
             clearSessionId();
+            // invocation which returns either the first parameter of the invocation or "a message"
             EJBTestServer.setHandler((invocation, affinity, out, method, handle, attachments) -> {
                 if (invocation.getParameters().length == 0) {
                     return "a message";
@@ -101,6 +107,7 @@ public class SimpleInvocationTestCase {
      */
     @Test
     public void testSimpleInvocationWithURLNeedingEncoding() throws Exception {
+        // invocation which returns the first parameter and does some comparisons of method names, parameters and parameter types
         EJBTestServer.setHandler((invocation, affinity, out, methodLocator, handle, attachments) -> {
             // check the invoked method and make sure it maps correctly to the view interface's method
             final Method viewMethod = EchoRemote.class.getDeclaredMethod("echo", new Class[]{String[].class});
@@ -262,21 +269,21 @@ public class SimpleInvocationTestCase {
     public void testInvocationAffinity() throws Exception {
         for (int i = 0; i < RETRIES; ++i) {
             clearSessionId();
+            // method which sets the affinity in the TestEJBOutput and returns the affinity
             EJBTestServer.setHandler((invocation, affinity, out, method, handle, attachments) -> {
                 out.setSessionAffinity("foo");
                 return affinity;
             });
             final StatelessEJBLocator<EchoRemote> statelessEJBLocator = new StatelessEJBLocator<>(EchoRemote.class, APP, MODULE, BEAN, "");
             final EchoRemote proxy = EJBClient.createProxy(statelessEJBLocator);
-
+            // first invocation should see initial affinity set by the affinity mechanism of the HTTPInvoker
             String echo = proxy.echo("");
             Assert.assertEquals("Unexpected echo message", EJBTestServer.INITIAL_SESSION_AFFINITY, echo);
+            // second invocation should see the affinity set by the method invocation
             echo = proxy.echo("");
             Assert.assertEquals("Unexpected echo message", "foo", echo);
         }
-
     }
-
 
     @Test
     public void testSessionOpen() throws Exception {
@@ -298,7 +305,6 @@ public class SimpleInvocationTestCase {
     @Test
     @Ignore
     public void testSessionOpenLazyAffinity() throws Exception {
-
         for (int i = 0; i < RETRIES; ++i) {
             clearSessionId();
             EJBTestServer.setHandler((invocation, affinity, out, method, handle, attachments) -> new String(Base64.getDecoder().decode(invocation.getEJBLocator().asStateful().getSessionId().getEncodedForm())) + "-" + affinity);
@@ -331,7 +337,6 @@ public class SimpleInvocationTestCase {
                 Assert.assertTrue(e.getCause().toString(), e.getCause() instanceof InvalidClassException);
             }
         }
-
     }
 
     private void clearSessionId() throws URISyntaxException {

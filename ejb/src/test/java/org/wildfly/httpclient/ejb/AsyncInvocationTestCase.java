@@ -24,6 +24,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
+import io.undertow.server.handlers.CookieImpl;
 import jakarta.ejb.ApplicationException;
 
 import org.jboss.ejb.client.EJBClient;
@@ -34,6 +36,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import io.undertow.util.Headers;
+import org.wildfly.httpclient.common.HTTPTestServer;
 
 /**
  * @author Stuart Douglas
@@ -46,7 +49,9 @@ public class AsyncInvocationTestCase {
 
     @Before
     public void before() {
-        EJBTestServer.registerServicesHandler("common/v1/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(Headers.SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
+        // when in interop mode, the first invocation will always be /v1
+        HTTPTestServer.registerServicesHandler("/common/v1/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
+        HTTPTestServer.registerServicesHandler("/common/v2/affinity", exchange -> exchange.setResponseCookie(new CookieImpl("JSESSIONID", "foo")));
     }
 
     @Test
