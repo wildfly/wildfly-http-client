@@ -30,7 +30,7 @@
 
     <groupId>org.wildfly.wildfly-http-client</groupId>
     <artifactId>wildfly-http-client-parent</artifactId>
-    <version>1.1.17.Final-SNAPSHOT</version>
+    <version>1.1.17.Final</version>
     <name>Wildfly HTTP Client Parent - Java EE Variant</name>
     <packaging>pom</packaging>
 
