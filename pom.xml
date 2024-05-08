@@ -61,7 +61,7 @@
         <version.org.jboss.marshalling>2.1.4.SP1</version.org.jboss.marshalling>
         <version.org.jboss.modules>2.1.5.Final</version.org.jboss.modules>
         <version.org.wildfly.client-config>1.0.1.Final</version.org.wildfly.client-config>
-        <version.org.wildfly.common>1.7.0.Final</version.org.wildfly.common>
+        <version.org.wildfly.common>2.0.0</version.org.wildfly.common>
         <version.org.wildfly.naming.client>2.0.1.Final</version.org.wildfly.naming.client>
         <version.org.wildfly.elytron>2.4.1.Final</version.org.wildfly.elytron>
         <version.org.wildfly.elytron.web>4.1.0.Final</version.org.wildfly.elytron.web>
