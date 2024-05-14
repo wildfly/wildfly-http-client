@@ -18,6 +18,16 @@
 
 package org.wildfly.httpclient.common;
 
+import static io.undertow.util.Headers.CHUNKED;
+import static io.undertow.util.Headers.COOKIE;
+import static io.undertow.util.Headers.CONTENT_ENCODING;
+import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.Headers.GZIP;
+import static io.undertow.util.Headers.HOST;
+import static io.undertow.util.Headers.IDENTITY;
+import static io.undertow.util.Headers.SET_COOKIE;
+import static io.undertow.util.Headers.TRANSFER_ENCODING;
+
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
@@ -26,7 +36,6 @@ import io.undertow.server.handlers.Cookie;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
-import io.undertow.util.Headers;
 import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.InputStreamByteInput;
@@ -152,7 +161,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
     public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
         if (sessionId != null) {
-            request.getRequestHeaders().add(Headers.COOKIE, JSESSIONID + "=" + sessionId);
+            request.getRequestHeaders().add(COOKIE, JSESSIONID + "=" + sessionId);
         }
         final ClassLoader tccl = getContextClassLoader();
         connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
@@ -162,7 +171,7 @@ public class HttpTargetContext extends AbstractAttachable {
         try {
             final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
 
-            if (!request.getRequestHeaders().contains(Headers.HOST)) {
+            if (!request.getRequestHeaders().contains(HOST)) {
                 String host;
                 int port = connection.getUri().getPort();
                 if (port == -1) {
@@ -170,7 +179,7 @@ public class HttpTargetContext extends AbstractAttachable {
                 } else {
                     host = connection.getUri().getHost() + ":" + port;
                 }
-                request.getRequestHeaders().put(Headers.HOST, host);
+                request.getRequestHeaders().put(HOST, host);
             }
 
             final SSLContext finalSslContext = (sslContext == null) ?
@@ -180,8 +189,8 @@ public class HttpTargetContext extends AbstractAttachable {
                 AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, initAuthenticationContext)
                 : authenticationConfiguration;
 
-            if (request.getRequestHeaders().contains(Headers.CONTENT_TYPE)) {
-                request.getRequestHeaders().put(Headers.TRANSFER_ENCODING, Headers.CHUNKED.toString());
+            if (request.getRequestHeaders().contains(CONTENT_TYPE)) {
+                request.getRequestHeaders().put(TRANSFER_ENCODING, CHUNKED.toString());
             }
             connection.sendRequest(request, new ClientCallback<ClientExchange>() {
                 @Override
@@ -219,7 +228,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                     }
                                 }
 
-                                ContentType type = ContentType.parse(response.getResponseHeaders().getFirst(Headers.CONTENT_TYPE));
+                                ContentType type = ContentType.parse(response.getResponseHeaders().getFirst(CONTENT_TYPE));
                                 final boolean ok;
                                 final boolean isException;
                                 if (type == null) {
@@ -257,12 +266,12 @@ public class HttpTargetContext extends AbstractAttachable {
                                         final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
                                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
                                             InputStream in = inputStream;
-                                            String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
+                                            String encoding = response.getResponseHeaders().getFirst(CONTENT_ENCODING);
                                             if (encoding != null) {
                                                 String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                if (Headers.GZIP.toString().equals(lowerEncoding)) {
+                                                if (GZIP.toString().equals(lowerEncoding)) {
                                                     in = new GZIPInputStream(in);
-                                                } else if (!lowerEncoding.equals(Headers.IDENTITY.toString())) {
+                                                } else if (!lowerEncoding.equals(IDENTITY.toString())) {
                                                     throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
                                                 }
                                             }
@@ -300,12 +309,12 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 IoUtils.safeClose(in);
                                                 httpResultHandler.handleResult(null, response, doneCallback);
                                             } else {
-                                                String encoding = response.getResponseHeaders().getFirst(Headers.CONTENT_ENCODING);
+                                                String encoding = response.getResponseHeaders().getFirst(CONTENT_ENCODING);
                                                 if (encoding != null) {
                                                     String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                    if (Headers.GZIP.toString().equals(lowerEncoding)) {
+                                                    if (GZIP.toString().equals(lowerEncoding)) {
                                                         inputStream = new GZIPInputStream(inputStream);
-                                                    } else if (!lowerEncoding.equals(Headers.IDENTITY.toString())) {
+                                                    } else if (!lowerEncoding.equals(IDENTITY.toString())) {
                                                         throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
                                                     }
                                                 }
@@ -381,7 +390,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
     private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
         //handle session affinity
-        HeaderValues cookies = response.getResponseHeaders().get(Headers.SET_COOKIE);
+        HeaderValues cookies = response.getResponseHeaders().get(SET_COOKIE);
         if (cookies != null) {
             for (String cookie : cookies) {
                 Cookie c = Cookies.parseSetCookieHeader(cookie);
@@ -396,7 +405,7 @@ public class HttpTargetContext extends AbstractAttachable {
             }
         }
         if (getSessionId() != null) {
-            request.getRequestHeaders().put(Headers.COOKIE, JSESSIONID + "=" + getSessionId());
+            request.getRequestHeaders().put(COOKIE, JSESSIONID + "=" + getSessionId());
         }
     }
 

@@ -1,5 +1,7 @@
 package org.wildfly.httpclient.common;
 
+import static io.undertow.util.Headers.AUTHORIZATION;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -13,7 +15,6 @@ import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
 import io.undertow.client.ClientRequest;
 import io.undertow.util.FlexBase64;
-import io.undertow.util.Headers;
 
 /**
  * Class for simple utils methods helping with client authentication tasks
@@ -34,6 +35,6 @@ public final class ClientAuthUtils {
         }
         char[] password = callback.getPassword();
         String challenge = principal.getName() + ":" + new String(password);
-        request.getRequestHeaders().put(Headers.AUTHORIZATION, "basic " + FlexBase64.encodeString(challenge.getBytes(StandardCharsets.UTF_8), false));
+        request.getRequestHeaders().put(AUTHORIZATION, "basic " + FlexBase64.encodeString(challenge.getBytes(StandardCharsets.UTF_8), false));
     }
 }
