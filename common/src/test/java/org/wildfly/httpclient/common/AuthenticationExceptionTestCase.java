@@ -1,6 +1,7 @@
 package org.wildfly.httpclient.common;
 
 import static io.undertow.util.Headers.CONTENT_TYPE;
+import static org.wildfly.httpclient.common.HeadersHelper.addResponseHeader;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -39,7 +40,7 @@ public class AuthenticationExceptionTestCase {
             public void handleRequest(HttpServerExchange exchange) {
                 // pretend authentication failure
                 exchange.setStatusCode(401);
-                exchange.getResponseHeaders().add(CONTENT_TYPE, "text/html");
+                addResponseHeader(exchange, CONTENT_TYPE, "text/html");
             }
         });
     }

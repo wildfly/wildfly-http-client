@@ -44,6 +44,10 @@ import java.net.URI;
 import java.util.List;
 
 import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
+import static org.wildfly.httpclient.common.HeadersHelper.addResponseHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
 import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
 import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
@@ -165,7 +169,7 @@ final class EENamespaceInteroperability {
                 switch (protocolVersion) {
                     case -1:
                         // new connection pool: send the protocol version header once with LATEST_VERSION value to see what will be the response
-                        request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
+                        putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
                         request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
                         break;
                     case Protocol.JAVAEE_PROTOCOL_VERSION:
@@ -176,7 +180,7 @@ final class EENamespaceInteroperability {
                     default:
                         // connection already set as Jakarta namespace, default factory can be used for marshalling
                         // (no transformation needed)
-                        request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
+                        putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
                         request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
                 }
                 super.sendRequest(request, new ClientCallback<ClientExchange>() {
@@ -211,7 +215,7 @@ final class EENamespaceInteroperability {
                             final ClientResponse response = result.getResponse();
                             if (protocolVersion == -1) {
                                 // we need to check for protocol version header to define the protocol version of the pool
-                                if (LATEST_VERSION.equals(response.getResponseHeaders().getFirst(PROTOCOL_VERSION))) {
+                                if (LATEST_VERSION.equals(getResponseHeader(response, PROTOCOL_VERSION))) {
                                     // this indicates this is the first response server sends, set the protocol to 2
                                     protocolVersion = Protocol.LATEST;
                                     // overwrite previous attachment, no transformation is needed for this connection any more
@@ -314,9 +318,9 @@ final class EENamespaceInteroperability {
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
-            if (LATEST_VERSION.equals(exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION))) {
+            if (LATEST_VERSION.equals(getRequestHeader(exchange, PROTOCOL_VERSION))) {
                 // respond that this end also supports version two
-                exchange.getResponseHeaders().add(PROTOCOL_VERSION, LATEST_VERSION);
+                addResponseHeader(exchange, PROTOCOL_VERSION, LATEST_VERSION);
                 // transformation is required for unmarshalling because client is on EE namespace interoperable mode
                 exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
                 // no transformation required for marshalling, server is sending response in Jakarta

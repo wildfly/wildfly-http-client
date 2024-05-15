@@ -21,6 +21,9 @@ package org.wildfly.httpclient.common;
 import static io.undertow.util.Headers.AUTHENTICATION_INFO;
 import static io.undertow.util.Headers.AUTHORIZATION;
 import static io.undertow.util.Headers.WWW_AUTHENTICATE;
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 
 import java.io.IOException;
 import java.net.URI;
@@ -80,7 +83,7 @@ class PoolAuthenticationContext {
         if (response.getResponseCode() != StatusCodes.UNAUTHORIZED) {
             return false;
         }
-        String authenticate = response.getResponseHeaders().getFirst(WWW_AUTHENTICATE);
+        String authenticate = getResponseHeader(response, WWW_AUTHENTICATE);
         if (authenticate == null) {
             return false;
         }
@@ -196,7 +199,7 @@ class PoolAuthenticationContext {
         Principal principal = new NamePrincipal(name);
         if (current == Type.BASIC) {
             String challenge = principal.getName() + ":" + new String(password);
-            request.getRequestHeaders().put(AUTHORIZATION, "Basic " + FlexBase64.encodeString(challenge.getBytes(StandardCharsets.UTF_8), false));
+            putRequestHeader(request, AUTHORIZATION, "Basic " + FlexBase64.encodeString(challenge.getBytes(StandardCharsets.UTF_8), false));
             return true;
         } else if (current == Type.DIGEST) {
             DigestImpl current = digestList.poll();
@@ -263,7 +266,7 @@ class PoolAuthenticationContext {
                 sb.append(", response=\"");
                 sb.append(HexConverter.convertToHexString(digest.digest()));
                 sb.append("\"");
-                request.getRequestHeaders().put(AUTHORIZATION, sb.toString());
+                putRequestHeader(request, AUTHORIZATION, sb.toString());
                 return true;
             } catch (NoSuchAlgorithmException e) {
                 throw new RuntimeException(e);
@@ -280,7 +283,7 @@ class PoolAuthenticationContext {
         if (response.getResponseCode() != StatusCodes.UNAUTHORIZED) {
             DigestImpl digest = exchange.getRequest().getAttachment(DIGEST);
             if(digest != null) {
-                String authInfo = response.getResponseHeaders().getFirst(AUTHENTICATION_INFO);
+                String authInfo = getResponseHeader(response, AUTHENTICATION_INFO);
                 if(authInfo != null) {
                     try {
                         Map<AuthenticationInfoToken, String> result = AuthenticationInfoToken.parseHeader(authInfo);
@@ -296,7 +299,7 @@ class PoolAuthenticationContext {
             }
             return false;
         }
-        HeaderValues headers = response.getResponseHeaders().get(WWW_AUTHENTICATE);
+        HeaderValues headers = getResponseHeaders(response, WWW_AUTHENTICATE);
         if (headers == null) {
             return false;
         }

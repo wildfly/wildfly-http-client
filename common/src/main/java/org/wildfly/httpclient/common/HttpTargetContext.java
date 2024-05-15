@@ -27,6 +27,11 @@ import static io.undertow.util.Headers.HOST;
 import static io.undertow.util.Headers.IDENTITY;
 import static io.undertow.util.Headers.SET_COOKIE;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
+import static org.wildfly.httpclient.common.HeadersHelper.addRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.containsRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
@@ -161,7 +166,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
     public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
         if (sessionId != null) {
-            request.getRequestHeaders().add(COOKIE, JSESSIONID + "=" + sessionId);
+            addRequestHeader(request, COOKIE, JSESSIONID + "=" + sessionId);
         }
         final ClassLoader tccl = getContextClassLoader();
         connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
@@ -171,7 +176,7 @@ public class HttpTargetContext extends AbstractAttachable {
         try {
             final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
 
-            if (!request.getRequestHeaders().contains(HOST)) {
+            if (!containsRequestHeader(request, HOST)) {
                 String host;
                 int port = connection.getUri().getPort();
                 if (port == -1) {
@@ -179,7 +184,7 @@ public class HttpTargetContext extends AbstractAttachable {
                 } else {
                     host = connection.getUri().getHost() + ":" + port;
                 }
-                request.getRequestHeaders().put(HOST, host);
+                putRequestHeader(request, HOST, host);
             }
 
             final SSLContext finalSslContext = (sslContext == null) ?
@@ -189,8 +194,8 @@ public class HttpTargetContext extends AbstractAttachable {
                 AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, initAuthenticationContext)
                 : authenticationConfiguration;
 
-            if (request.getRequestHeaders().contains(CONTENT_TYPE)) {
-                request.getRequestHeaders().put(TRANSFER_ENCODING, CHUNKED.toString());
+            if (containsRequestHeader(request, CONTENT_TYPE)) {
+                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED.toString());
             }
             connection.sendRequest(request, new ClientCallback<ClientExchange>() {
                 @Override
@@ -228,7 +233,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                     }
                                 }
 
-                                ContentType type = ContentType.parse(response.getResponseHeaders().getFirst(CONTENT_TYPE));
+                                ContentType type = ContentType.parse(getResponseHeader(response, CONTENT_TYPE));
                                 final boolean ok;
                                 final boolean isException;
                                 if (type == null) {
@@ -266,7 +271,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                         final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
                                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
                                             InputStream in = inputStream;
-                                            String encoding = response.getResponseHeaders().getFirst(CONTENT_ENCODING);
+                                            String encoding = getResponseHeader(response, CONTENT_ENCODING);
                                             if (encoding != null) {
                                                 String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
                                                 if (GZIP.toString().equals(lowerEncoding)) {
@@ -309,7 +314,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 IoUtils.safeClose(in);
                                                 httpResultHandler.handleResult(null, response, doneCallback);
                                             } else {
-                                                String encoding = response.getResponseHeaders().getFirst(CONTENT_ENCODING);
+                                                String encoding = getResponseHeader(response, CONTENT_ENCODING);
                                                 if (encoding != null) {
                                                     String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
                                                     if (GZIP.toString().equals(lowerEncoding)) {
@@ -390,7 +395,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
     private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
         //handle session affinity
-        HeaderValues cookies = response.getResponseHeaders().get(SET_COOKIE);
+        HeaderValues cookies = getResponseHeaders(response, SET_COOKIE);
         if (cookies != null) {
             for (String cookie : cookies) {
                 Cookie c = Cookies.parseSetCookieHeader(cookie);
@@ -405,7 +410,7 @@ public class HttpTargetContext extends AbstractAttachable {
             }
         }
         if (getSessionId() != null) {
-            request.getRequestHeaders().put(COOKIE, JSESSIONID + "=" + getSessionId());
+            putRequestHeader(request, COOKIE, JSESSIONID + "=" + getSessionId());
         }
     }
 

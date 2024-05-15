@@ -1,6 +1,7 @@
 package org.wildfly.httpclient.common;
 
 import static io.undertow.util.Headers.AUTHORIZATION;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 
 import java.io.IOException;
 import java.net.URI;
@@ -35,6 +36,6 @@ public final class ClientAuthUtils {
         }
         char[] password = callback.getPassword();
         String challenge = principal.getName() + ":" + new String(password);
-        request.getRequestHeaders().put(AUTHORIZATION, "basic " + FlexBase64.encodeString(challenge.getBytes(StandardCharsets.UTF_8), false));
+        putRequestHeader(request, AUTHORIZATION, "basic " + FlexBase64.encodeString(challenge.getBytes(StandardCharsets.UTF_8), false));
     }
 }

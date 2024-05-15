@@ -19,6 +19,7 @@
 package org.wildfly.httpclient.common;
 
 import static io.undertow.util.Headers.HOST;
+import static org.wildfly.httpclient.common.HeadersHelper.addRequestHeader;
 
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
@@ -128,7 +129,7 @@ public class ConnectionPoolTestCase {
         pool.getConnection((connectionHandle) -> {
             ClientRequest request = new ClientRequest().setMethod(Methods.GET).setPath(path);
             ClientAuthUtils.setupBasicAuth(request, connectionHandle.getUri());
-            request.getRequestHeaders().add(HOST, HTTPTestServer.getHostAddress());
+            addRequestHeader(request, HOST, HTTPTestServer.getHostAddress());
             connectionHandle.sendRequest(request, new ClientCallback<ClientExchange>() {
                 @Override
                 public void completed(ClientExchange result) {

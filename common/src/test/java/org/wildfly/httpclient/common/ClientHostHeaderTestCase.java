@@ -1,6 +1,8 @@
 package org.wildfly.httpclient.common;
 
 import static io.undertow.util.Headers.HOST;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 
 import java.io.Closeable;
 import java.io.InputStream;
@@ -30,7 +32,7 @@ public class ClientHostHeaderTestCase {
     public void hostHeaderIncludesPortTest() throws URISyntaxException, InterruptedException {
         final List<String> hosts = new ArrayList<>();
         String path = "/host";
-        HTTPTestServer.registerPathHandler(path, exchange -> hosts.add(exchange.getRequestHeaders().getFirst(HOST)));
+        HTTPTestServer.registerPathHandler(path, exchange -> hosts.add(getRequestHeader(exchange, HOST)));
         ClientRequest request = new ClientRequest().setMethod(Methods.GET).setPath(path);
         doClientRequest(request);
 
@@ -43,10 +45,10 @@ public class ClientHostHeaderTestCase {
     public void hostHeaderIsNotOverridenIfProvided() throws URISyntaxException, InterruptedException {
         final List<String> hosts = new ArrayList<>();
         String path = "/host";
-        HTTPTestServer.registerPathHandler(path, exchange -> hosts.add(exchange.getRequestHeaders().getFirst(HOST)));
+        HTTPTestServer.registerPathHandler(path, exchange -> hosts.add(getRequestHeader(exchange, HOST)));
         String myHostHeader = "127.0.0.2";
         ClientRequest request = new ClientRequest().setMethod(Methods.GET).setPath(path);
-        request.getRequestHeaders().put(HOST, myHostHeader);
+        putRequestHeader(request, HOST, myHostHeader);
         doClientRequest(request);
 
         Assertions.assertThat(hosts)
