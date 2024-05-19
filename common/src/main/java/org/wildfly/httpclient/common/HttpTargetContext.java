@@ -173,8 +173,6 @@ public class HttpTargetContext extends AbstractAttachable {
             addRequestHeader(request, COOKIE, JSESSIONID + "=" + sessionId);
         }
         try {
-            final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
-
             if (!containsRequestHeader(request, HOST)) {
                 String host;
                 int port = connection.getUri().getPort();
@@ -196,6 +194,7 @@ public class HttpTargetContext extends AbstractAttachable {
             if (containsRequestHeader(request, CONTENT_TYPE)) {
                 putRequestHeader(request, TRANSFER_ENCODING, CHUNKED.toString());
             }
+            final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
             connection.sendRequest(request, new ClientCallback<ClientExchange>() {
                 @Override
                 public void completed(ClientExchange result) {
