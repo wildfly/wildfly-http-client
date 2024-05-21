@@ -18,16 +18,19 @@
 
 package org.wildfly.httpclient.ejb;
 
-import static io.undertow.util.Methods.POST;
 import static io.undertow.util.Methods.DELETE;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
-import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+import static io.undertow.util.Methods.POST;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
+import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
+import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.net.URLEncoder.encode;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
@@ -35,8 +38,6 @@ import io.undertow.util.HttpString;
 import org.wildfly.httpclient.common.Protocol;
 
 import java.lang.reflect.Method;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Builder for invocations against a specific EJB, such as invocation and session open
@@ -193,7 +194,7 @@ final class HttpEJBInvocationBuilder {
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
-        sb.append("/").append(path == null || path.isEmpty() ? "-" : encode ? URLEncoder.encode(path, StandardCharsets.UTF_8) : path);
+        sb.append("/").append(path == null || path.isEmpty() ? "-" : encode ? encode(path, UTF_8) : path);
     }
 
 }
