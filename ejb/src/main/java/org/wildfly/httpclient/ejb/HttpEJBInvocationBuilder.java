@@ -151,10 +151,8 @@ final class HttpEJBInvocationBuilder {
     private String buildPath(final String mountPoint, final String invocationId, boolean cancelIfRunning) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_CANCEL_PATH, sb);
-        sb.append("/");
-        sb.append(invocationId);
-        sb.append("/");
-        sb.append(cancelIfRunning);
+        appendPath(sb, invocationId);
+        appendPath(sb, "" + cancelIfRunning); // TODO: convert to String
         return sb.toString();
     }
 
@@ -162,13 +160,10 @@ final class HttpEJBInvocationBuilder {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_INVOKE_PATH, sb);
         appendPath(sb, beanId);
-        sb.append("/");
-        sb.append(view);
-        sb.append("/");
-        sb.append(method.getName());
+        appendPath(sb, view);
+        appendPath(sb, method.getName()); // TODO: convert to String
         for (final Class<?> param : method.getParameterTypes()) {
-            sb.append("/");
-            sb.append(encodeUrlPart(param.getName()));
+            appendEncodedPath(sb, param.getName());
         }
         return sb.toString();
     }
@@ -177,7 +172,9 @@ final class HttpEJBInvocationBuilder {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
-        sb.append("/ejb/v").append(version).append("/").append(type);
+        appendPath(sb, "ejb");
+        appendPath(sb, "v" + version); // TODO: convert to String
+        appendPath(sb, type);
         appendEncodedPath(sb, appName);
         appendEncodedPath(sb, moduleName);
         appendEncodedPath(sb, distinctName);
