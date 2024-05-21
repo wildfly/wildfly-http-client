@@ -211,28 +211,14 @@ class HttpEJBInvocationBuilder {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
-        sb.append("/ejb/v");
-        sb.append(version);
-        sb.append("/");
-        sb.append(type);
-        sb.append("/");
-        if (appName == null || appName.isEmpty()) {
-            sb.append("-");
-        } else {
-            sb.append(encodeUrlPart(appName));
-        }
-        sb.append("/");
-        if (moduleName == null || moduleName.isEmpty()) {
-            sb.append("-");
-        } else {
-            sb.append(encodeUrlPart(moduleName));
-        }
-        sb.append("/");
-        if (distinctName == null || distinctName.isEmpty()) {
-            sb.append("-");
-        } else {
-            sb.append(encodeUrlPart(distinctName));
-        }
+        sb.append("/ejb/v").append(version).append("/").append(type);
+        appendPath(sb, appName);
+        appendPath(sb, moduleName);
+        appendPath(sb, distinctName);
+    }
+
+    private static void appendPath(final StringBuilder sb, final String subPath) {
+        sb.append("/").append(subPath == null || subPath.isEmpty() ? "-" : encodeUrlPart(subPath));
     }
 
     private static String encodeUrlPart(final String part) {
