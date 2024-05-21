@@ -124,7 +124,7 @@ final class HttpEJBInvocationBuilder {
         ClientRequest clientRequest = new ClientRequest();
         if (invocationType == InvocationType.METHOD_INVOCATION) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.setPath(invokeBeanRequestPath(mountPoint, beanId, view, method));
+            clientRequest.setPath(invokeBeanRequestPath(mountPoint));
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             if (invocationId != null) {
                 clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
@@ -137,7 +137,7 @@ final class HttpEJBInvocationBuilder {
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
         } else if(invocationType == InvocationType.CANCEL) {
             clientRequest.setMethod(Methods.DELETE);
-            clientRequest.setPath(cancelBeanRequestPath(mountPoint, invocationId, cancelIfRunning));
+            clientRequest.setPath(cancelBeanRequestPath(mountPoint));
         }
         return clientRequest;
     }
@@ -148,7 +148,7 @@ final class HttpEJBInvocationBuilder {
         return sb.toString();
     }
 
-    private String cancelBeanRequestPath(final String mountPoint, final String invocationId, boolean cancelIfRunning) {
+    private String cancelBeanRequestPath(final String mountPoint) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_CANCEL_PATH, sb);
         appendPath(sb, invocationId, false);
@@ -156,7 +156,7 @@ final class HttpEJBInvocationBuilder {
         return sb.toString();
     }
 
-    private String invokeBeanRequestPath(final String mountPoint, final String beanId, final String view, final Method method) {
+    private String invokeBeanRequestPath(final String mountPoint) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_INVOKE_PATH, sb);
         appendPath(sb, beanId, false);
