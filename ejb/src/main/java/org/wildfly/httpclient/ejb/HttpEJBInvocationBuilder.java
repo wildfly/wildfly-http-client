@@ -151,13 +151,9 @@ class HttpEJBInvocationBuilder {
      * Constructs an EJB invocation path
      *
      * @param mountPoint   The mount point of the EJB context
-     * @param appName      The application name
-     * @param moduleName   The module name
-     * @param distinctName The distinct name
-     * @param beanName     The bean name
      * @return The request path to invoke
      */
-    private String buildPath(final String mountPoint, String type, final String appName, final String moduleName, final String distinctName, final String beanName) {
+    private String buildPath(final String mountPoint, String type) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, type, appName, moduleName, distinctName, beanName, sb);
         return sb.toString();
@@ -167,13 +163,9 @@ class HttpEJBInvocationBuilder {
      * Constructs an EJB invocation path
      *
      * @param mountPoint   The mount point of the EJB context
-     * @param appName      The application name
-     * @param moduleName   The module name
-     * @param distinctName The distinct name
-     * @param beanName     The bean name
      * @return The request path to invoke
      */
-    private String buildPath(final String mountPoint, String type, final String appName, final String moduleName, final String distinctName, final String beanName, String invocationId, boolean cancelIfRunning) {
+    private String buildPath(final String mountPoint, String type, String invocationId, boolean cancelIfRunning) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, type, appName, moduleName, distinctName, beanName, sb);
         sb.append("/");
@@ -187,14 +179,10 @@ class HttpEJBInvocationBuilder {
      * Constructs an EJB invocation path
      *
      * @param mountPoint   The mount point of the EJB context
-     * @param appName      The application name
-     * @param moduleName   The module name
-     * @param distinctName The distinct name
-     * @param beanName     The bean name
      * @param beanId       The bean id
      * @return The request path to invoke
      */
-    private String buildPath(final String mountPoint, String type, final String appName, final String moduleName, final String distinctName, final String beanName, final String beanId, final String view, final Method method) {
+    private String buildPath(final String mountPoint, String type, final String beanId, final String view, final Method method) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, type, appName, moduleName, distinctName, beanName, sb);
         sb.append("/");
@@ -264,16 +252,16 @@ class HttpEJBInvocationBuilder {
             if (invocationId != null) {
                 clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
             }
-            clientRequest.setPath(buildPath(mountPoint, EJB_INVOKE_PATH, appName, moduleName, distinctName, beanName, beanId, view, method));
+            clientRequest.setPath(buildPath(mountPoint, EJB_INVOKE_PATH, beanId, view, method));
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
             clientRequest.setMethod(Methods.POST);
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
-            clientRequest.setPath(buildPath(mountPoint, EJB_OPEN_PATH, appName, moduleName, distinctName, beanName));
+            clientRequest.setPath(buildPath(mountPoint, EJB_OPEN_PATH));
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
         } else if(invocationType == InvocationType.CANCEL) {
             clientRequest.setMethod(Methods.DELETE);
-            clientRequest.setPath(buildPath(mountPoint, EJB_CANCEL_PATH, appName, moduleName, distinctName, beanName, invocationId, cancelIfRunning));
+            clientRequest.setPath(buildPath(mountPoint, EJB_CANCEL_PATH, invocationId, cancelIfRunning));
         }
         return clientRequest;
     }
