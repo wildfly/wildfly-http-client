@@ -52,7 +52,6 @@ import javax.naming.NameNotFoundException;
 import javax.naming.NamingException;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -257,33 +256,25 @@ public class HttpRootContext extends AbstractContext {
         ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
         final RetryContext context = canRetry(environment) ? new RetryContext() : null;
         return performWithRetry((contextOrNull, name1, param) -> {
-
-            try {
-                HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
-                final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(peerIdentity.getUri());
-                StringBuilder sb = new StringBuilder();
-                String uriPath = peerIdentity.getUri().getPath();
-                sb.append(uriPath);
-                if (!uriPath.endsWith("/")) {
-                    sb.append("/");
-                }
-                sb.append(NAMING_CONTEXT);
-                sb.append(VERSION_PATH);
-                sb.append(targetContext.getProtocolVersion());
-                sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
-
-                final ClientRequest clientRequest = new ClientRequest()
-                        .setPath(sb.toString())
-                        .setMethod(method);
-                clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
-
-                return performOperation(name1, peerIdentity.getUri(), targetContext, clientRequest);
-
-            } catch (UnsupportedEncodingException e) {
-                NamingException namingException = new NamingException(e.getMessage());
-                namingException.initCause(e);
-                throw namingException;
+            HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
+            final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(peerIdentity.getUri());
+            StringBuilder sb = new StringBuilder();
+            String uriPath = peerIdentity.getUri().getPath();
+            sb.append(uriPath);
+            if (!uriPath.endsWith("/")) {
+                sb.append("/");
             }
+            sb.append(NAMING_CONTEXT);
+            sb.append(VERSION_PATH);
+            sb.append(targetContext.getProtocolVersion());
+            sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8));
+
+            final ClientRequest clientRequest = new ClientRequest()
+                    .setPath(sb.toString())
+                    .setMethod(method);
+            clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
+
+            return performOperation(name1, peerIdentity.getUri(), targetContext, clientRequest);
         }, environment, context, name, null);
     }
 
@@ -375,40 +366,33 @@ public class HttpRootContext extends AbstractContext {
         final RetryContext context = canRetry(environment) ? new RetryContext() : null;
         performWithRetry((contextOrNull, name1, param) -> {
             HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
-            try {
-                URI uri = peerIdentity.getUri();
-                final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
-                StringBuilder sb = new StringBuilder();
-                String uriPath = uri.getPath();
-                sb.append(uriPath);
+            URI uri = peerIdentity.getUri();
+            final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
+            StringBuilder sb = new StringBuilder();
+            String uriPath = uri.getPath();
+            sb.append(uriPath);
 
-                if (!uriPath.endsWith("/")) {
-                    sb.append("/");
-                }
-                sb.append(NAMING_CONTEXT);
-                sb.append(VERSION_PATH);
-                sb.append(targetContext.getProtocolVersion());
-                sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
-                if (newName != null) {
-                    sb.append("?new=");
-                    sb.append(URLEncoder.encode(newName.toString(), StandardCharsets.UTF_8.name()));
-                }
-                final ClientRequest clientRequest = new ClientRequest()
-                        .setPath(sb.toString())
-                        .setMethod(method);
-
-                clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
-                if (object != null) {
-                    clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
-                }
-                performOperation(uri, object, targetContext, clientRequest);
-                return null;
-
-            } catch (UnsupportedEncodingException e) {
-                NamingException namingException = new NamingException(e.getMessage());
-                namingException.initCause(e);
-                throw namingException;
+            if (!uriPath.endsWith("/")) {
+                sb.append("/");
             }
+            sb.append(NAMING_CONTEXT);
+            sb.append(VERSION_PATH);
+            sb.append(targetContext.getProtocolVersion());
+            sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8));
+            if (newName != null) {
+                sb.append("?new=");
+                sb.append(URLEncoder.encode(newName.toString(), StandardCharsets.UTF_8));
+            }
+            final ClientRequest clientRequest = new ClientRequest()
+                    .setPath(sb.toString())
+                    .setMethod(method);
+
+            clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
+            if (object != null) {
+                clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
+            }
+            performOperation(uri, object, targetContext, clientRequest);
+            return null;
         }, environment, context, name, object);
 
     }
