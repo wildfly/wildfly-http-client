@@ -44,6 +44,7 @@ import java.lang.reflect.Method;
  * Builder for invocations against a specific EJB, such as invocation and session open
  *
  * @author Stuart Douglas
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 final class HttpEJBInvocationBuilder {
 
@@ -170,7 +171,7 @@ final class HttpEJBInvocationBuilder {
         final StringBuilder sb = new StringBuilder();
         appendBeanPath(sb, mountPoint, EJB_CANCEL_PATH);
         appendPath(sb, invocationId, false);
-        appendPath(sb, "" + cancelIfRunning, false); // TODO: convert to String
+        appendPath(sb, "" + cancelIfRunning, false);
         return sb.toString();
     }
 
@@ -179,9 +180,9 @@ final class HttpEJBInvocationBuilder {
         appendBeanPath(sb, mountPoint, EJB_INVOKE_PATH);
         appendPath(sb, beanId, false);
         appendPath(sb, view, false);
-        appendPath(sb, method.getName(), false); // TODO: convert to String
+        appendPath(sb, method.getName(), false);
         for (final Class<?> param : method.getParameterTypes()) {
-            appendPath(sb, param.getName(), true); // TODO: convert to Strings
+            appendPath(sb, param.getName(), true);
         }
         return sb.toString();
     }
@@ -191,7 +192,7 @@ final class HttpEJBInvocationBuilder {
             sb.append(mountPoint);
         }
         appendPath(sb, "ejb", false);
-        appendPath(sb, "v" + version, false); // TODO: convert to String
+        appendPath(sb, "v" + version, false);
         appendPath(sb, operationType, false);
         appendPath(sb, appName, true);
         appendPath(sb, moduleName, true);
