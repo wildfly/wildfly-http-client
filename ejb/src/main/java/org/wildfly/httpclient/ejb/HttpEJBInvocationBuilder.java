@@ -142,24 +142,12 @@ final class HttpEJBInvocationBuilder {
         return clientRequest;
     }
 
-    /**
-     * Constructs an EJB invocation path
-     *
-     * @param mountPoint   The mount point of the EJB context
-     * @return The request path to invoke
-     */
     private String buildPath(final String mountPoint) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_OPEN_PATH, sb);
         return sb.toString();
     }
 
-    /**
-     * Constructs an EJB invocation path
-     *
-     * @param mountPoint   The mount point of the EJB context
-     * @return The request path to invoke
-     */
     private String buildPath(final String mountPoint, String invocationId, boolean cancelIfRunning) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_CANCEL_PATH, sb);
@@ -170,13 +158,6 @@ final class HttpEJBInvocationBuilder {
         return sb.toString();
     }
 
-    /**
-     * Constructs an EJB invocation path
-     *
-     * @param mountPoint   The mount point of the EJB context
-     * @param beanId       The bean id
-     * @return The request path to invoke
-     */
     private String buildPath(final String mountPoint, final String beanId, final String view, final Method method) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_INVOKE_PATH, sb);
