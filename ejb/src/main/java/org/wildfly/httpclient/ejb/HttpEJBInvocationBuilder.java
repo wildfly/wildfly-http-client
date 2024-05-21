@@ -244,20 +244,20 @@ class HttpEJBInvocationBuilder {
         }
     }
 
-    public ClientRequest createRequest(String mountPoint) {
+    public ClientRequest createRequest(final String mountPoint) {
         ClientRequest clientRequest = new ClientRequest();
         if (invocationType == InvocationType.METHOD_INVOCATION) {
             clientRequest.setMethod(Methods.POST);
+            clientRequest.setPath(buildPath(mountPoint, EJB_INVOKE_PATH, beanId, view, method));
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             if (invocationId != null) {
                 clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
             }
-            clientRequest.setPath(buildPath(mountPoint, EJB_INVOKE_PATH, beanId, view, method));
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
             clientRequest.setPath(buildPath(mountPoint, EJB_OPEN_PATH));
+            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
         } else if(invocationType == InvocationType.CANCEL) {
             clientRequest.setMethod(Methods.DELETE);
