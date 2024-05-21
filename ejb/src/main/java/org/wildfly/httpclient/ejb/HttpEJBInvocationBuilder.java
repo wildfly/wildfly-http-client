@@ -150,7 +150,7 @@ final class HttpEJBInvocationBuilder {
      */
     private String buildPath(final String mountPoint) {
         StringBuilder sb = new StringBuilder();
-        buildBeanPath(mountPoint, EJB_OPEN_PATH, appName, moduleName, distinctName, beanName, sb);
+        buildBeanPath(mountPoint, EJB_OPEN_PATH, sb);
         return sb.toString();
     }
 
@@ -162,7 +162,7 @@ final class HttpEJBInvocationBuilder {
      */
     private String buildPath(final String mountPoint, String invocationId, boolean cancelIfRunning) {
         StringBuilder sb = new StringBuilder();
-        buildBeanPath(mountPoint, EJB_CANCEL_PATH, appName, moduleName, distinctName, beanName, sb);
+        buildBeanPath(mountPoint, EJB_CANCEL_PATH, sb);
         sb.append("/");
         sb.append(invocationId);
         sb.append("/");
@@ -179,7 +179,7 @@ final class HttpEJBInvocationBuilder {
      */
     private String buildPath(final String mountPoint, final String beanId, final String view, final Method method) {
         StringBuilder sb = new StringBuilder();
-        buildBeanPath(mountPoint, EJB_INVOKE_PATH, appName, moduleName, distinctName, beanName, sb);
+        buildBeanPath(mountPoint, EJB_INVOKE_PATH, sb);
         appendPath(sb, beanId);
         sb.append("/");
         sb.append(view);
@@ -192,7 +192,7 @@ final class HttpEJBInvocationBuilder {
         return sb.toString();
     }
 
-    private void buildBeanPath(String mountPoint, String type, String appName, String moduleName, String distinctName, String beanName, StringBuilder sb) {
+    private void buildBeanPath(String mountPoint, String type, StringBuilder sb) {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
