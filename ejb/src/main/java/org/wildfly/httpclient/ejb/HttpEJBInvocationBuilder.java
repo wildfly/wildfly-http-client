@@ -193,12 +193,6 @@ final class HttpEJBInvocationBuilder {
     }
 
     private void buildBeanPath(String mountPoint, String type, String appName, String moduleName, String distinctName, String beanName, StringBuilder sb) {
-        buildModulePath(mountPoint, type, appName, moduleName, distinctName, sb);
-        sb.append("/");
-        sb.append(encodeUrlPart(beanName));
-    }
-
-    private void buildModulePath(String mountPoint, String type, String appName, String moduleName, String distinctName, StringBuilder sb) {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
@@ -206,6 +200,8 @@ final class HttpEJBInvocationBuilder {
         appendEncodedPath(sb, appName);
         appendEncodedPath(sb, moduleName);
         appendEncodedPath(sb, distinctName);
+        sb.append("/");
+        sb.append(encodeUrlPart(beanName));
     }
 
     private static void appendPath(final StringBuilder sb, final String subPath) {
