@@ -32,7 +32,6 @@ import io.undertow.util.Headers;
 import io.undertow.util.Methods;
 import org.wildfly.httpclient.common.Protocol;
 
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -237,11 +236,7 @@ class HttpEJBInvocationBuilder {
     }
 
     private static String encodeUrlPart(final String part) {
-        try {
-            return URLEncoder.encode(part, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        return URLEncoder.encode(part, StandardCharsets.UTF_8);
     }
 
     public ClientRequest createRequest(final String mountPoint) {
