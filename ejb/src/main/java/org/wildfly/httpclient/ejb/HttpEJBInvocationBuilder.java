@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static io.undertow.util.Headers.ACCEPT;
+import static io.undertow.util.Headers.CONTENT_TYPE;
 import static io.undertow.util.Methods.DELETE;
 import static io.undertow.util.Methods.POST;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
@@ -33,7 +35,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.net.URLEncoder.encode;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.util.Headers;
 import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import org.wildfly.httpclient.common.Protocol;
@@ -135,14 +136,14 @@ final class HttpEJBInvocationBuilder {
     private void setRequestHeaders(final ClientRequest request) {
         final HeaderMap headers = request.getRequestHeaders();
         if (invocationType == InvocationType.METHOD_INVOCATION) {
-            headers.add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+            headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+            headers.put(CONTENT_TYPE, INVOCATION.toString());
             if (invocationId != null) {
                 headers.put(INVOCATION_ID, invocationId);
             }
-            headers.put(Headers.CONTENT_TYPE, INVOCATION.toString());
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
-            headers.put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
-            headers.add(Headers.ACCEPT, EJB_EXCEPTION.toString());
+            headers.add(ACCEPT, EJB_EXCEPTION.toString());
+            headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
         }
     }
 
