@@ -148,7 +148,7 @@ final class HttpEJBInvocationBuilder {
         return sb.toString();
     }
 
-    private String buildPath(final String mountPoint, String invocationId, boolean cancelIfRunning) {
+    private String buildPath(final String mountPoint, final String invocationId, boolean cancelIfRunning) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_CANCEL_PATH, sb);
         sb.append("/");
@@ -173,7 +173,7 @@ final class HttpEJBInvocationBuilder {
         return sb.toString();
     }
 
-    private void buildBeanPath(String mountPoint, String type, StringBuilder sb) {
+    private void buildBeanPath(final String mountPoint, final String type, final StringBuilder sb) {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
