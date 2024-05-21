@@ -180,12 +180,7 @@ final class HttpEJBInvocationBuilder {
     private String buildPath(final String mountPoint, final String beanId, final String view, final Method method) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_INVOKE_PATH, appName, moduleName, distinctName, beanName, sb);
-        sb.append("/");
-        if (beanId == null) {
-            sb.append("-");
-        } else {
-            sb.append(beanId);
-        }
+        appendPath(sb, beanId);
         sb.append("/");
         sb.append(view);
         sb.append("/");
@@ -208,12 +203,16 @@ final class HttpEJBInvocationBuilder {
             sb.append(mountPoint);
         }
         sb.append("/ejb/v").append(version).append("/").append(type);
-        appendPath(sb, appName);
-        appendPath(sb, moduleName);
-        appendPath(sb, distinctName);
+        appendEncodedPath(sb, appName);
+        appendEncodedPath(sb, moduleName);
+        appendEncodedPath(sb, distinctName);
     }
 
     private static void appendPath(final StringBuilder sb, final String subPath) {
+        sb.append("/").append(subPath == null || subPath.isEmpty() ? "-" : subPath);
+    }
+
+    private static void appendEncodedPath(final StringBuilder sb, final String subPath) {
         sb.append("/").append(subPath == null || subPath.isEmpty() ? "-" : encodeUrlPart(subPath));
     }
 
