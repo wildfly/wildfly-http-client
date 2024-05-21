@@ -151,19 +151,19 @@ final class HttpEJBInvocationBuilder {
     private String buildPath(final String mountPoint, final String invocationId, boolean cancelIfRunning) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_CANCEL_PATH, sb);
-        appendPath(sb, invocationId);
-        appendPath(sb, "" + cancelIfRunning); // TODO: convert to String
+        appendPath(sb, invocationId, false);
+        appendPath(sb, "" + cancelIfRunning, false); // TODO: convert to String
         return sb.toString();
     }
 
     private String buildPath(final String mountPoint, final String beanId, final String view, final Method method) {
         StringBuilder sb = new StringBuilder();
         buildBeanPath(mountPoint, EJB_INVOKE_PATH, sb);
-        appendPath(sb, beanId);
-        appendPath(sb, view);
-        appendPath(sb, method.getName()); // TODO: convert to String
+        appendPath(sb, beanId, false);
+        appendPath(sb, view, false);
+        appendPath(sb, method.getName(), false); // TODO: convert to String
         for (final Class<?> param : method.getParameterTypes()) {
-            appendEncodedPath(sb, param.getName());
+            appendPath(sb, param.getName(), true); // TODO: convert to Strings
         }
         return sb.toString();
     }
@@ -172,26 +172,17 @@ final class HttpEJBInvocationBuilder {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
-        appendPath(sb, "ejb");
-        appendPath(sb, "v" + version); // TODO: convert to String
-        appendPath(sb, type);
-        appendEncodedPath(sb, appName);
-        appendEncodedPath(sb, moduleName);
-        appendEncodedPath(sb, distinctName);
-        sb.append("/");
-        sb.append(encodeUrlPart(beanName));
+        appendPath(sb, "ejb", false);
+        appendPath(sb, "v" + version, false); // TODO: convert to String
+        appendPath(sb, type, false);
+        appendPath(sb, appName, true);
+        appendPath(sb, moduleName, true);
+        appendPath(sb, distinctName, true);
+        appendPath(sb, beanName, true);
     }
 
-    private static void appendPath(final StringBuilder sb, final String subPath) {
-        sb.append("/").append(subPath == null || subPath.isEmpty() ? "-" : subPath);
-    }
-
-    private static void appendEncodedPath(final StringBuilder sb, final String subPath) {
-        sb.append("/").append(subPath == null || subPath.isEmpty() ? "-" : encodeUrlPart(subPath));
-    }
-
-    private static String encodeUrlPart(final String part) {
-        return URLEncoder.encode(part, StandardCharsets.UTF_8);
+    private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
+        sb.append("/").append(path == null || path.isEmpty() ? "-" : encode ? URLEncoder.encode(path, StandardCharsets.UTF_8) : path);
     }
 
 }
