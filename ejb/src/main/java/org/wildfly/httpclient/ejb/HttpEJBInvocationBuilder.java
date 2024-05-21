@@ -36,7 +36,6 @@ import java.lang.reflect.Method;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-
 /**
  * Builder for invocations against a specific EJB, such as invocation and session open
  *
@@ -146,6 +145,21 @@ class HttpEJBInvocationBuilder {
         return this;
     }
 
+    public HttpEJBInvocationBuilder setCancelIfRunning(boolean cancelIfRunning) {
+        this.cancelIfRunning = cancelIfRunning;
+        return this;
+    }
+
+    public boolean isCancelIfRunning() {
+        return cancelIfRunning;
+    }
+
+    public enum InvocationType {
+        METHOD_INVOCATION,
+        STATEFUL_CREATE,
+        CANCEL,
+    }
+
     /**
      * Constructs an EJB invocation path
      *
@@ -245,22 +259,6 @@ class HttpEJBInvocationBuilder {
             clientRequest.setPath(buildPath(mountPoint, invocationId, cancelIfRunning));
         }
         return clientRequest;
-    }
-
-    public HttpEJBInvocationBuilder setCancelIfRunning(boolean cancelIfRunning) {
-        this.cancelIfRunning = cancelIfRunning;
-        return this;
-    }
-
-    public boolean isCancelIfRunning() {
-        return cancelIfRunning;
-    }
-
-
-    public enum InvocationType {
-        METHOD_INVOCATION,
-        STATEFUL_CREATE,
-        CANCEL,
     }
 
 }
