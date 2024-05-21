@@ -152,9 +152,9 @@ class HttpEJBInvocationBuilder {
      * @param mountPoint   The mount point of the EJB context
      * @return The request path to invoke
      */
-    private String buildPath(final String mountPoint, String type) {
+    private String buildPath(final String mountPoint) {
         StringBuilder sb = new StringBuilder();
-        buildBeanPath(mountPoint, type, appName, moduleName, distinctName, beanName, sb);
+        buildBeanPath(mountPoint, EJB_OPEN_PATH, appName, moduleName, distinctName, beanName, sb);
         return sb.toString();
     }
 
@@ -164,9 +164,9 @@ class HttpEJBInvocationBuilder {
      * @param mountPoint   The mount point of the EJB context
      * @return The request path to invoke
      */
-    private String buildPath(final String mountPoint, String type, String invocationId, boolean cancelIfRunning) {
+    private String buildPath(final String mountPoint, String invocationId, boolean cancelIfRunning) {
         StringBuilder sb = new StringBuilder();
-        buildBeanPath(mountPoint, type, appName, moduleName, distinctName, beanName, sb);
+        buildBeanPath(mountPoint, EJB_CANCEL_PATH, appName, moduleName, distinctName, beanName, sb);
         sb.append("/");
         sb.append(invocationId);
         sb.append("/");
@@ -181,9 +181,9 @@ class HttpEJBInvocationBuilder {
      * @param beanId       The bean id
      * @return The request path to invoke
      */
-    private String buildPath(final String mountPoint, String type, final String beanId, final String view, final Method method) {
+    private String buildPath(final String mountPoint, final String beanId, final String view, final Method method) {
         StringBuilder sb = new StringBuilder();
-        buildBeanPath(mountPoint, type, appName, moduleName, distinctName, beanName, sb);
+        buildBeanPath(mountPoint, EJB_INVOKE_PATH, appName, moduleName, distinctName, beanName, sb);
         sb.append("/");
         if (beanId == null) {
             sb.append("-");
@@ -243,7 +243,7 @@ class HttpEJBInvocationBuilder {
         ClientRequest clientRequest = new ClientRequest();
         if (invocationType == InvocationType.METHOD_INVOCATION) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.setPath(buildPath(mountPoint, EJB_INVOKE_PATH, beanId, view, method));
+            clientRequest.setPath(buildPath(mountPoint, beanId, view, method));
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             if (invocationId != null) {
                 clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
@@ -251,12 +251,12 @@ class HttpEJBInvocationBuilder {
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.setPath(buildPath(mountPoint, EJB_OPEN_PATH));
+            clientRequest.setPath(buildPath(mountPoint));
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
         } else if(invocationType == InvocationType.CANCEL) {
             clientRequest.setMethod(Methods.DELETE);
-            clientRequest.setPath(buildPath(mountPoint, EJB_CANCEL_PATH, invocationId, cancelIfRunning));
+            clientRequest.setPath(buildPath(mountPoint, invocationId, cancelIfRunning));
         }
         return clientRequest;
     }
