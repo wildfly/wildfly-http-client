@@ -55,109 +55,91 @@ final class HttpEJBInvocationBuilder {
     private int version = Protocol.LATEST;
     private boolean cancelIfRunning;
 
-    String getAppName() {
-        return appName;
-    }
+    // setters
 
-    HttpEJBInvocationBuilder setAppName(String appName) {
+    HttpEJBInvocationBuilder setAppName(final String appName) {
         this.appName = appName;
         return this;
     }
 
-    String getModuleName() {
-        return moduleName;
-    }
-
-    HttpEJBInvocationBuilder setModuleName(String moduleName) {
+    HttpEJBInvocationBuilder setModuleName(final String moduleName) {
         this.moduleName = moduleName;
         return this;
     }
 
-    String getDistinctName() {
-        return distinctName;
-    }
-
-    HttpEJBInvocationBuilder setDistinctName(String distinctName) {
+    HttpEJBInvocationBuilder setDistinctName(final String distinctName) {
         this.distinctName = distinctName;
         return this;
     }
 
-    String getBeanName() {
-        return beanName;
-    }
-
-    HttpEJBInvocationBuilder setBeanName(String beanName) {
+    HttpEJBInvocationBuilder setBeanName(final String beanName) {
         this.beanName = beanName;
         return this;
     }
 
-    String getBeanId() {
-        return beanId;
-    }
-
-    HttpEJBInvocationBuilder setBeanId(String beanId) {
+    HttpEJBInvocationBuilder setBeanId(final String beanId) {
         this.beanId = beanId;
         return this;
     }
 
-    Method getMethod() {
-        return method;
-    }
-
-    HttpEJBInvocationBuilder setMethod(Method method) {
+    HttpEJBInvocationBuilder setMethod(final Method method) {
         this.method = method;
         return this;
     }
 
-    String getView() {
-        return view;
-    }
-
-    HttpEJBInvocationBuilder setView(String view) {
+    HttpEJBInvocationBuilder setView(final String view) {
         this.view = view;
         return this;
     }
 
-    InvocationType getInvocationType() {
-        return invocationType;
-    }
-
-    HttpEJBInvocationBuilder setInvocationType(InvocationType invocationType) {
+    HttpEJBInvocationBuilder setInvocationType(final InvocationType invocationType) {
         this.invocationType = invocationType;
         return this;
     }
 
-    String getInvocationId() {
-        return invocationId;
-    }
-
-    HttpEJBInvocationBuilder setInvocationId(String invocationId) {
+    HttpEJBInvocationBuilder setInvocationId(final String invocationId) {
         this.invocationId = invocationId;
         return this;
     }
 
-    int getVersion() {
-        return version;
-    }
-
-    HttpEJBInvocationBuilder setVersion(int version) {
+    HttpEJBInvocationBuilder setVersion(final int version) {
         this.version = version;
         return this;
     }
 
-    HttpEJBInvocationBuilder setCancelIfRunning(boolean cancelIfRunning) {
+    HttpEJBInvocationBuilder setCancelIfRunning(final boolean cancelIfRunning) {
         this.cancelIfRunning = cancelIfRunning;
         return this;
-    }
-
-    boolean isCancelIfRunning() {
-        return cancelIfRunning;
     }
 
     enum InvocationType {
         METHOD_INVOCATION,
         STATEFUL_CREATE,
         CANCEL,
+    }
+
+    // helper methods
+
+    ClientRequest createRequest(final String mountPoint) {
+        ClientRequest clientRequest = new ClientRequest();
+        if (invocationType == InvocationType.METHOD_INVOCATION) {
+            clientRequest.setMethod(Methods.POST);
+            clientRequest.setPath(buildPath(mountPoint, beanId, view, method));
+            clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+            if (invocationId != null) {
+                clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
+            }
+            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
+        } else if (invocationType == InvocationType.STATEFUL_CREATE) {
+            clientRequest.setMethod(Methods.POST);
+            clientRequest.setPath(buildPath(mountPoint));
+            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
+            clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
+        } else if(invocationType == InvocationType.CANCEL) {
+            clientRequest.setMethod(Methods.DELETE);
+            clientRequest.setPath(buildPath(mountPoint, invocationId, cancelIfRunning));
+        }
+        return clientRequest;
     }
 
     /**
@@ -237,28 +219,6 @@ final class HttpEJBInvocationBuilder {
 
     private static String encodeUrlPart(final String part) {
         return URLEncoder.encode(part, StandardCharsets.UTF_8);
-    }
-
-    ClientRequest createRequest(final String mountPoint) {
-        ClientRequest clientRequest = new ClientRequest();
-        if (invocationType == InvocationType.METHOD_INVOCATION) {
-            clientRequest.setMethod(Methods.POST);
-            clientRequest.setPath(buildPath(mountPoint, beanId, view, method));
-            clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
-            if (invocationId != null) {
-                clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
-            }
-            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
-        } else if (invocationType == InvocationType.STATEFUL_CREATE) {
-            clientRequest.setMethod(Methods.POST);
-            clientRequest.setPath(buildPath(mountPoint));
-            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
-            clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
-        } else if(invocationType == InvocationType.CANCEL) {
-            clientRequest.setMethod(Methods.DELETE);
-            clientRequest.setPath(buildPath(mountPoint, invocationId, cancelIfRunning));
-        }
-        return clientRequest;
     }
 
 }
