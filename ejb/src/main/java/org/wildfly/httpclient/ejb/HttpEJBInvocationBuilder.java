@@ -36,7 +36,6 @@ import static java.net.URLEncoder.encode;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.HeaderMap;
-import io.undertow.util.HttpString;
 import org.wildfly.httpclient.common.Protocol;
 
 import java.lang.reflect.Method;
@@ -127,7 +126,7 @@ final class HttpEJBInvocationBuilder {
 
     ClientRequest createRequest(final String prefix) {
         final ClientRequest clientRequest = new ClientRequest();
-        clientRequest.setMethod(getBeanRequestMethod());
+        setRequestMethod(clientRequest);
         clientRequest.setPath(getBeanRequestPath(prefix));
         setRequestHeaders(clientRequest);
         return clientRequest;
@@ -147,11 +146,11 @@ final class HttpEJBInvocationBuilder {
         }
     }
 
-    private HttpString getBeanRequestMethod() {
-        if (invocationType == InvocationType.METHOD_INVOCATION) return POST;
-        if (invocationType == InvocationType.STATEFUL_CREATE) return POST;
-        if (invocationType == InvocationType.CANCEL) return DELETE;
-        throw new IllegalStateException();
+    private void setRequestMethod(final ClientRequest request) {
+        if (invocationType == InvocationType.METHOD_INVOCATION) request.setMethod(POST);
+        else if (invocationType == InvocationType.STATEFUL_CREATE) request.setMethod(POST);
+        else if (invocationType == InvocationType.CANCEL) request.setMethod(DELETE);
+        else throw new IllegalStateException();
     }
 
     private String getBeanRequestPath(final String prefix) {
