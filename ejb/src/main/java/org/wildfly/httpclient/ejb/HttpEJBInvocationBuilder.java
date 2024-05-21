@@ -170,7 +170,7 @@ class HttpEJBInvocationBuilder {
         sb.append("/");
         sb.append(invocationId);
         sb.append("/");
-        sb.append(Boolean.toString(cancelIfRunning));
+        sb.append(cancelIfRunning);
         return sb.toString();
     }
 
