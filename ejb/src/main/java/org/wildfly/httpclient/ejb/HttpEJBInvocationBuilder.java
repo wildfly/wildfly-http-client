@@ -158,6 +158,8 @@ final class HttpEJBInvocationBuilder {
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
             headers.add(ACCEPT, EJB_EXCEPTION.toString());
             headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
+        } else if (invocationType != InvocationType.CANCEL) {
+            throw new IllegalStateException();
         }
     }
 
