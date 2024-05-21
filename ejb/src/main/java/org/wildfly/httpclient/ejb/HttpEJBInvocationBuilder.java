@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static io.undertow.util.Methods.POST;
+import static io.undertow.util.Methods.DELETE;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
@@ -29,7 +31,7 @@ import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
+import io.undertow.util.HttpString;
 import org.wildfly.httpclient.common.Protocol;
 
 import java.lang.reflect.Method;
@@ -122,22 +124,26 @@ final class HttpEJBInvocationBuilder {
 
     ClientRequest createRequest(final String prefix) {
         final ClientRequest clientRequest = new ClientRequest();
+        clientRequest.setMethod(getBeanRequestMethod());
         clientRequest.setPath(getBeanRequestPath(prefix));
         if (invocationType == InvocationType.METHOD_INVOCATION) {
-            clientRequest.setMethod(Methods.POST);
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             if (invocationId != null) {
                 clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
             }
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
-            clientRequest.setMethod(Methods.POST);
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
-        } else if(invocationType == InvocationType.CANCEL) {
-            clientRequest.setMethod(Methods.DELETE);
         }
         return clientRequest;
+    }
+
+    private HttpString getBeanRequestMethod() {
+        if (invocationType == InvocationType.METHOD_INVOCATION) return POST;
+        if (invocationType == InvocationType.STATEFUL_CREATE) return POST;
+        if (invocationType == InvocationType.CANCEL) return DELETE;
+        throw new IllegalStateException();
     }
 
     private String getBeanRequestPath(final String prefix) {
