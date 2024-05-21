@@ -120,11 +120,11 @@ final class HttpEJBInvocationBuilder {
 
     // helper methods
 
-    ClientRequest createRequest(final String mountPoint) {
-        ClientRequest clientRequest = new ClientRequest();
+    ClientRequest createRequest(final String prefix) {
+        final ClientRequest clientRequest = new ClientRequest();
+        clientRequest.setPath(getBeanRequestPath(prefix));
         if (invocationType == InvocationType.METHOD_INVOCATION) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.setPath(invokeBeanRequestPath(mountPoint));
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             if (invocationId != null) {
                 clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
@@ -132,14 +132,19 @@ final class HttpEJBInvocationBuilder {
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
         } else if (invocationType == InvocationType.STATEFUL_CREATE) {
             clientRequest.setMethod(Methods.POST);
-            clientRequest.setPath(openBeanRequestPath(mountPoint));
             clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
             clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
         } else if(invocationType == InvocationType.CANCEL) {
             clientRequest.setMethod(Methods.DELETE);
-            clientRequest.setPath(cancelBeanRequestPath(mountPoint));
         }
         return clientRequest;
+    }
+
+    private String getBeanRequestPath(final String prefix) {
+        if (invocationType == InvocationType.METHOD_INVOCATION) return invokeBeanRequestPath(prefix);
+        if (invocationType == InvocationType.STATEFUL_CREATE) return openBeanRequestPath(prefix);
+        if (invocationType == InvocationType.CANCEL) return cancelBeanRequestPath(prefix);
+        throw new IllegalStateException();
     }
 
     private String openBeanRequestPath(final String mountPoint) {
