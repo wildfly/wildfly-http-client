@@ -34,6 +34,7 @@ import static java.net.URLEncoder.encode;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
+import io.undertow.util.HeaderMap;
 import io.undertow.util.HttpString;
 import org.wildfly.httpclient.common.Protocol;
 
@@ -127,17 +128,22 @@ final class HttpEJBInvocationBuilder {
         final ClientRequest clientRequest = new ClientRequest();
         clientRequest.setMethod(getBeanRequestMethod());
         clientRequest.setPath(getBeanRequestPath(prefix));
-        if (invocationType == InvocationType.METHOD_INVOCATION) {
-            clientRequest.getRequestHeaders().add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
-            if (invocationId != null) {
-                clientRequest.getRequestHeaders().put(INVOCATION_ID, invocationId);
-            }
-            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, INVOCATION.toString());
-        } else if (invocationType == InvocationType.STATEFUL_CREATE) {
-            clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
-            clientRequest.getRequestHeaders().add(Headers.ACCEPT, EJB_EXCEPTION.toString());
-        }
+        setRequestHeaders(clientRequest);
         return clientRequest;
+    }
+
+    private void setRequestHeaders(final ClientRequest request) {
+        final HeaderMap headers = request.getRequestHeaders();
+        if (invocationType == InvocationType.METHOD_INVOCATION) {
+            headers.add(Headers.ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+            if (invocationId != null) {
+                headers.put(INVOCATION_ID, invocationId);
+            }
+            headers.put(Headers.CONTENT_TYPE, INVOCATION.toString());
+        } else if (invocationType == InvocationType.STATEFUL_CREATE) {
+            headers.put(Headers.CONTENT_TYPE, SESSION_OPEN.toString());
+            headers.add(Headers.ACCEPT, EJB_EXCEPTION.toString());
+        }
     }
 
     private HttpString getBeanRequestMethod() {
