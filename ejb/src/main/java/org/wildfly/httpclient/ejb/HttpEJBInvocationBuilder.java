@@ -41,7 +41,7 @@ import java.nio.charset.StandardCharsets;
  *
  * @author Stuart Douglas
  */
-class HttpEJBInvocationBuilder {
+final class HttpEJBInvocationBuilder {
 
     private String appName;
     private String moduleName;
@@ -55,106 +55,106 @@ class HttpEJBInvocationBuilder {
     private int version = Protocol.LATEST;
     private boolean cancelIfRunning;
 
-    public String getAppName() {
+    String getAppName() {
         return appName;
     }
 
-    public HttpEJBInvocationBuilder setAppName(String appName) {
+    HttpEJBInvocationBuilder setAppName(String appName) {
         this.appName = appName;
         return this;
     }
 
-    public String getModuleName() {
+    String getModuleName() {
         return moduleName;
     }
 
-    public HttpEJBInvocationBuilder setModuleName(String moduleName) {
+    HttpEJBInvocationBuilder setModuleName(String moduleName) {
         this.moduleName = moduleName;
         return this;
     }
 
-    public String getDistinctName() {
+    String getDistinctName() {
         return distinctName;
     }
 
-    public HttpEJBInvocationBuilder setDistinctName(String distinctName) {
+    HttpEJBInvocationBuilder setDistinctName(String distinctName) {
         this.distinctName = distinctName;
         return this;
     }
 
-    public String getBeanName() {
+    String getBeanName() {
         return beanName;
     }
 
-    public HttpEJBInvocationBuilder setBeanName(String beanName) {
+    HttpEJBInvocationBuilder setBeanName(String beanName) {
         this.beanName = beanName;
         return this;
     }
 
-    public String getBeanId() {
+    String getBeanId() {
         return beanId;
     }
 
-    public HttpEJBInvocationBuilder setBeanId(String beanId) {
+    HttpEJBInvocationBuilder setBeanId(String beanId) {
         this.beanId = beanId;
         return this;
     }
 
-    public Method getMethod() {
+    Method getMethod() {
         return method;
     }
 
-    public HttpEJBInvocationBuilder setMethod(Method method) {
+    HttpEJBInvocationBuilder setMethod(Method method) {
         this.method = method;
         return this;
     }
 
-    public String getView() {
+    String getView() {
         return view;
     }
 
-    public HttpEJBInvocationBuilder setView(String view) {
+    HttpEJBInvocationBuilder setView(String view) {
         this.view = view;
         return this;
     }
 
-    public InvocationType getInvocationType() {
+    InvocationType getInvocationType() {
         return invocationType;
     }
 
-    public HttpEJBInvocationBuilder setInvocationType(InvocationType invocationType) {
+    HttpEJBInvocationBuilder setInvocationType(InvocationType invocationType) {
         this.invocationType = invocationType;
         return this;
     }
 
-    public String getInvocationId() {
+    String getInvocationId() {
         return invocationId;
     }
 
-    public HttpEJBInvocationBuilder setInvocationId(String invocationId) {
+    HttpEJBInvocationBuilder setInvocationId(String invocationId) {
         this.invocationId = invocationId;
         return this;
     }
 
-    public int getVersion() {
+    int getVersion() {
         return version;
     }
 
-    public HttpEJBInvocationBuilder setVersion(int version) {
+    HttpEJBInvocationBuilder setVersion(int version) {
         this.version = version;
         return this;
     }
 
-    public HttpEJBInvocationBuilder setCancelIfRunning(boolean cancelIfRunning) {
+    HttpEJBInvocationBuilder setCancelIfRunning(boolean cancelIfRunning) {
         this.cancelIfRunning = cancelIfRunning;
         return this;
     }
 
-    public boolean isCancelIfRunning() {
+    boolean isCancelIfRunning() {
         return cancelIfRunning;
     }
 
-    public enum InvocationType {
+    enum InvocationType {
         METHOD_INVOCATION,
         STATEFUL_CREATE,
         CANCEL,
@@ -239,7 +239,7 @@ class HttpEJBInvocationBuilder {
         return URLEncoder.encode(part, StandardCharsets.UTF_8);
     }
 
-    public ClientRequest createRequest(final String mountPoint) {
+    ClientRequest createRequest(final String mountPoint) {
         ClientRequest clientRequest = new ClientRequest();
         if (invocationType == InvocationType.METHOD_INVOCATION) {
             clientRequest.setMethod(Methods.POST);
