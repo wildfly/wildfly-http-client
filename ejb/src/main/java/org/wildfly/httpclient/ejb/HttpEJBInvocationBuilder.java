@@ -132,20 +132,6 @@ final class HttpEJBInvocationBuilder {
         return clientRequest;
     }
 
-    private void setRequestHeaders(final ClientRequest request) {
-        final HeaderMap headers = request.getRequestHeaders();
-        if (invocationType == InvocationType.METHOD_INVOCATION) {
-            headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
-            headers.put(CONTENT_TYPE, INVOCATION.toString());
-            if (invocationId != null) {
-                headers.put(INVOCATION_ID, invocationId);
-            }
-        } else if (invocationType == InvocationType.STATEFUL_CREATE) {
-            headers.add(ACCEPT, EJB_EXCEPTION.toString());
-            headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
-        }
-    }
-
     private void setRequestMethod(final ClientRequest request) {
         if (invocationType == InvocationType.METHOD_INVOCATION) request.setMethod(POST);
         else if (invocationType == InvocationType.STATEFUL_CREATE) request.setMethod(POST);
@@ -158,6 +144,20 @@ final class HttpEJBInvocationBuilder {
         if (invocationType == InvocationType.STATEFUL_CREATE) return openBeanRequestPath(prefix);
         if (invocationType == InvocationType.CANCEL) return cancelBeanRequestPath(prefix);
         throw new IllegalStateException();
+    }
+
+    private void setRequestHeaders(final ClientRequest request) {
+        final HeaderMap headers = request.getRequestHeaders();
+        if (invocationType == InvocationType.METHOD_INVOCATION) {
+            headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+            headers.put(CONTENT_TYPE, INVOCATION.toString());
+            if (invocationId != null) {
+                headers.put(INVOCATION_ID, invocationId);
+            }
+        } else if (invocationType == InvocationType.STATEFUL_CREATE) {
+            headers.add(ACCEPT, EJB_EXCEPTION.toString());
+            headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
+        }
     }
 
     private String openBeanRequestPath(final String mountPoint) {
