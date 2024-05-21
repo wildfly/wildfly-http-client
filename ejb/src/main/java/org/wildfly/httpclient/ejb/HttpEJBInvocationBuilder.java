@@ -127,7 +127,7 @@ final class HttpEJBInvocationBuilder {
     ClientRequest createRequest(final String prefix) {
         final ClientRequest clientRequest = new ClientRequest();
         setRequestMethod(clientRequest);
-        clientRequest.setPath(getBeanRequestPath(prefix));
+        setRequestPath(clientRequest, prefix);
         setRequestHeaders(clientRequest);
         return clientRequest;
     }
@@ -139,11 +139,11 @@ final class HttpEJBInvocationBuilder {
         else throw new IllegalStateException();
     }
 
-    private String getBeanRequestPath(final String prefix) {
-        if (invocationType == InvocationType.METHOD_INVOCATION) return invokeBeanRequestPath(prefix);
-        if (invocationType == InvocationType.STATEFUL_CREATE) return openBeanRequestPath(prefix);
-        if (invocationType == InvocationType.CANCEL) return cancelBeanRequestPath(prefix);
-        throw new IllegalStateException();
+    private void setRequestPath(final ClientRequest request, final String prefix) {
+        if (invocationType == InvocationType.METHOD_INVOCATION) request.setPath(invokeBeanRequestPath(prefix));
+        else if (invocationType == InvocationType.STATEFUL_CREATE) request.setPath(openBeanRequestPath(prefix));
+        else if (invocationType == InvocationType.CANCEL) request.setPath(cancelBeanRequestPath(prefix));
+        else throw new IllegalStateException();
     }
 
     private void setRequestHeaders(final ClientRequest request) {
