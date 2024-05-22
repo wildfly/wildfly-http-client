@@ -198,6 +198,9 @@ public class HttpRemoteContext implements Context {
     // helper methods
 
     private CompositeName getNameOf(final Object name) throws InvalidNameException {
+        if (name == null) {
+            throw new InvalidNameException();
+        }
         return new CompositeName(rootName + "/" + name);
     }
 
