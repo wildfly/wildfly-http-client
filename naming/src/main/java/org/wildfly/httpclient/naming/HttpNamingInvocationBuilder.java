@@ -18,7 +18,18 @@
 
 package org.wildfly.httpclient.naming;
 
+import static io.undertow.util.Headers.ACCEPT;
+import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.Methods.DELETE;
+import static io.undertow.util.Methods.GET;
+import static io.undertow.util.Methods.PATCH;
+import static io.undertow.util.Methods.POST;
+import static io.undertow.util.Methods.PUT;
+import static org.wildfly.httpclient.naming.NamingConstants.EXCEPTION;
+import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+
 import io.undertow.client.ClientRequest;
+import io.undertow.util.HeaderMap;
 import org.wildfly.httpclient.common.Protocol;
 
 import javax.naming.CompositeName;
@@ -85,7 +96,17 @@ final class HttpNamingInvocationBuilder {
     }
 
     private void setRequestMethod(final ClientRequest request) {
-        throw new UnsupportedOperationException(); // TODO: implement
+        if (invocationType == InvocationType.BIND) request.setMethod(PUT);
+        else if (invocationType == InvocationType.CREATE_SUBCONTEXT) request.setMethod(PUT);
+        else if (invocationType == InvocationType.DESTROY_SUBCONTEXT) request.setMethod(DELETE);
+        else if (invocationType == InvocationType.LIST) request.setMethod(GET);
+        else if (invocationType == InvocationType.LIST_BINDINGS) request.setMethod(GET);
+        else if (invocationType == InvocationType.LOOKUP) request.setMethod(POST);
+        else if (invocationType == InvocationType.LOOKUP_LINK) request.setMethod(POST);
+        else if (invocationType == InvocationType.REBIND_PATH) request.setMethod(PATCH);
+        else if (invocationType == InvocationType.RENAME_PATH) request.setMethod(PATCH);
+        else if (invocationType == InvocationType.UNBIND_PATH) request.setMethod(DELETE);
+        else throw new IllegalStateException();
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
@@ -93,7 +114,11 @@ final class HttpNamingInvocationBuilder {
     }
 
     private void setRequestHeaders(final ClientRequest request) {
-        throw new UnsupportedOperationException(); // TODO: implement
+        final HeaderMap headers = request.getRequestHeaders();
+        headers.put(ACCEPT, VALUE + "," + EXCEPTION);
+        if (object != null) {
+            headers.put(CONTENT_TYPE, VALUE.toString());
+        }
     }
 
 }
