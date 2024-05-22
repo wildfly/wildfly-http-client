@@ -51,7 +51,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public Object lookup(Name name) throws NamingException {
-        return rootContext.lookupNative(new CompositeName(this.rootName + "/" + name.toString()));
+        return rootContext.lookupNative(new CompositeName(this.rootName + "/" + name));
     }
 
     @Override
@@ -61,7 +61,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public void bind(Name name, Object o) throws NamingException {
-        rootContext.bindNative(new CompositeName(this.rootName + "/" + name.toString()), o);
+        rootContext.bindNative(new CompositeName(this.rootName + "/" + name), o);
     }
 
     @Override
@@ -71,7 +71,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public void rebind(Name name, Object o) throws NamingException {
-        rootContext.rebindNative(new CompositeName(this.rootName + "/" + name.toString()), o);
+        rootContext.rebindNative(new CompositeName(this.rootName + "/" + name), o);
     }
 
     @Override
@@ -81,7 +81,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public void unbind(Name name) throws NamingException {
-        rootContext.unbindNative(new CompositeName(this.rootName + "/" + name.toString()));
+        rootContext.unbindNative(new CompositeName(this.rootName + "/" + name));
     }
 
     @Override
@@ -91,7 +91,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public void rename(Name name, Name name1) throws NamingException {
-        rootContext.renameNative(new CompositeName(this.rootName + "/" + name.toString()), new CompositeName(this.rootName + "/" + name1.toString()));
+        rootContext.renameNative(new CompositeName(this.rootName + "/" + name), new CompositeName(this.rootName + "/" + name1));
     }
 
     @Override
@@ -101,7 +101,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public NamingEnumeration<NameClassPair> list(Name name) throws NamingException {
-        return rootContext.listNative(new CompositeName(this.rootName + "/" + name.toString()));
+        return rootContext.listNative(new CompositeName(this.rootName + "/" + name));
     }
 
     @Override
@@ -111,7 +111,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public NamingEnumeration<Binding> listBindings(Name name) throws NamingException {
-        return rootContext.listBindingsNative(new CompositeName(this.rootName + "/" + name.toString()));
+        return rootContext.listBindingsNative(new CompositeName(this.rootName + "/" + name));
     }
 
     @Override
@@ -121,7 +121,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public void destroySubcontext(Name name) throws NamingException {
-        rootContext.destroySubcontextNative(new CompositeName(this.rootName + "/" + name.toString()));
+        rootContext.destroySubcontextNative(new CompositeName(this.rootName + "/" + name));
     }
 
     @Override
@@ -131,7 +131,7 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public Context createSubcontext(Name name) throws NamingException {
-        return rootContext.createSubcontextNative(new CompositeName(this.rootName + "/" + name.toString()));
+        return rootContext.createSubcontextNative(new CompositeName(this.rootName + "/" + name));
     }
 
     @Override
@@ -141,12 +141,12 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public Object lookupLink(Name name) throws NamingException {
-        return rootContext.lookupLinkNative(new CompositeName(this.rootName + "/" + name.toString()));
+        return rootContext.lookupLinkNative(new CompositeName(this.rootName + "/" + name));
     }
 
     @Override
     public Object lookupLink(String s) throws NamingException {
-        return rootContext.lookupLinkNative(new CompositeName(this.rootName + "/" + s.toString()));
+        return rootContext.lookupLinkNative(new CompositeName(this.rootName + "/" + s));
     }
 
     @Override
