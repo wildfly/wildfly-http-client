@@ -371,10 +371,6 @@ public class HttpRootContext extends AbstractContext {
             StringBuilder sb = new StringBuilder();
             String uriPath = uri.getPath();
             sb.append(uriPath);
-
-            if (!uriPath.endsWith("/")) {
-                sb.append("/");
-            }
             sb.append(NAMING_CONTEXT);
             sb.append(VERSION_PATH);
             sb.append(targetContext.getProtocolVersion());
