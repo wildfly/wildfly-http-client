@@ -51,102 +51,102 @@ public class HttpRemoteContext implements Context {
 
     @Override
     public Object lookup(Name name) throws NamingException {
-        return rootContext.lookupNative(new CompositeName(this.rootName + "/" + name));
+        return rootContext.lookupNative(new CompositeName(rootName + "/" + name));
     }
 
     @Override
     public Object lookup(String s) throws NamingException {
-        return rootContext.lookupNative(new CompositeName(this.rootName + "/" + s));
+        return rootContext.lookupNative(new CompositeName(rootName + "/" + s));
     }
 
     @Override
     public void bind(Name name, Object o) throws NamingException {
-        rootContext.bindNative(new CompositeName(this.rootName + "/" + name), o);
+        rootContext.bindNative(new CompositeName(rootName + "/" + name), o);
     }
 
     @Override
     public void bind(String s, Object o) throws NamingException {
-        rootContext.bindNative(new CompositeName(this.rootName + "/" + s), o);
+        rootContext.bindNative(new CompositeName(rootName + "/" + s), o);
     }
 
     @Override
     public void rebind(Name name, Object o) throws NamingException {
-        rootContext.rebindNative(new CompositeName(this.rootName + "/" + name), o);
+        rootContext.rebindNative(new CompositeName(rootName + "/" + name), o);
     }
 
     @Override
     public void rebind(String s, Object o) throws NamingException {
-        rootContext.rebindNative(new CompositeName(this.rootName + "/" + s), o);
+        rootContext.rebindNative(new CompositeName(rootName + "/" + s), o);
     }
 
     @Override
     public void unbind(Name name) throws NamingException {
-        rootContext.unbindNative(new CompositeName(this.rootName + "/" + name));
+        rootContext.unbindNative(new CompositeName(rootName + "/" + name));
     }
 
     @Override
     public void unbind(String s) throws NamingException {
-        rootContext.unbindNative(new CompositeName(this.rootName + "/" + s));
+        rootContext.unbindNative(new CompositeName(rootName + "/" + s));
     }
 
     @Override
     public void rename(Name name, Name name1) throws NamingException {
-        rootContext.renameNative(new CompositeName(this.rootName + "/" + name), new CompositeName(this.rootName + "/" + name1));
+        rootContext.renameNative(new CompositeName(rootName + "/" + name), new CompositeName(this.rootName + "/" + name1));
     }
 
     @Override
     public void rename(String s, String s1) throws NamingException {
-        rootContext.renameNative(new CompositeName(this.rootName + "/" + s), new CompositeName(this.rootName + "/" + s));
+        rootContext.renameNative(new CompositeName(rootName + "/" + s), new CompositeName(this.rootName + "/" + s));
     }
 
     @Override
     public NamingEnumeration<NameClassPair> list(Name name) throws NamingException {
-        return rootContext.listNative(new CompositeName(this.rootName + "/" + name));
+        return rootContext.listNative(new CompositeName(rootName + "/" + name));
     }
 
     @Override
     public NamingEnumeration<NameClassPair> list(String s) throws NamingException {
-        return rootContext.listNative(new CompositeName(this.rootName + "/" + s));
+        return rootContext.listNative(new CompositeName(rootName + "/" + s));
     }
 
     @Override
     public NamingEnumeration<Binding> listBindings(Name name) throws NamingException {
-        return rootContext.listBindingsNative(new CompositeName(this.rootName + "/" + name));
+        return rootContext.listBindingsNative(new CompositeName(rootName + "/" + name));
     }
 
     @Override
     public NamingEnumeration<Binding> listBindings(String s) throws NamingException {
-        return rootContext.listBindingsNative(new CompositeName(this.rootName + "/" + s));
+        return rootContext.listBindingsNative(new CompositeName(rootName + "/" + s));
     }
 
     @Override
     public void destroySubcontext(Name name) throws NamingException {
-        rootContext.destroySubcontextNative(new CompositeName(this.rootName + "/" + name));
+        rootContext.destroySubcontextNative(new CompositeName(rootName + "/" + name));
     }
 
     @Override
     public void destroySubcontext(String s) throws NamingException {
-        rootContext.destroySubcontextNative(new CompositeName(this.rootName + "/" + s));
+        rootContext.destroySubcontextNative(new CompositeName(rootName + "/" + s));
     }
 
     @Override
     public Context createSubcontext(Name name) throws NamingException {
-        return rootContext.createSubcontextNative(new CompositeName(this.rootName + "/" + name));
+        return rootContext.createSubcontextNative(new CompositeName(rootName + "/" + name));
     }
 
     @Override
     public Context createSubcontext(String s) throws NamingException {
-        return rootContext.createSubcontextNative(new CompositeName(this.rootName + "/" + s));
+        return rootContext.createSubcontextNative(new CompositeName(rootName + "/" + s));
     }
 
     @Override
     public Object lookupLink(Name name) throws NamingException {
-        return rootContext.lookupLinkNative(new CompositeName(this.rootName + "/" + name));
+        return rootContext.lookupLinkNative(new CompositeName(rootName + "/" + name));
     }
 
     @Override
     public Object lookupLink(String s) throws NamingException {
-        return rootContext.lookupLinkNative(new CompositeName(this.rootName + "/" + s));
+        return rootContext.lookupLinkNative(new CompositeName(rootName + "/" + s));
     }
 
     @Override
