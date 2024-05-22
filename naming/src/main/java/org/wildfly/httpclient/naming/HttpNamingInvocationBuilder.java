@@ -46,7 +46,7 @@ import io.undertow.client.ClientRequest;
 import io.undertow.util.HeaderMap;
 import org.wildfly.httpclient.common.Protocol;
 
-import javax.naming.CompositeName;
+import javax.naming.Name;
 
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
@@ -54,8 +54,8 @@ import javax.naming.CompositeName;
 final class HttpNamingInvocationBuilder {
 
     private InvocationType invocationType;
-    private CompositeName name;
-    private CompositeName newName;
+    private Name name;
+    private Name newName;
     private Object object;
     private int version = Protocol.LATEST;
 
@@ -66,12 +66,12 @@ final class HttpNamingInvocationBuilder {
         return this;
     }
 
-    HttpNamingInvocationBuilder setName(final CompositeName name) {
+    HttpNamingInvocationBuilder setName(final Name name) {
         this.name = name;
         return this;
     }
 
-    HttpNamingInvocationBuilder setNewName(final CompositeName newName) {
+    HttpNamingInvocationBuilder setNewName(final Name newName) {
         this.newName = newName;
         return this;
     }
