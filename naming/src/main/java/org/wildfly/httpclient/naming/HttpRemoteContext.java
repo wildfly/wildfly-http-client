@@ -33,8 +33,9 @@ import org.wildfly.naming.client.util.FastHashtable;
 
 /**
  * @author Stuart Douglas
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-public class HttpRemoteContext implements Context {
+final class HttpRemoteContext implements Context {
 
     private final HttpRootContext rootContext;
     private final String rootName;
