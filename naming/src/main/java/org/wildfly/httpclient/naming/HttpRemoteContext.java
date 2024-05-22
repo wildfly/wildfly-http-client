@@ -56,28 +56,28 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public Object lookup(final String s) throws NamingException {
-        return rootContext.lookupNative(getNameOf(s));
+    public Object lookup(final String name) throws NamingException {
+        return rootContext.lookupNative(getNameOf(name));
     }
 
     @Override
-    public void bind(final Name name, final Object o) throws NamingException {
-        rootContext.bindNative(getNameOf(name), o);
+    public void bind(final Name name, final Object obj) throws NamingException {
+        rootContext.bindNative(getNameOf(name), obj);
     }
 
     @Override
-    public void bind(final String s, final Object o) throws NamingException {
-        rootContext.bindNative(getNameOf(s), o);
+    public void bind(final String name, final Object obj) throws NamingException {
+        rootContext.bindNative(getNameOf(name), obj);
     }
 
     @Override
-    public void rebind(final Name name, final Object o) throws NamingException {
-        rootContext.rebindNative(getNameOf(name), o);
+    public void rebind(final Name name, final Object obj) throws NamingException {
+        rootContext.rebindNative(getNameOf(name), obj);
     }
 
     @Override
-    public void rebind(final String s, final Object o) throws NamingException {
-        rootContext.rebindNative(getNameOf(s), o);
+    public void rebind(final String name, final Object obj) throws NamingException {
+        rootContext.rebindNative(getNameOf(name), obj);
     }
 
     @Override
@@ -86,18 +86,18 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public void unbind(final String s) throws NamingException {
-        rootContext.unbindNative(getNameOf(s));
+    public void unbind(final String name) throws NamingException {
+        rootContext.unbindNative(getNameOf(name));
     }
 
     @Override
-    public void rename(final Name name, final Name name1) throws NamingException {
-        rootContext.renameNative(getNameOf(name), getNameOf(name1));
+    public void rename(final Name oldName, final Name newName) throws NamingException {
+        rootContext.renameNative(getNameOf(oldName), getNameOf(newName));
     }
 
     @Override
-    public void rename(final String s, final String s1) throws NamingException {
-        rootContext.renameNative(getNameOf(s), getNameOf(s));
+    public void rename(final String oldName, final String newName) throws NamingException {
+        rootContext.renameNative(getNameOf(oldName), getNameOf(newName));
     }
 
     @Override
@@ -106,8 +106,8 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public NamingEnumeration<NameClassPair> list(final String s) throws NamingException {
-        return rootContext.listNative(getNameOf(s));
+    public NamingEnumeration<NameClassPair> list(final String name) throws NamingException {
+        return rootContext.listNative(getNameOf(name));
     }
 
     @Override
@@ -116,8 +116,8 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public NamingEnumeration<Binding> listBindings(final String s) throws NamingException {
-        return rootContext.listBindingsNative(getNameOf(s));
+    public NamingEnumeration<Binding> listBindings(final String name) throws NamingException {
+        return rootContext.listBindingsNative(getNameOf(name));
     }
 
     @Override
@@ -126,8 +126,8 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public void destroySubcontext(final String s) throws NamingException {
-        rootContext.destroySubcontextNative(getNameOf(s));
+    public void destroySubcontext(final String name) throws NamingException {
+        rootContext.destroySubcontextNative(getNameOf(name));
     }
 
     @Override
@@ -136,8 +136,8 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public Context createSubcontext(final String s) throws NamingException {
-        return rootContext.createSubcontextNative(getNameOf(s));
+    public Context createSubcontext(final String name) throws NamingException {
+        return rootContext.createSubcontextNative(getNameOf(name));
     }
 
     @Override
@@ -146,8 +146,8 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public Object lookupLink(final String s) throws NamingException {
-        return rootContext.lookupLinkNative(getNameOf(s));
+    public Object lookupLink(final String name) throws NamingException {
+        return rootContext.lookupLinkNative(getNameOf(name));
     }
 
     @Override
@@ -156,28 +156,28 @@ public class HttpRemoteContext implements Context {
     }
 
     @Override
-    public NameParser getNameParser(final String s) throws NamingException {
-        return rootContext.getNameParser(s);
+    public NameParser getNameParser(final String name) throws NamingException {
+        return rootContext.getNameParser(name);
     }
 
     @Override
-    public Name composeName(final Name name, final Name name1) throws NamingException {
-        return rootContext.composeName(name, name1);
+    public Name composeName(final Name name, final Name prefix) throws NamingException {
+        return rootContext.composeName(name, prefix);
     }
 
     @Override
-    public String composeName(final String s, final String s1) throws NamingException {
-        return rootContext.composeName(s, s1);
+    public String composeName(final String name, final String prefix) throws NamingException {
+        return rootContext.composeName(name, prefix);
     }
 
     @Override
-    public Object addToEnvironment(final String s, final Object o) throws NamingException {
-        return environment.put(s, o);
+    public Object addToEnvironment(final String propName, final Object propVal) throws NamingException {
+        return environment.put(propName, propVal);
     }
 
     @Override
-    public Object removeFromEnvironment(final String s) throws NamingException {
-        return environment.remove(s);
+    public Object removeFromEnvironment(final String propName) throws NamingException {
+        return environment.remove(propName);
     }
 
     @Override
