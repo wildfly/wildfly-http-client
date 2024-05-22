@@ -366,7 +366,8 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setBeanName(locator.getBeanName());
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
         builder.setVersion(targetContext.getProtocolVersion());
-        targetContext.sendRequest(builder.createRequest(targetContext.getUri().getPath()), sslContext, authenticationConfiguration, null, (stream, response, closeable) -> {
+        ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration, null, (stream, response, closeable) -> {
             try {
                 result.complete(true);
                 IoUtils.safeClose(stream);
