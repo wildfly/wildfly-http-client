@@ -155,31 +155,31 @@ final class HttpEJBInvocationBuilder {
         }
     }
 
-    private String openBeanRequestPath(final String mountPoint) {
+    private String openBeanRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, mountPoint, EJB_OPEN_PATH);
+        appendOperationPath(sb, prefix, EJB_OPEN_PATH);
         appendBeanPath(sb);
         return sb.toString();
     }
 
-    private String discoverBeanRequestPath(final String mountPoint) {
+    private String discoverBeanRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, mountPoint, EJB_DISCOVER_PATH);
+        appendOperationPath(sb, prefix, EJB_DISCOVER_PATH);
         return sb.toString();
     }
 
-    private String cancelBeanRequestPath(final String mountPoint) {
+    private String cancelBeanRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, mountPoint, EJB_CANCEL_PATH);
+        appendOperationPath(sb, prefix, EJB_CANCEL_PATH);
         appendBeanPath(sb);
         appendPath(sb, invocationId, false);
         appendPath(sb, "" + cancelIfRunning, false);
         return sb.toString();
     }
 
-    private String invokeBeanRequestPath(final String mountPoint) {
+    private String invokeBeanRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, mountPoint, EJB_INVOKE_PATH);
+        appendOperationPath(sb, prefix, EJB_INVOKE_PATH);
         appendBeanPath(sb);
         appendPath(sb, beanId, false);
         appendPath(sb, view, false);
@@ -197,9 +197,9 @@ final class HttpEJBInvocationBuilder {
         appendPath(sb, locator.getBeanName(), true);
     }
 
-    private void appendOperationPath(final StringBuilder sb, final String mountPoint, final String operationType) {
-        if (mountPoint != null) {
-            sb.append(mountPoint);
+    private void appendOperationPath(final StringBuilder sb, final String prefix, final String operationType) {
+        if (prefix != null) {
+            sb.append(prefix);
         }
         appendPath(sb, "ejb", false);
         appendPath(sb, "v" + version, false);
