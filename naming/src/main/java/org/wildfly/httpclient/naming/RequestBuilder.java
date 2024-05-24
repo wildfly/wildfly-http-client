@@ -20,31 +20,15 @@ package org.wildfly.httpclient.naming;
 
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
-import static io.undertow.util.Methods.DELETE;
-import static io.undertow.util.Methods.GET;
-import static io.undertow.util.Methods.PATCH;
-import static io.undertow.util.Methods.POST;
-import static io.undertow.util.Methods.PUT;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.EXCEPTION;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.NAMING_CONTEXT;
-import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.HeaderMap;
-import io.undertow.util.HttpString;
 import org.wildfly.httpclient.common.Protocol;
 
 import javax.naming.Name;
@@ -54,7 +38,7 @@ import javax.naming.Name;
  */
 final class RequestBuilder {
 
-    private InvocationType invocationType;
+    private RequestType requestType;
     private Name name;
     private Name newName;
     private Object object;
@@ -62,8 +46,8 @@ final class RequestBuilder {
 
     // setters
 
-    RequestBuilder setInvocationType(final InvocationType invocationType) {
-        this.invocationType = invocationType;
+    RequestBuilder setRequestType(final RequestType requestType) {
+        this.requestType = requestType;
         return this;
     }
 
@@ -87,35 +71,6 @@ final class RequestBuilder {
         return this;
     }
 
-    enum InvocationType {
-        BIND(BIND_PATH, PUT),
-        CREATE_SUBCONTEXT(CREATE_SUBCONTEXT_PATH, PUT),
-        DESTROY_SUBCONTEXT(DESTROY_SUBCONTEXT_PATH, DELETE),
-        LIST(LIST_PATH, GET),
-        LIST_BINDINGS(LIST_BINDINGS_PATH, GET),
-        LOOKUP(LOOKUP_PATH, POST),
-        LOOKUP_LINK(LOOKUP_LINK_PATH, POST),
-        REBIND(REBIND_PATH, PATCH),
-        RENAME(RENAME_PATH, PATCH),
-        UNBIND(UNBIND_PATH, DELETE);
-
-        private final String path;
-        private final HttpString method;
-
-        InvocationType(final String path, final HttpString method) {
-            this.path = path;
-            this.method = method;
-        }
-
-        String getPath() {
-            return path;
-        }
-
-        HttpString getMethod() {
-            return method;
-        }
-    }
-
     // helper methods
 
     ClientRequest createRequest(final String prefix) {
@@ -127,7 +82,7 @@ final class RequestBuilder {
     }
 
     private void setRequestMethod(final ClientRequest request) {
-        request.setMethod(invocationType.getMethod());
+        request.setMethod(requestType.getMethod());
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
@@ -137,7 +92,7 @@ final class RequestBuilder {
         }
         appendPath(sb, NAMING_CONTEXT, false);
         appendPath(sb, VERSION_PATH + version, false);
-        appendPath(sb, invocationType.getPath(), false);
+        appendPath(sb, requestType.getPath(), false);
         appendPath(sb, name.toString(), true);
         if (newName != null) {
             sb.append("?new=");

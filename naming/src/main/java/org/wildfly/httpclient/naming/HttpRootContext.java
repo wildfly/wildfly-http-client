@@ -30,7 +30,6 @@ import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.naming.client.AbstractContext;
 import org.wildfly.naming.client.CloseableNamingEnumeration;
 import org.wildfly.naming.client.ExhaustedDestinationsException;
-import org.wildfly.httpclient.naming.RequestBuilder.InvocationType;
 import org.wildfly.naming.client.NamingOperation;
 import org.wildfly.naming.client.ProviderEnvironment;
 import org.wildfly.naming.client.RetryContext;
@@ -61,20 +60,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.BIND;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.CREATE_SUBCONTEXT;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.DESTROY_SUBCONTEXT;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.LIST;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.LIST_BINDINGS;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.LOOKUP;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.LOOKUP_LINK;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.REBIND;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.RENAME;
-import static org.wildfly.httpclient.naming.RequestBuilder.InvocationType.UNBIND;
 import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_PORT;
 import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.naming.NamingConstants.HTTP_PORT;
 import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+import static org.wildfly.httpclient.naming.RequestType.BIND;
+import static org.wildfly.httpclient.naming.RequestType.CREATE_SUBCONTEXT;
+import static org.wildfly.httpclient.naming.RequestType.DESTROY_SUBCONTEXT;
+import static org.wildfly.httpclient.naming.RequestType.LIST;
+import static org.wildfly.httpclient.naming.RequestType.LIST_BINDINGS;
+import static org.wildfly.httpclient.naming.RequestType.LOOKUP;
+import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
+import static org.wildfly.httpclient.naming.RequestType.REBIND;
+import static org.wildfly.httpclient.naming.RequestType.RENAME;
+import static org.wildfly.httpclient.naming.RequestType.UNBIND;
 
 /**
  * Root naming context.
@@ -244,22 +243,22 @@ public class HttpRootContext extends AbstractContext {
         environment.updateBlocklist(location);
     }
 
-    private Object processInvocation(InvocationType invocationType, Name name) throws NamingException {
-        return processInvocation(invocationType, name, null, null, true);
+    private Object processInvocation(RequestType requestType, Name name) throws NamingException {
+        return processInvocation(requestType, name, null, null, true);
     }
 
-    private void processInvocation(InvocationType invocationType, Name name, Name newName, Object object) throws NamingException {
-        processInvocation(invocationType, name, newName, object, false);
+    private void processInvocation(RequestType requestType, Name name, Name newName, Object object) throws NamingException {
+        processInvocation(requestType, name, newName, object, false);
     }
 
-    private Object processInvocation(InvocationType invocationType, Name name, Name newName, Object object, final boolean expectedValue) throws NamingException {
+    private Object processInvocation(RequestType requestType, Name name, Name newName, Object object, final boolean expectedValue) throws NamingException {
         ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
         final RetryContext context = canRetry(environment) ? new RetryContext() : null;
         return performWithRetry((contextOrNull, name1, param) -> {
             HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
             URI uri = peerIdentity.getUri();
             final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
-            RequestBuilder builder = new RequestBuilder().setInvocationType(invocationType).setName(name).setNewName(newName).setObject(object).setVersion(targetContext.getProtocolVersion());
+            RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setName(name).setNewName(newName).setObject(object).setVersion(targetContext.getProtocolVersion());
             final ClientRequest clientRequest = builder.createRequest(uri.getPath());
             if (expectedValue) {
                 return performOperation(name1, uri, targetContext, clientRequest);
