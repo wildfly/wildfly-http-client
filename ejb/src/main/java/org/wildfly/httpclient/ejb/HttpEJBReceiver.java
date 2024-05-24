@@ -146,12 +146,9 @@ class HttpEJBReceiver extends EJBReceiver {
         EjbContextData ejbData = targetContext.getAttachment(EJB_CONTEXT_DATA);
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
                 .setInvocationType(HttpEJBInvocationBuilder.InvocationType.START_EJB_INVOCATION)
+                .setLocator(locator)
                 .setMethod(clientInvocationContext.getInvokedMethod())
-                .setAppName(locator.getAppName())
-                .setModuleName(locator.getModuleName())
-                .setDistinctName(locator.getDistinctName())
-                .setView(clientInvocationContext.getViewClass().getName())
-                .setBeanName(locator.getBeanName());
+                .setView(clientInvocationContext.getViewClass().getName());
         if (locator instanceof StatefulEJBLocator) {
             builder.setBeanId(Base64.getUrlEncoder().encodeToString(locator.asStateful().getSessionId().getEncodedForm()));
         }
@@ -293,11 +290,8 @@ class HttpEJBReceiver extends EJBReceiver {
 
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
                 .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CREATE_SESSION_EJB)
-                .setAppName(locator.getAppName())
-                .setModuleName(locator.getModuleName())
-                .setDistinctName(locator.getDistinctName())
-                .setView(locator.getViewType().getName())
-                .setBeanName(locator.getBeanName());
+                .setLocator(locator)
+                .setView(locator.getViewType().getName());
         builder.setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
@@ -358,12 +352,9 @@ class HttpEJBReceiver extends EJBReceiver {
         targetContext.awaitSessionId(false, authenticationConfiguration);
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
                 .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CANCEL_EJB_INVOCATION)
-                .setAppName(locator.getAppName())
-                .setModuleName(locator.getModuleName())
-                .setDistinctName(locator.getDistinctName())
+                .setLocator(locator)
                 .setCancelIfRunning(cancelIfRunning)
-                .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID))
-                .setBeanName(locator.getBeanName());
+                .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID));
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
         builder.setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());

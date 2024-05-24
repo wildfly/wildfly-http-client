@@ -36,6 +36,7 @@ import static java.net.URLEncoder.encode;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.HeaderMap;
+import org.jboss.ejb.client.EJBLocator;
 import org.wildfly.httpclient.common.Protocol;
 
 import java.lang.reflect.Method;
@@ -48,10 +49,7 @@ import java.lang.reflect.Method;
  */
 final class HttpEJBInvocationBuilder {
 
-    private String appName;
-    private String moduleName;
-    private String distinctName;
-    private String beanName;
+    private EJBLocator<?> locator;
     private String beanId;
     private String view;
     private Method method;
@@ -62,23 +60,8 @@ final class HttpEJBInvocationBuilder {
 
     // setters
 
-    HttpEJBInvocationBuilder setAppName(final String appName) {
-        this.appName = appName;
-        return this;
-    }
-
-    HttpEJBInvocationBuilder setModuleName(final String moduleName) {
-        this.moduleName = moduleName;
-        return this;
-    }
-
-    HttpEJBInvocationBuilder setDistinctName(final String distinctName) {
-        this.distinctName = distinctName;
-        return this;
-    }
-
-    HttpEJBInvocationBuilder setBeanName(final String beanName) {
-        this.beanName = beanName;
+    HttpEJBInvocationBuilder setLocator(final EJBLocator<?> locator) {
+        this.locator = locator;
         return this;
     }
 
@@ -196,10 +179,10 @@ final class HttpEJBInvocationBuilder {
         appendPath(sb, "ejb", false);
         appendPath(sb, "v" + version, false);
         appendPath(sb, operationType, false);
-        appendPath(sb, appName, true);
-        appendPath(sb, moduleName, true);
-        appendPath(sb, distinctName, true);
-        appendPath(sb, beanName, true);
+        appendPath(sb, locator.getAppName(), true);
+        appendPath(sb, locator.getModuleName(), true);
+        appendPath(sb, locator.getDistinctName(), true);
+        appendPath(sb, locator.getBeanName(), true);
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
