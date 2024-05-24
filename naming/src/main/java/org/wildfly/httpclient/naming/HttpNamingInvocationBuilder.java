@@ -44,6 +44,7 @@ import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.HeaderMap;
+import io.undertow.util.HttpString;
 import org.wildfly.httpclient.common.Protocol;
 
 import javax.naming.Name;
@@ -87,25 +88,31 @@ final class HttpNamingInvocationBuilder {
     }
 
     enum InvocationType {
-        BIND(BIND_PATH),
-        CREATE_SUBCONTEXT(CREATE_SUBCONTEXT_PATH),
-        DESTROY_SUBCONTEXT(DESTROY_SUBCONTEXT_PATH),
-        LIST(LIST_PATH),
-        LIST_BINDINGS(LIST_BINDINGS_PATH),
-        LOOKUP(LOOKUP_PATH),
-        LOOKUP_LINK(LOOKUP_LINK_PATH),
-        REBIND(REBIND_PATH),
-        RENAME(RENAME_PATH),
-        UNBIND(UNBIND_PATH);
+        BIND(BIND_PATH, PUT),
+        CREATE_SUBCONTEXT(CREATE_SUBCONTEXT_PATH, PUT),
+        DESTROY_SUBCONTEXT(DESTROY_SUBCONTEXT_PATH, DELETE),
+        LIST(LIST_PATH, GET),
+        LIST_BINDINGS(LIST_BINDINGS_PATH, GET),
+        LOOKUP(LOOKUP_PATH, POST),
+        LOOKUP_LINK(LOOKUP_LINK_PATH, POST),
+        REBIND(REBIND_PATH, PATCH),
+        RENAME(RENAME_PATH, PATCH),
+        UNBIND(UNBIND_PATH, DELETE);
 
         private final String path;
+        private final HttpString method;
 
-        InvocationType(final String path) {
+        InvocationType(final String path, final HttpString method) {
             this.path = path;
+            this.method = method;
         }
 
         String getPath() {
             return path;
+        }
+
+        HttpString getMethod() {
+            return method;
         }
     }
 
@@ -120,17 +127,7 @@ final class HttpNamingInvocationBuilder {
     }
 
     private void setRequestMethod(final ClientRequest request) {
-        if (invocationType == InvocationType.BIND) request.setMethod(PUT);
-        else if (invocationType == InvocationType.CREATE_SUBCONTEXT) request.setMethod(PUT);
-        else if (invocationType == InvocationType.DESTROY_SUBCONTEXT) request.setMethod(DELETE);
-        else if (invocationType == InvocationType.LIST) request.setMethod(GET);
-        else if (invocationType == InvocationType.LIST_BINDINGS) request.setMethod(GET);
-        else if (invocationType == InvocationType.LOOKUP) request.setMethod(POST);
-        else if (invocationType == InvocationType.LOOKUP_LINK) request.setMethod(POST);
-        else if (invocationType == InvocationType.REBIND) request.setMethod(PATCH);
-        else if (invocationType == InvocationType.RENAME) request.setMethod(PATCH);
-        else if (invocationType == InvocationType.UNBIND) request.setMethod(DELETE);
-        else throw new IllegalStateException();
+        request.setMethod(invocationType.getMethod());
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
