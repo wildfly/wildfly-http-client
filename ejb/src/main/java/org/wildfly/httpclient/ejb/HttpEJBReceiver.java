@@ -145,7 +145,7 @@ class HttpEJBReceiver extends EJBReceiver {
 
         EjbContextData ejbData = targetContext.getAttachment(EJB_CONTEXT_DATA);
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
-                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.METHOD_INVOCATION)
+                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.START_EJB_INVOCATION)
                 .setMethod(clientInvocationContext.getInvokedMethod())
                 .setAppName(locator.getAppName())
                 .setModuleName(locator.getModuleName())
@@ -292,7 +292,7 @@ class HttpEJBReceiver extends EJBReceiver {
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
-                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.STATEFUL_CREATE)
+                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CREATE_SESSION_EJB)
                 .setAppName(locator.getAppName())
                 .setModuleName(locator.getModuleName())
                 .setDistinctName(locator.getDistinctName())
@@ -357,7 +357,7 @@ class HttpEJBReceiver extends EJBReceiver {
         }
         targetContext.awaitSessionId(false, authenticationConfiguration);
         HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
-                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CANCEL)
+                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CANCEL_EJB_INVOCATION)
                 .setAppName(locator.getAppName())
                 .setModuleName(locator.getModuleName())
                 .setDistinctName(locator.getDistinctName())

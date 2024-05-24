@@ -118,9 +118,9 @@ final class HttpEJBInvocationBuilder {
     }
 
     enum InvocationType {
-        METHOD_INVOCATION,
-        STATEFUL_CREATE,
-        CANCEL,
+        START_EJB_INVOCATION,
+        CANCEL_EJB_INVOCATION,
+        CREATE_SESSION_EJB,
     }
 
     // helper methods
@@ -134,31 +134,31 @@ final class HttpEJBInvocationBuilder {
     }
 
     private void setRequestMethod(final ClientRequest request) {
-        if (invocationType == InvocationType.METHOD_INVOCATION) request.setMethod(POST);
-        else if (invocationType == InvocationType.STATEFUL_CREATE) request.setMethod(POST);
-        else if (invocationType == InvocationType.CANCEL) request.setMethod(DELETE);
+        if (invocationType == InvocationType.START_EJB_INVOCATION) request.setMethod(POST);
+        else if (invocationType == InvocationType.CREATE_SESSION_EJB) request.setMethod(POST);
+        else if (invocationType == InvocationType.CANCEL_EJB_INVOCATION) request.setMethod(DELETE);
         else throw new IllegalStateException();
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
-        if (invocationType == InvocationType.METHOD_INVOCATION) request.setPath(invokeBeanRequestPath(prefix));
-        else if (invocationType == InvocationType.STATEFUL_CREATE) request.setPath(openBeanRequestPath(prefix));
-        else if (invocationType == InvocationType.CANCEL) request.setPath(cancelBeanRequestPath(prefix));
+        if (invocationType == InvocationType.START_EJB_INVOCATION) request.setPath(invokeBeanRequestPath(prefix));
+        else if (invocationType == InvocationType.CREATE_SESSION_EJB) request.setPath(openBeanRequestPath(prefix));
+        else if (invocationType == InvocationType.CANCEL_EJB_INVOCATION) request.setPath(cancelBeanRequestPath(prefix));
         else throw new IllegalStateException();
     }
 
     private void setRequestHeaders(final ClientRequest request) {
         final HeaderMap headers = request.getRequestHeaders();
-        if (invocationType == InvocationType.METHOD_INVOCATION) {
+        if (invocationType == InvocationType.START_EJB_INVOCATION) {
             headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             headers.put(CONTENT_TYPE, INVOCATION.toString());
             if (invocationId != null) {
                 headers.put(INVOCATION_ID, invocationId);
             }
-        } else if (invocationType == InvocationType.STATEFUL_CREATE) {
+        } else if (invocationType == InvocationType.CREATE_SESSION_EJB) {
             headers.add(ACCEPT, EJB_EXCEPTION.toString());
             headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
-        } else if (invocationType != InvocationType.CANCEL) {
+        } else if (invocationType != InvocationType.CANCEL_EJB_INVOCATION) {
             throw new IllegalStateException();
         }
     }
