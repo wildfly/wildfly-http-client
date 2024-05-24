@@ -58,7 +58,7 @@ final class RequestBuilder {
     private String beanId;
     private String view;
     private Method method;
-    private RequestType invocationType;
+    private RequestType requestType;
     private String invocationId;
     private int version = Protocol.LATEST;
     private boolean cancelIfRunning;
@@ -85,8 +85,8 @@ final class RequestBuilder {
         return this;
     }
 
-    RequestBuilder setRequestType(final RequestType invocationType) {
-        this.invocationType = invocationType;
+    RequestBuilder setRequestType(final RequestType requestType) {
+        this.requestType = requestType;
         return this;
     }
 
@@ -116,35 +116,35 @@ final class RequestBuilder {
     }
 
     private void setRequestMethod(final ClientRequest request) {
-        if (invocationType == START_EJB_INVOCATION) request.setMethod(POST);
-        else if (invocationType == CREATE_SESSION_EJB) request.setMethod(POST);
-        else if (invocationType == DISCOVER_EJB) request.setMethod(GET);
-        else if (invocationType == CANCEL_EJB_INVOCATION) request.setMethod(DELETE);
+        if (requestType == START_EJB_INVOCATION) request.setMethod(POST);
+        else if (requestType == CREATE_SESSION_EJB) request.setMethod(POST);
+        else if (requestType == DISCOVER_EJB) request.setMethod(GET);
+        else if (requestType == CANCEL_EJB_INVOCATION) request.setMethod(DELETE);
         else throw new IllegalStateException();
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
-        if (invocationType == START_EJB_INVOCATION) request.setPath(getStartEjbInvocationRequestPath(prefix));
-        else if (invocationType == CREATE_SESSION_EJB) request.setPath(getCreateSessionEjbRequestPath(prefix));
-        else if (invocationType == DISCOVER_EJB) request.setPath(getDiscoverEjbRequestPath(prefix));
-        else if (invocationType == CANCEL_EJB_INVOCATION) request.setPath(getCancelEjbInvocationRequestPath(prefix));
+        if (requestType == START_EJB_INVOCATION) request.setPath(getStartEjbInvocationRequestPath(prefix));
+        else if (requestType == CREATE_SESSION_EJB) request.setPath(getCreateSessionEjbRequestPath(prefix));
+        else if (requestType == DISCOVER_EJB) request.setPath(getDiscoverEjbRequestPath(prefix));
+        else if (requestType == CANCEL_EJB_INVOCATION) request.setPath(getCancelEjbInvocationRequestPath(prefix));
         else throw new IllegalStateException();
     }
 
     private void setRequestHeaders(final ClientRequest request) {
         final HeaderMap headers = request.getRequestHeaders();
-        if (invocationType == START_EJB_INVOCATION) {
+        if (requestType == START_EJB_INVOCATION) {
             headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             headers.put(CONTENT_TYPE, INVOCATION.toString());
             if (invocationId != null) {
                 headers.put(INVOCATION_ID, invocationId);
             }
-        } else if (invocationType == CREATE_SESSION_EJB) {
+        } else if (requestType == CREATE_SESSION_EJB) {
             headers.add(ACCEPT, EJB_EXCEPTION.toString());
             headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
-        } else if (invocationType == DISCOVER_EJB) {
+        } else if (requestType == DISCOVER_EJB) {
             headers.add(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
-        } else if (invocationType != CANCEL_EJB_INVOCATION) {
+        } else if (requestType != CANCEL_EJB_INVOCATION) {
             throw new IllegalStateException();
         }
     }
