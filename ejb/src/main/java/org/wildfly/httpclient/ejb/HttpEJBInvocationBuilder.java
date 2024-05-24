@@ -21,8 +21,12 @@ package org.wildfly.httpclient.ejb;
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static io.undertow.util.Methods.DELETE;
+import static io.undertow.util.Methods.GET;
 import static io.undertow.util.Methods.POST;
+
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
+import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
@@ -104,6 +108,7 @@ final class HttpEJBInvocationBuilder {
         START_EJB_INVOCATION,
         CANCEL_EJB_INVOCATION,
         CREATE_SESSION_EJB,
+        DISCOVER_EJB,
     }
 
     // helper methods
@@ -119,6 +124,7 @@ final class HttpEJBInvocationBuilder {
     private void setRequestMethod(final ClientRequest request) {
         if (invocationType == InvocationType.START_EJB_INVOCATION) request.setMethod(POST);
         else if (invocationType == InvocationType.CREATE_SESSION_EJB) request.setMethod(POST);
+        else if (invocationType == InvocationType.DISCOVER_EJB) request.setMethod(GET);
         else if (invocationType == InvocationType.CANCEL_EJB_INVOCATION) request.setMethod(DELETE);
         else throw new IllegalStateException();
     }
@@ -126,6 +132,7 @@ final class HttpEJBInvocationBuilder {
     private void setRequestPath(final ClientRequest request, final String prefix) {
         if (invocationType == InvocationType.START_EJB_INVOCATION) request.setPath(invokeBeanRequestPath(prefix));
         else if (invocationType == InvocationType.CREATE_SESSION_EJB) request.setPath(openBeanRequestPath(prefix));
+        else if (invocationType == InvocationType.DISCOVER_EJB) request.setPath(discoverBeanRequestPath(prefix));
         else if (invocationType == InvocationType.CANCEL_EJB_INVOCATION) request.setPath(cancelBeanRequestPath(prefix));
         else throw new IllegalStateException();
     }
@@ -141,6 +148,8 @@ final class HttpEJBInvocationBuilder {
         } else if (invocationType == InvocationType.CREATE_SESSION_EJB) {
             headers.add(ACCEPT, EJB_EXCEPTION.toString());
             headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
+        } else if (invocationType == InvocationType.DISCOVER_EJB) {
+            headers.add(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
         } else if (invocationType != InvocationType.CANCEL_EJB_INVOCATION) {
             throw new IllegalStateException();
         }
@@ -150,6 +159,12 @@ final class HttpEJBInvocationBuilder {
         final StringBuilder sb = new StringBuilder();
         appendOperationPath(sb, mountPoint, EJB_OPEN_PATH);
         appendBeanPath(sb);
+        return sb.toString();
+    }
+
+    private String discoverBeanRequestPath(final String mountPoint) {
+        final StringBuilder sb = new StringBuilder();
+        appendOperationPath(sb, mountPoint, EJB_DISCOVER_PATH);
         return sb.toString();
     }
 
