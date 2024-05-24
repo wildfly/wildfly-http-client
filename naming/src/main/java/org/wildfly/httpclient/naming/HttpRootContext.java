@@ -259,7 +259,7 @@ public class HttpRootContext extends AbstractContext {
             HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
             URI uri = peerIdentity.getUri();
             final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
-            HttpNamingInvocationBuilder builder = new HttpNamingInvocationBuilder().setInvocationType(invocationType).setName(name).setNewName(newName).setObject(object);
+            HttpNamingInvocationBuilder builder = new HttpNamingInvocationBuilder().setInvocationType(invocationType).setName(name).setNewName(newName).setObject(object).setVersion(targetContext.getProtocolVersion());
             final ClientRequest clientRequest = builder.createRequest(uri.getPath());
             if (expectedValue) {
                 return performOperation(name1, uri, targetContext, clientRequest);
