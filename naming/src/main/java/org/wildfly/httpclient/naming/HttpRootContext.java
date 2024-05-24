@@ -256,6 +256,21 @@ public class HttpRootContext extends AbstractContext {
         }, environment, context, name, null);
     }
 
+    private void processInvocation(InvocationType invocationType, Name name, Name newName, Object object) throws NamingException {
+        ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
+        final RetryContext context = canRetry(environment) ? new RetryContext() : null;
+        performWithRetry((contextOrNull, name1, param) -> {
+            HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
+            URI uri = peerIdentity.getUri();
+            final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
+            HttpNamingInvocationBuilder builder = new HttpNamingInvocationBuilder().setInvocationType(invocationType).setName(name).setNewName(newName).setObject(object);
+            final ClientRequest clientRequest = builder.createRequest(uri.getPath());
+            performOperation(uri, object, targetContext, clientRequest);
+            return null;
+        }, environment, context, name, object);
+
+    }
+
     private Object performOperation(Name name, URI providerUri, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
@@ -336,22 +351,6 @@ public class HttpRootContext extends AbstractContext {
                 throw namingException;
             }
         }
-    }
-
-
-    private void processInvocation(InvocationType invocationType, Name name, Name newName, Object object) throws NamingException {
-        ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
-        final RetryContext context = canRetry(environment) ? new RetryContext() : null;
-        performWithRetry((contextOrNull, name1, param) -> {
-            HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
-            URI uri = peerIdentity.getUri();
-            final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
-            HttpNamingInvocationBuilder builder = new HttpNamingInvocationBuilder().setInvocationType(invocationType).setName(name).setNewName(newName).setObject(object);
-            final ClientRequest clientRequest = builder.createRequest(uri.getPath());
-            performOperation(uri, object, targetContext, clientRequest);
-            return null;
-        }, environment, context, name, object);
-
     }
 
     private boolean canRetry(ProviderEnvironment environment) {
