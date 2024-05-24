@@ -130,10 +130,10 @@ final class HttpEJBInvocationBuilder {
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
-        if (invocationType == InvocationType.START_EJB_INVOCATION) request.setPath(invokeBeanRequestPath(prefix));
-        else if (invocationType == InvocationType.CREATE_SESSION_EJB) request.setPath(openBeanRequestPath(prefix));
-        else if (invocationType == InvocationType.DISCOVER_EJB) request.setPath(discoverBeanRequestPath(prefix));
-        else if (invocationType == InvocationType.CANCEL_EJB_INVOCATION) request.setPath(cancelBeanRequestPath(prefix));
+        if (invocationType == InvocationType.START_EJB_INVOCATION) request.setPath(getStartEjbInvocationRequestPath(prefix));
+        else if (invocationType == InvocationType.CREATE_SESSION_EJB) request.setPath(getCreateSessionEjbRequestPath(prefix));
+        else if (invocationType == InvocationType.DISCOVER_EJB) request.setPath(getDiscoverEjbRequestPath(prefix));
+        else if (invocationType == InvocationType.CANCEL_EJB_INVOCATION) request.setPath(getCancelEjbInvocationRequestPath(prefix));
         else throw new IllegalStateException();
     }
 
@@ -155,20 +155,20 @@ final class HttpEJBInvocationBuilder {
         }
     }
 
-    private String openBeanRequestPath(final String prefix) {
+    private String getCreateSessionEjbRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
         appendOperationPath(sb, prefix, EJB_OPEN_PATH);
         appendBeanPath(sb);
         return sb.toString();
     }
 
-    private String discoverBeanRequestPath(final String prefix) {
+    private String getDiscoverEjbRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
         appendOperationPath(sb, prefix, EJB_DISCOVER_PATH);
         return sb.toString();
     }
 
-    private String cancelBeanRequestPath(final String prefix) {
+    private String getCancelEjbInvocationRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
         appendOperationPath(sb, prefix, EJB_CANCEL_PATH);
         appendBeanPath(sb);
@@ -177,7 +177,7 @@ final class HttpEJBInvocationBuilder {
         return sb.toString();
     }
 
-    private String invokeBeanRequestPath(final String prefix) {
+    private String getStartEjbInvocationRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
         appendOperationPath(sb, prefix, EJB_INVOKE_PATH);
         appendBeanPath(sb);
