@@ -46,12 +46,9 @@ import org.wildfly.httpclient.common.Protocol;
 import java.lang.reflect.Method;
 
 /**
- * Builder for invocations against a specific EJB, such as invocation and session open
- *
- * @author Stuart Douglas
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class HttpEJBInvocationBuilder {
+final class RequestBuilder {
 
     private EJBLocator<?> locator;
     private String beanId;
@@ -64,42 +61,42 @@ final class HttpEJBInvocationBuilder {
 
     // setters
 
-    HttpEJBInvocationBuilder setLocator(final EJBLocator<?> locator) {
+    RequestBuilder setLocator(final EJBLocator<?> locator) {
         this.locator = locator;
         return this;
     }
 
-    HttpEJBInvocationBuilder setBeanId(final String beanId) {
+    RequestBuilder setBeanId(final String beanId) {
         this.beanId = beanId;
         return this;
     }
 
-    HttpEJBInvocationBuilder setMethod(final Method method) {
+    RequestBuilder setMethod(final Method method) {
         this.method = method;
         return this;
     }
 
-    HttpEJBInvocationBuilder setView(final String view) {
+    RequestBuilder setView(final String view) {
         this.view = view;
         return this;
     }
 
-    HttpEJBInvocationBuilder setInvocationType(final InvocationType invocationType) {
+    RequestBuilder setInvocationType(final InvocationType invocationType) {
         this.invocationType = invocationType;
         return this;
     }
 
-    HttpEJBInvocationBuilder setInvocationId(final String invocationId) {
+    RequestBuilder setInvocationId(final String invocationId) {
         this.invocationId = invocationId;
         return this;
     }
 
-    HttpEJBInvocationBuilder setVersion(final int version) {
+    RequestBuilder setVersion(final int version) {
         this.version = version;
         return this;
     }
 
-    HttpEJBInvocationBuilder setCancelIfRunning(final boolean cancelIfRunning) {
+    RequestBuilder setCancelIfRunning(final boolean cancelIfRunning) {
         this.cancelIfRunning = cancelIfRunning;
         return this;
     }
