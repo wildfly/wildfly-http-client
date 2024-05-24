@@ -52,7 +52,7 @@ import javax.naming.Name;
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class HttpNamingInvocationBuilder {
+final class RequestBuilder {
 
     private InvocationType invocationType;
     private Name name;
@@ -62,27 +62,27 @@ final class HttpNamingInvocationBuilder {
 
     // setters
 
-    HttpNamingInvocationBuilder setInvocationType(final InvocationType invocationType) {
+    RequestBuilder setInvocationType(final InvocationType invocationType) {
         this.invocationType = invocationType;
         return this;
     }
 
-    HttpNamingInvocationBuilder setName(final Name name) {
+    RequestBuilder setName(final Name name) {
         this.name = name;
         return this;
     }
 
-    HttpNamingInvocationBuilder setNewName(final Name newName) {
+    RequestBuilder setNewName(final Name newName) {
         this.newName = newName;
         return this;
     }
 
-    HttpNamingInvocationBuilder setObject(final Object object) {
+    RequestBuilder setObject(final Object object) {
         this.object = object;
         return this;
     }
 
-    HttpNamingInvocationBuilder setVersion(final int version) {
+    RequestBuilder setVersion(final int version) {
         this.version = version;
         return this;
     }
