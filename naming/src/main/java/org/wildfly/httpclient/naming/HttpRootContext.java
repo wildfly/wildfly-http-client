@@ -249,10 +249,11 @@ public class HttpRootContext extends AbstractContext {
         final RetryContext context = canRetry(environment) ? new RetryContext() : null;
         return performWithRetry((contextOrNull, name1, param) -> {
             HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
-            final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(peerIdentity.getUri());
+            URI uri = peerIdentity.getUri();
+            final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
             HttpNamingInvocationBuilder builder = new HttpNamingInvocationBuilder().setInvocationType(invocationType).setName(name);
-            final ClientRequest clientRequest = builder.createRequest(peerIdentity.getUri().getPath());
-            return performOperation(name1, peerIdentity.getUri(), targetContext, clientRequest);
+            final ClientRequest clientRequest = builder.createRequest(uri.getPath());
+            return performOperation(name1, uri, targetContext, clientRequest);
         }, environment, context, name, null);
     }
 
