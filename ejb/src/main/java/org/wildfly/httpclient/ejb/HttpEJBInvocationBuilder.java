@@ -173,16 +173,20 @@ final class HttpEJBInvocationBuilder {
     }
 
     private void appendBeanPath(final StringBuilder sb, final String mountPoint, final String operationType) {
+        appendOperationPath(sb, mountPoint, operationType);
+        appendPath(sb, locator.getAppName(), true);
+        appendPath(sb, locator.getModuleName(), true);
+        appendPath(sb, locator.getDistinctName(), true);
+        appendPath(sb, locator.getBeanName(), true);
+    }
+
+    private void appendOperationPath(final StringBuilder sb, final String mountPoint, final String operationType) {
         if (mountPoint != null) {
             sb.append(mountPoint);
         }
         appendPath(sb, "ejb", false);
         appendPath(sb, "v" + version, false);
         appendPath(sb, operationType, false);
-        appendPath(sb, locator.getAppName(), true);
-        appendPath(sb, locator.getModuleName(), true);
-        appendPath(sb, locator.getDistinctName(), true);
-        appendPath(sb, locator.getBeanName(), true);
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
