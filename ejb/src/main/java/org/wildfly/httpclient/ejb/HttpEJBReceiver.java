@@ -144,8 +144,8 @@ class HttpEJBReceiver extends EJBReceiver {
 
 
         EjbContextData ejbData = targetContext.getAttachment(EJB_CONTEXT_DATA);
-        HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
-                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.START_EJB_INVOCATION)
+        RequestBuilder builder = new RequestBuilder()
+                .setInvocationType(RequestBuilder.InvocationType.START_EJB_INVOCATION)
                 .setLocator(locator)
                 .setMethod(clientInvocationContext.getInvokedMethod())
                 .setView(clientInvocationContext.getViewClass().getName());
@@ -288,8 +288,8 @@ class HttpEJBReceiver extends EJBReceiver {
         targetContext.awaitSessionId(true, authenticationConfiguration);
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
-        HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
-                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CREATE_SESSION_EJB)
+        RequestBuilder builder = new RequestBuilder()
+                .setInvocationType(RequestBuilder.InvocationType.CREATE_SESSION_EJB)
                 .setLocator(locator)
                 .setView(locator.getViewType().getName());
         builder.setVersion(targetContext.getProtocolVersion());
@@ -350,8 +350,8 @@ class HttpEJBReceiver extends EJBReceiver {
             }
         }
         targetContext.awaitSessionId(false, authenticationConfiguration);
-        HttpEJBInvocationBuilder builder = new HttpEJBInvocationBuilder()
-                .setInvocationType(HttpEJBInvocationBuilder.InvocationType.CANCEL_EJB_INVOCATION)
+        RequestBuilder builder = new RequestBuilder()
+                .setInvocationType(RequestBuilder.InvocationType.CANCEL_EJB_INVOCATION)
                 .setLocator(locator)
                 .setCancelIfRunning(cancelIfRunning)
                 .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID));
