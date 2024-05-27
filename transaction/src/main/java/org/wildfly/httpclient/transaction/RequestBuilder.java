@@ -18,7 +18,20 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static io.undertow.util.Headers.ACCEPT;
+import static io.undertow.util.Headers.CONTENT_TYPE;
+import static org.wildfly.httpclient.transaction.RequestType.UT_BEGIN;
+import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
+import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID_LIST;
+
 import io.undertow.client.ClientRequest;
+import io.undertow.util.HeaderMap;
 import org.wildfly.httpclient.common.Protocol;
 
 /**
@@ -28,6 +41,9 @@ final class RequestBuilder {
 
     private RequestType requestType;
     private int version = Protocol.LATEST;
+    private int timeout;
+    private int flags;
+    private String parentName;
 
     // setters
 
@@ -38,6 +54,21 @@ final class RequestBuilder {
 
     RequestBuilder setVersion(final int version) {
         this.version = version;
+        return this;
+    }
+
+    RequestBuilder setTimeout(final int timeout) {
+        this.timeout = timeout;
+        return this;
+    }
+
+    RequestBuilder setFlags(final int flags) {
+        this.flags = flags;
+        return this;
+    }
+
+    RequestBuilder setParent(final String parentName) {
+        this.parentName = parentName;
         return this;
     }
 
@@ -60,7 +91,18 @@ final class RequestBuilder {
     }
 
     private void setRequestHeaders(final ClientRequest request) {
-        // NOOP
+        final HeaderMap headers = request.getRequestHeaders();
+        if (requestType == UT_BEGIN) {
+            headers.put(ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
+            headers.put(TIMEOUT, timeout);
+        } else if (requestType == XA_RECOVER) {
+            headers.put(ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
+            headers.put(RECOVERY_PARENT_NAME, parentName);
+            headers.put(RECOVERY_FLAGS, Integer.toString(flags));
+        } else {
+            headers.add(ACCEPT, EXCEPTION.toString());
+            headers.put(CONTENT_TYPE, XID.toString());
+        }
     }
 
 }

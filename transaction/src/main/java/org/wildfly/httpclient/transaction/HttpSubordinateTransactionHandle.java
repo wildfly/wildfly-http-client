@@ -24,7 +24,6 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
 import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
-import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.READ_ONLY;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
 import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
@@ -32,11 +31,9 @@ import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_
 import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
-import io.undertow.util.Headers;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -120,8 +117,6 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setVersion(targetContext.getProtocolVersion());
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion() + operationPath);
-        request.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
-        request.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
             Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
             marshaller.start(Marshalling.createByteOutput(output));

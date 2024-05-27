@@ -19,7 +19,6 @@
 package org.wildfly.httpclient.transaction;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.util.Headers;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -39,11 +38,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
 import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 /**
  * Represents a remote transaction that is managed over HTTP protocol.
@@ -91,8 +88,6 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
             request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH +
                             targetContext.getProtocolVersion() + UT_COMMIT_PATH);
-            request.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
-            request.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
                 Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
                 marshaller.start(Marshalling.createByteOutput(output));
@@ -162,8 +157,6 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
             request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion()
                             + UT_ROLLBACK_PATH);
-            request.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
-            request.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
                 Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
                 marshaller.start(Marshalling.createByteOutput(output));
