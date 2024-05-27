@@ -18,12 +18,30 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static io.undertow.util.Methods.DELETE;
+import static io.undertow.util.Methods.GET;
+import static io.undertow.util.Methods.POST;
+
+import io.undertow.util.HttpString;
+
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 enum RequestType {
-    START_EJB_INVOCATION,
-    CANCEL_EJB_INVOCATION,
-    CREATE_SESSION_EJB,
-    DISCOVER_EJB,
+
+    START_EJB_INVOCATION(POST),
+    CANCEL_EJB_INVOCATION(DELETE),
+    CREATE_SESSION_EJB(POST),
+    DISCOVER_EJB(GET);
+
+    private final HttpString method;
+
+    RequestType(final HttpString method) {
+        this.method = method;
+    }
+
+    HttpString getMethod() {
+        return method;
+    }
+
 }
