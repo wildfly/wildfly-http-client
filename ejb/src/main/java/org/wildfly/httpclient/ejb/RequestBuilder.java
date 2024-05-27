@@ -20,9 +20,6 @@ package org.wildfly.httpclient.ejb;
 
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
-import static io.undertow.util.Methods.DELETE;
-import static io.undertow.util.Methods.GET;
-import static io.undertow.util.Methods.POST;
 
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
@@ -116,11 +113,7 @@ final class RequestBuilder {
     }
 
     private void setRequestMethod(final ClientRequest request) {
-        if (requestType == START_EJB_INVOCATION) request.setMethod(POST);
-        else if (requestType == CREATE_SESSION_EJB) request.setMethod(POST);
-        else if (requestType == DISCOVER_EJB) request.setMethod(GET);
-        else if (requestType == CANCEL_EJB_INVOCATION) request.setMethod(DELETE);
-        else throw new IllegalStateException();
+        request.setMethod(requestType.getMethod());
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
