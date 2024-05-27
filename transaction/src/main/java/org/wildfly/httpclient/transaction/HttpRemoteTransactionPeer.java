@@ -20,7 +20,6 @@ package org.wildfly.httpclient.transaction;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -87,13 +86,13 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     public Xid[] recover(int flag, String parentName) throws XAException {
         final CompletableFuture<Xid[]> xidList = new CompletableFuture<>();
 
-        ClientRequest cr = new ClientRequest()
-                .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion() +
-                        XA_RECOVER_PATH + "/" + parentName)
-                .setMethod(Methods.GET);
-        cr.getRequestHeaders().put(Headers.ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
-        cr.getRequestHeaders().put(RECOVERY_PARENT_NAME, parentName);
-        cr.getRequestHeaders().put(RECOVERY_FLAGS, Integer.toString(flag));
+        RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.XA_RECOVER).setVersion(targetContext.getProtocolVersion());
+        final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion() +
+                        XA_RECOVER_PATH + "/" + parentName);
+        request.getRequestHeaders().put(Headers.ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
+        request.getRequestHeaders().put(RECOVERY_PARENT_NAME, parentName);
+        request.getRequestHeaders().put(RECOVERY_FLAGS, Integer.toString(flag));
 
         final AuthenticationConfiguration authenticationConfiguration = getAuthenticationConfiguration(targetContext.getUri());
         final SSLContext sslContext;
@@ -105,9 +104,9 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
             throw xaException;
         }
 
-        targetContext.sendRequest(cr,  sslContext, authenticationConfiguration,null, (result, response, closeable) -> {
+        targetContext.sendRequest(request,  sslContext, authenticationConfiguration,null, (result, response, closeable) -> {
             try {
-                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
+                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(request).createUnmarshaller();
                 unmarshaller.start(new InputStreamByteInput(result));
                 int length = unmarshaller.readInt();
                 Xid[] ret = new Xid[length];
@@ -149,12 +148,12 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     public SimpleTransactionControl begin(int timeout) throws SystemException {
         final CompletableFuture<Xid> beginXid = new CompletableFuture<>();
 
-        ClientRequest cr = new ClientRequest()
-                .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH +
-                        targetContext.getProtocolVersion() + UT_BEGIN_PATH)
-                .setMethod(Methods.POST);
-        cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
-        cr.getRequestHeaders().put(TIMEOUT, timeout);
+        RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_BEGIN).setVersion(targetContext.getProtocolVersion());
+        final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH +
+                        targetContext.getProtocolVersion() + UT_BEGIN_PATH);
+        request.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
+        request.getRequestHeaders().put(TIMEOUT, timeout);
 
         final AuthenticationConfiguration authenticationConfiguration = getAuthenticationConfiguration(targetContext.getUri());
         final SSLContext sslContext;
@@ -164,9 +163,9 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
             throw new SystemException(e.getMessage());
         }
 
-        targetContext.sendRequest(cr, sslContext, authenticationConfiguration, null, (result, response, closeable) -> {
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration, null, (result, response, closeable) -> {
             try {
-                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(cr).createUnmarshaller();
+                Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(request).createUnmarshaller();
                 unmarshaller.start(new InputStreamByteInput(result));
                 int formatId = unmarshaller.readInt();
                 int len = unmarshaller.readInt();

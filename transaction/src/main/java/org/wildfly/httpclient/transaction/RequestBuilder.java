@@ -56,11 +56,11 @@ final class RequestBuilder {
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
-        throw new UnsupportedOperationException();
+        // NOOP
     }
 
     private void setRequestHeaders(final ClientRequest request) {
-        throw new UnsupportedOperationException();
+        // NOOP
     }
 
 }

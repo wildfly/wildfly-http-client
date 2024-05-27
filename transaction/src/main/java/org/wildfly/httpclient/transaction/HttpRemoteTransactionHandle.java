@@ -20,7 +20,6 @@ package org.wildfly.httpclient.transaction;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -87,14 +86,15 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             }
             final CompletableFuture<Void> result = new CompletableFuture<>();
             statusRef.set(Status.STATUS_COMMITTING);
-            ClientRequest cr = new ClientRequest()
-                    .setMethod(Methods.POST)
-                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH +
+
+            RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_COMMIT).setVersion(targetContext.getProtocolVersion());
+            final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+            request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH +
                             targetContext.getProtocolVersion() + UT_COMMIT_PATH);
-            cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
-            cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
-            targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
+            request.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
+            request.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
+            targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
+                Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
                 marshaller.start(Marshalling.createByteOutput(output));
                 marshaller.writeInt(id.getFormatId());
                 final byte[] gtid = id.getGlobalTransactionId();
@@ -157,14 +157,15 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
             statusRef.set(Status.STATUS_COMMITTING);
-            ClientRequest cr = new ClientRequest()
-                    .setMethod(Methods.POST)
-                    .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion()
+
+            RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_ROLLBACK).setVersion(targetContext.getProtocolVersion());
+            final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+            request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion()
                             + UT_ROLLBACK_PATH);
-            cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
-            cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
-            targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
+            request.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
+            request.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
+            targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
+                Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
                 marshaller.start(Marshalling.createByteOutput(output));
                 marshaller.writeInt(id.getFormatId());
                 final byte[] gtid = id.getGlobalTransactionId();

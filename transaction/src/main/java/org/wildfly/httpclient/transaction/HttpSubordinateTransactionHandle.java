@@ -18,10 +18,25 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
+import static org.wildfly.httpclient.transaction.RequestType.XA_BEFORE_COMPLETION;
+import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
+import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
+import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
+import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
+import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.TransactionConstants.READ_ONLY;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
+import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
+
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -36,17 +51,6 @@ import javax.transaction.xa.Xid;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
-
-import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.READ_ONLY;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 /**
  * Represents a remote subordinate transaction that is managed over HTTP protocol.
@@ -74,12 +78,12 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     @Override
     public void commit(boolean onePhase) throws XAException {
         String operationPath = XA_COMMIT_PATH + (onePhase ? "?opc=true" : "");
-        processOperation(operationPath);
+        processOperation(XA_COMMIT, operationPath);
     }
 
     @Override
     public void rollback() throws XAException {
-        processOperation(XA_ROLLBACK_PATH);
+        processOperation(XA_ROLLBACK, XA_ROLLBACK_PATH);
     }
 
     @Override
@@ -89,12 +93,12 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void beforeCompletion() throws XAException {
-        processOperation(XA_BC_PATH);
+        processOperation(XA_BEFORE_COMPLETION, XA_BC_PATH);
     }
 
     @Override
     public int prepare() throws XAException {
-        boolean readOnly = processOperation(XA_PREP_PATH, (result) -> {
+        boolean readOnly = processOperation(XA_PREPARE, XA_PREP_PATH, (result) -> {
             String header = result.getResponseHeaders().getFirst(READ_ONLY);
             return header != null && Boolean.parseBoolean(header);
         });
@@ -103,22 +107,23 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void forget() throws XAException {
-        processOperation(XA_FORGET_PATH);
+        processOperation(XA_FORGET, XA_FORGET_PATH);
     }
 
-    private void processOperation(String operationPath) throws XAException {
-        processOperation(operationPath, null);
+    private void processOperation(RequestType requestType, String operationPath) throws XAException {
+        processOperation(requestType, operationPath, null);
     }
 
-    private <T> T processOperation(String operationPath, Function<ClientResponse, T> resultFunction) throws XAException {
+    private <T> T processOperation(RequestType requestType, String operationPath, Function<ClientResponse, T> resultFunction) throws XAException {
         final CompletableFuture<T> result = new CompletableFuture<>();
-        ClientRequest cr = new ClientRequest()
-                .setMethod(Methods.POST)
-                .setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion() + operationPath);
-        cr.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
-        cr.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
-        targetContext.sendRequest(cr, sslContext, authenticationConfiguration, output -> {
-            Marshaller marshaller = targetContext.getHttpMarshallerFactory(cr).createMarshaller();
+
+        RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setVersion(targetContext.getProtocolVersion());
+        final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion() + operationPath);
+        request.getRequestHeaders().put(Headers.ACCEPT, EXCEPTION.toString());
+        request.getRequestHeaders().put(Headers.CONTENT_TYPE, XID.toString());
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
+            Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
             marshaller.start(Marshalling.createByteOutput(output));
             marshaller.writeInt(id.getFormatId());
             final byte[] gtid = id.getGlobalTransactionId();
