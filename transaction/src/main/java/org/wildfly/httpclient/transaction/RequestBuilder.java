@@ -52,7 +52,7 @@ final class RequestBuilder {
     }
 
     private void setRequestMethod(final ClientRequest request) {
-        throw new UnsupportedOperationException();
+        request.setMethod(requestType.getMethod());
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {

@@ -18,19 +18,34 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static io.undertow.util.Methods.GET;
+import static io.undertow.util.Methods.POST;
+
+import io.undertow.util.HttpString;
+
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 enum RequestType {
 
-    UT_BEGIN,
-    UT_COMMIT,
-    UT_ROLLBACK,
-    XA_BEFORE_COMPLETION,
-    XA_COMMIT,
-    XA_FORGET,
-    XA_PREPARE,
-    XA_RECOVER,
-    XA_ROLLBACK;
+    UT_BEGIN(POST),
+    UT_COMMIT(POST),
+    UT_ROLLBACK(POST),
+    XA_BEFORE_COMPLETION(POST),
+    XA_COMMIT(POST),
+    XA_FORGET(POST),
+    XA_PREPARE(POST),
+    XA_RECOVER(GET),
+    XA_ROLLBACK(POST);
+
+    private final HttpString method;
+
+    RequestType(final HttpString method) {
+        this.method = method;
+    }
+
+    HttpString getMethod() {
+        return method;
+    }
 
 }
