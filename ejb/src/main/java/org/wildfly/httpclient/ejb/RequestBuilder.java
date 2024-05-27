@@ -27,10 +27,10 @@ import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
 import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
-import static org.wildfly.httpclient.ejb.RequestType.CANCEL_EJB_INVOCATION;
-import static org.wildfly.httpclient.ejb.RequestType.CREATE_SESSION_EJB;
-import static org.wildfly.httpclient.ejb.RequestType.DISCOVER_EJB;
-import static org.wildfly.httpclient.ejb.RequestType.START_EJB_INVOCATION;
+import static org.wildfly.httpclient.ejb.RequestType.CANCEL_INVOCATION;
+import static org.wildfly.httpclient.ejb.RequestType.CREATE_SESSION;
+import static org.wildfly.httpclient.ejb.RequestType.DISCOVER;
+import static org.wildfly.httpclient.ejb.RequestType.START_INVOCATION;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.net.URLEncoder.encode;
@@ -113,27 +113,27 @@ final class RequestBuilder {
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
-        if (requestType == START_EJB_INVOCATION) request.setPath(getStartEjbInvocationRequestPath(prefix));
-        else if (requestType == CREATE_SESSION_EJB) request.setPath(getCreateSessionEjbRequestPath(prefix));
-        else if (requestType == DISCOVER_EJB) request.setPath(getDiscoverEjbRequestPath(prefix));
-        else if (requestType == CANCEL_EJB_INVOCATION) request.setPath(getCancelEjbInvocationRequestPath(prefix));
+        if (requestType == START_INVOCATION) request.setPath(getStartEjbInvocationRequestPath(prefix));
+        else if (requestType == CREATE_SESSION) request.setPath(getCreateSessionEjbRequestPath(prefix));
+        else if (requestType == DISCOVER) request.setPath(getDiscoverEjbRequestPath(prefix));
+        else if (requestType == CANCEL_INVOCATION) request.setPath(getCancelEjbInvocationRequestPath(prefix));
         else throw new IllegalStateException();
     }
 
     private void setRequestHeaders(final ClientRequest request) {
         final HeaderMap headers = request.getRequestHeaders();
-        if (requestType == START_EJB_INVOCATION) {
+        if (requestType == START_INVOCATION) {
             headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
             headers.put(CONTENT_TYPE, INVOCATION.toString());
             if (invocationId != null) {
                 headers.put(INVOCATION_ID, invocationId);
             }
-        } else if (requestType == CREATE_SESSION_EJB) {
+        } else if (requestType == CREATE_SESSION) {
             headers.add(ACCEPT, EJB_EXCEPTION.toString());
             headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
-        } else if (requestType == DISCOVER_EJB) {
+        } else if (requestType == DISCOVER) {
             headers.add(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
-        } else if (requestType != CANCEL_EJB_INVOCATION) {
+        } else if (requestType != CANCEL_INVOCATION) {
             throw new IllegalStateException();
         }
     }
