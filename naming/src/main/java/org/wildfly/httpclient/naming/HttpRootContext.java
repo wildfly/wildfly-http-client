@@ -259,11 +259,11 @@ public class HttpRootContext extends AbstractContext {
             URI uri = peerIdentity.getUri();
             final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
             RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setName(name).setNewName(newName).setObject(object).setVersion(targetContext.getProtocolVersion());
-            final ClientRequest clientRequest = builder.createRequest(uri.getPath());
+            final ClientRequest request = builder.createRequest(uri.getPath());
             if (expectedValue) {
-                return performOperation(name1, uri, targetContext, clientRequest);
+                return performOperation(name1, uri, targetContext, request);
             }
-            performOperation(uri, object, targetContext, clientRequest);
+            performOperation(uri, object, targetContext, request);
             return null;
         }, environment, context, name, object);
     }
