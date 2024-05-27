@@ -41,31 +41,31 @@ import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
  */
 enum RequestType {
 
-    BIND(BIND_PATH, PUT),
-    CREATE_SUBCONTEXT(CREATE_SUBCONTEXT_PATH, PUT),
-    DESTROY_SUBCONTEXT(DESTROY_SUBCONTEXT_PATH, DELETE),
-    LIST(LIST_PATH, GET),
-    LIST_BINDINGS(LIST_BINDINGS_PATH, GET),
-    LOOKUP(LOOKUP_PATH, POST),
-    LOOKUP_LINK(LOOKUP_LINK_PATH, POST),
-    REBIND(REBIND_PATH, PATCH),
-    RENAME(RENAME_PATH, PATCH),
-    UNBIND(UNBIND_PATH, DELETE);
+    BIND(PUT, BIND_PATH),
+    CREATE_SUBCONTEXT(PUT, CREATE_SUBCONTEXT_PATH),
+    DESTROY_SUBCONTEXT(DELETE, DESTROY_SUBCONTEXT_PATH),
+    LIST(GET, LIST_PATH),
+    LIST_BINDINGS(GET, LIST_BINDINGS_PATH),
+    LOOKUP(POST, LOOKUP_PATH),
+    LOOKUP_LINK(POST, LOOKUP_LINK_PATH),
+    REBIND(PATCH, REBIND_PATH),
+    RENAME(PATCH, RENAME_PATH),
+    UNBIND(DELETE, UNBIND_PATH);
 
-    private final String path;
     private final HttpString method;
+    private final String path;
 
-    RequestType(final String path, final HttpString method) {
-        this.path = path;
+    RequestType(final HttpString method, final String path) {
         this.method = method;
-    }
-
-    String getPath() {
-        return path;
+        this.path = path;
     }
 
     HttpString getMethod() {
         return method;
+    }
+
+    String getPath() {
+        return path;
     }
 
 }
