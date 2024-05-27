@@ -41,11 +41,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_BEGIN_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER_PATH;
 
 /**
  * @author Stuart Douglas
@@ -80,10 +76,8 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     public Xid[] recover(int flag, String parentName) throws XAException {
         final CompletableFuture<Xid[]> xidList = new CompletableFuture<>();
 
-        RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.XA_RECOVER).setVersion(targetContext.getProtocolVersion());
+        RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.XA_RECOVER).setVersion(targetContext.getProtocolVersion()).setFlags(flag).setParent(parentName);
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
-        request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH + targetContext.getProtocolVersion() +
-                        XA_RECOVER_PATH + "/" + parentName);
 
         final AuthenticationConfiguration authenticationConfiguration = getAuthenticationConfiguration(targetContext.getUri());
         final SSLContext sslContext;
@@ -141,8 +135,6 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_BEGIN).setVersion(targetContext.getProtocolVersion()).setTimeout(timeout);
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
-        request.setPath(targetContext.getUri().getPath() + TXN_CONTEXT + VERSION_PATH +
-                        targetContext.getProtocolVersion() + UT_BEGIN_PATH);
 
         final AuthenticationConfiguration authenticationConfiguration = getAuthenticationConfiguration(targetContext.getUri());
         final SSLContext sslContext;

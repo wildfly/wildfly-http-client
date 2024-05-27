@@ -20,13 +20,18 @@ package org.wildfly.httpclient.transaction;
 
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
+import static java.net.URLEncoder.encode;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.RequestType.UT_BEGIN;
+import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
+import static org.wildfly.httpclient.transaction.TransactionConstants.TXN_CONTEXT;
 import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 import static org.wildfly.httpclient.transaction.TransactionConstants.XID_LIST;
 
@@ -44,6 +49,7 @@ final class RequestBuilder {
     private int timeout;
     private int flags;
     private String parentName;
+    private Boolean onePhase;
 
     // setters
 
@@ -67,6 +73,11 @@ final class RequestBuilder {
         return this;
     }
 
+    RequestBuilder setOnePhase(final Boolean onePhase) {
+        this.onePhase = onePhase;
+        return this;
+    }
+
     RequestBuilder setParent(final String parentName) {
         this.parentName = parentName;
         return this;
@@ -87,8 +98,21 @@ final class RequestBuilder {
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
-        // NOOP
+        final StringBuilder sb = new StringBuilder();
+        if (prefix != null) {
+            sb.append(prefix);
+        }
+        appendPath(sb, TXN_CONTEXT, false);
+        appendPath(sb, VERSION_PATH + version, false);
+        appendPath(sb, requestType.getPath(), false);
+        if (requestType == XA_COMMIT) {
+            sb.append(onePhase != null && onePhase ? "?opc=true" : "");
+        } else if (requestType == XA_RECOVER) {
+            appendPath(sb, parentName, false);
+        }
+        request.setPath(sb.toString());
     }
+
 
     private void setRequestHeaders(final ClientRequest request) {
         final HeaderMap headers = request.getRequestHeaders();
@@ -103,6 +127,13 @@ final class RequestBuilder {
             headers.add(ACCEPT, EXCEPTION.toString());
             headers.put(CONTENT_TYPE, XID.toString());
         }
+    }
+
+    private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
+        if (!path.startsWith("/")) {
+            sb.append("/");
+        }
+        sb.append(encode ? encode(path, UTF_8) : path);
     }
 
 }
