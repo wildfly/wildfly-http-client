@@ -21,12 +21,8 @@ package org.wildfly.httpclient.ejb;
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
@@ -144,20 +140,20 @@ final class RequestBuilder {
 
     private String getCreateSessionEjbRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix, EJB_OPEN_PATH);
+        appendOperationPath(sb, prefix);
         appendBeanPath(sb);
         return sb.toString();
     }
 
     private String getDiscoverEjbRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix, EJB_DISCOVER_PATH);
+        appendOperationPath(sb, prefix);
         return sb.toString();
     }
 
     private String getCancelEjbInvocationRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix, EJB_CANCEL_PATH);
+        appendOperationPath(sb, prefix);
         appendBeanPath(sb);
         appendPath(sb, invocationId, false);
         appendPath(sb, "" + cancelIfRunning, false);
@@ -166,7 +162,7 @@ final class RequestBuilder {
 
     private String getStartEjbInvocationRequestPath(final String prefix) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix, EJB_INVOKE_PATH);
+        appendOperationPath(sb, prefix);
         appendBeanPath(sb);
         appendPath(sb, beanId, false);
         appendPath(sb, view, false);
@@ -184,13 +180,13 @@ final class RequestBuilder {
         appendPath(sb, locator.getBeanName(), true);
     }
 
-    private void appendOperationPath(final StringBuilder sb, final String prefix, final String operationType) {
+    private void appendOperationPath(final StringBuilder sb, final String prefix) {
         if (prefix != null) {
             sb.append(prefix);
         }
         appendPath(sb, "ejb", false);
         appendPath(sb, "v" + version, false);
-        appendPath(sb, operationType, false);
+        appendPath(sb, requestType.getPath(), false);
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
