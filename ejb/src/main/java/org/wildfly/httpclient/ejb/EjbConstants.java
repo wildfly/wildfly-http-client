@@ -41,14 +41,6 @@ final class EjbConstants {
     static final HttpString EJB_SESSION_ID = new HttpString("x-wf-ejb-jbmar-session-id");
     static final HttpString INVOCATION_ID = new HttpString("X-wf-invocation-id");
 
-    // paths
-    static final String EJB_CANCEL_PATH = "/cancel";
-    static final String EJB_DISCOVER_PATH = "/discover";
-    static final String EJB_INVOKE_PATH = "/invoke";
-    static final String EJB_OPEN_PATH = "/open";
-
-    static final String DISCOVERY_PATH_PREFIX =  "/ejb";
-
     // cookies
     static final String JSESSIONID_COOKIE_NAME = "JSESSIONID";
 
