@@ -153,7 +153,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         }
 
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(newUri, authenticationContext, -1, "ejb", "jboss");
-        RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.DISCOVER);
+        RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.DISCOVER).setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
                 ((result, response, closeable) -> {
