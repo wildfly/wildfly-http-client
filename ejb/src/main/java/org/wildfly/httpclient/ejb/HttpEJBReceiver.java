@@ -148,7 +148,8 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setRequestType(RequestType.START_INVOCATION)
                 .setLocator(locator)
                 .setMethod(clientInvocationContext.getInvokedMethod())
-                .setView(clientInvocationContext.getViewClass().getName());
+                .setView(clientInvocationContext.getViewClass().getName())
+                .setVersion(targetContext.getProtocolVersion());
         if (locator instanceof StatefulEJBLocator) {
             builder.setBeanId(Base64.getUrlEncoder().encodeToString(locator.asStateful().getSessionId().getEncodedForm()));
         }
@@ -170,7 +171,6 @@ class HttpEJBReceiver extends EJBReceiver {
             }
         }
         boolean compressResponse = receiverContext.getClientInvocationContext().isCompressResponse();
-        builder.setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         if (compressResponse) {
             request.getRequestHeaders().put(Headers.ACCEPT_ENCODING, Headers.GZIP.toString());
@@ -291,8 +291,8 @@ class HttpEJBReceiver extends EJBReceiver {
         RequestBuilder builder = new RequestBuilder()
                 .setRequestType(RequestType.CREATE_SESSION)
                 .setLocator(locator)
-                .setView(locator.getViewType().getName());
-        builder.setVersion(targetContext.getProtocolVersion());
+                .setView(locator.getViewType().getName())
+                .setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
                     Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
@@ -354,9 +354,9 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setRequestType(RequestType.CANCEL_INVOCATION)
                 .setLocator(locator)
                 .setCancelIfRunning(cancelIfRunning)
-                .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID));
+                .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID))
+                .setVersion(targetContext.getProtocolVersion());
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
-        builder.setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null, (stream, response, closeable) -> {
             try {
