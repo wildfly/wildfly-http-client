@@ -69,8 +69,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
-import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION;
+import static org.wildfly.httpclient.ejb.Constants.JSESSIONID_COOKIE_NAME;
 
 /**
  * Http handler for EJB invocations.
@@ -133,7 +133,7 @@ final class HttpInvocationHandler extends RemoteHTTPHandler {
         final String sessionAffinity = cookie != null ? cookie.getValue() : null;
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
 
-        final String cancellationId = exchange.getRequestHeaders().getFirst(EjbConstants.INVOCATION_ID);
+        final String cancellationId = exchange.getRequestHeaders().getFirst(Constants.INVOCATION_ID);
         final InvocationIdentifier identifier;
         if(cancellationId != null && sessionAffinity != null) {
             identifier = new InvocationIdentifier(cancellationId, sessionAffinity);
@@ -382,7 +382,7 @@ final class HttpInvocationHandler extends RemoteHTTPHandler {
                 cancellationFlags.remove(identifier);
             }
             try {
-                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE.toString());
+                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, Constants.EJB_RESPONSE.toString());
 //                                    if (output.getSessionAffinity() != null) {
 //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
 //                                    }

@@ -22,10 +22,9 @@ import org.wildfly.httpclient.common.ContentType;
 import io.undertow.util.HttpString;
 
 /**
- * @author Stuart Douglas
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class EjbConstants {
+final class Constants {
 
     // request headers
     static final ContentType INVOCATION_ACCEPT = new ContentType("application/x-wf-ejb-response", 1);
@@ -52,7 +51,7 @@ final class EjbConstants {
     static final int HTTP_PORT = 80;
     static final int HTTPS_PORT = 443;
 
-    private EjbConstants() {
+    private Constants() {
         // forbidden instantiation
     }
 

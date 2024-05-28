@@ -33,8 +33,8 @@ import org.jboss.ejb.client.EJBTransportProvider;
  */
 public class HttpClientProvider implements EJBTransportProvider {
 
-    public static final String HTTP = EjbConstants.HTTP_SCHEME;
-    public static final String HTTPS = EjbConstants.HTTPS_SCHEME;
+    public static final String HTTP = Constants.HTTP_SCHEME;
+    public static final String HTTPS = Constants.HTTPS_SCHEME;
     public static final Set<String> PROTOCOLS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(HTTP, HTTPS)));
 
     private static final AttachmentKey<HttpEJBReceiver> RECEIVER = new AttachmentKey<>();

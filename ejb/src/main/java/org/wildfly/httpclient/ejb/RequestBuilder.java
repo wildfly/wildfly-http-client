@@ -26,12 +26,12 @@ import static io.undertow.util.Headers.CHUNKED;
 import static io.undertow.util.Headers.GZIP;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
-import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
+import static org.wildfly.httpclient.ejb.Constants.EJB_EXCEPTION;
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION_ACCEPT;
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION_ID;
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION;
+import static org.wildfly.httpclient.ejb.Constants.SESSION_OPEN;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.net.URLEncoder.encode;

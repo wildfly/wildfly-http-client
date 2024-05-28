@@ -52,8 +52,8 @@ import java.util.Base64;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
-import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+import static org.wildfly.httpclient.ejb.Constants.JSESSIONID_COOKIE_NAME;
+import static org.wildfly.httpclient.ejb.Constants.SESSION_OPEN;
 
 /**
  * Http handler for open session requests.
@@ -218,8 +218,8 @@ final class HttpSessionOpenHandler extends RemoteHTTPHandler {
                         exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
                     }
 
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE_NEW_SESSION.toString());
-                    exchange.getResponseHeaders().put(EjbConstants.EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
+                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, Constants.EJB_RESPONSE_NEW_SESSION.toString());
+                    exchange.getResponseHeaders().put(Constants.EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
 
                     exchange.setStatusCode(StatusCodes.NO_CONTENT);
                     exchange.endExchange();

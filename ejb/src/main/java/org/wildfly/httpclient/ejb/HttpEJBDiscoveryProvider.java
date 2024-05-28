@@ -51,8 +51,8 @@ import java.util.stream.Collectors;
 
 import static java.security.AccessController.doPrivileged;
 import static org.jboss.ejb.client.EJBClientContext.getCurrent;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_SCHEME;
+import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.ejb.Constants.HTTP_SCHEME;
 
 /**
  * @author <a href="mailto:tadamski@redhat.com">Tomasz Adamski</a>
@@ -179,7 +179,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                     EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
                     outstandingLatch.countDown();
                 },
-                EjbConstants.EJB_DISCOVERY_RESPONSE, null);
+                Constants.EJB_DISCOVERY_RESPONSE, null);
     }
 
     private ServiceURL createServiceURL(final URI newUri, final EJBModuleIdentifier moduleIdentifier) {

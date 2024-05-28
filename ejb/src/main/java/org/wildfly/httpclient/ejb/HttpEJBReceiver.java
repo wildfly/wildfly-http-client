@@ -77,9 +77,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPOutputStream;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_PORT;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTPS_SCHEME;
-import static org.wildfly.httpclient.ejb.EjbConstants.HTTP_PORT;
+import static org.wildfly.httpclient.ejb.Constants.HTTPS_PORT;
+import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.ejb.Constants.HTTP_PORT;
 
 /**
  * EJB receiver for invocations over HTTP.
@@ -253,7 +253,7 @@ class HttpEJBReceiver extends EJBReceiver {
                             }
                         });
                 }),
-                (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), EjbConstants.EJB_RESPONSE, null);
+                (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
 
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
@@ -296,7 +296,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 },
                 ((unmarshaller, response, c) -> {
                     try {
-                        String sessionId = response.getResponseHeaders().getFirst(EjbConstants.EJB_SESSION_ID);
+                        String sessionId = response.getResponseHeaders().getFirst(Constants.EJB_SESSION_ID);
                         if (sessionId == null) {
                             result.completeExceptionally(EjbHttpClientMessages.MESSAGES.noSessionIdInResponse());
                         } else {
@@ -307,7 +307,7 @@ class HttpEJBReceiver extends EJBReceiver {
                         IoUtils.safeClose(c);
                     }
                 })
-                , result::completeExceptionally, EjbConstants.EJB_RESPONSE_NEW_SESSION, null);
+                , result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
 
         return result.get();
     }

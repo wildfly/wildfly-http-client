@@ -69,7 +69,7 @@ final class HttpDiscoveryHandler extends RemoteHTTPHandler {
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
-        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_DISCOVERY_RESPONSE.toString());
+        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, Constants.EJB_DISCOVERY_RESPONSE.toString());
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange)
                 .createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
