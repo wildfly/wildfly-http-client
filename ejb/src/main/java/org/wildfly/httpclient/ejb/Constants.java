@@ -40,6 +40,9 @@ final class Constants {
     static final HttpString EJB_SESSION_ID = new HttpString("x-wf-ejb-jbmar-session-id");
     static final HttpString INVOCATION_ID = new HttpString("X-wf-invocation-id");
 
+    // context path
+    static final String EJB_CONTEXT = "/ejb";
+
     // cookies
     static final String JSESSIONID_COOKIE_NAME = "JSESSIONID";
 
