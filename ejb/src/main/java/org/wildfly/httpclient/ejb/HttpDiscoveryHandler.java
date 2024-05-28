@@ -41,7 +41,7 @@ import java.util.concurrent.ExecutorService;
  * @author <a href="mailto:tadamski@redhat.com">Tomasz Adamski</a>
  */
 
-public class HttpDiscoveryHandler extends RemoteHTTPHandler {
+final class HttpDiscoveryHandler extends RemoteHTTPHandler {
 
     private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
     private final HttpServiceConfig httpServiceConfig;

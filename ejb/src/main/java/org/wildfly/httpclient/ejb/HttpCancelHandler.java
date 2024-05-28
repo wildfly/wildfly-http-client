@@ -35,7 +35,7 @@ import io.undertow.util.StatusCodes;
 /**
  * @author Stuart Douglas
  */
-class HttpCancelHandler extends RemoteHTTPHandler {
+final class HttpCancelHandler extends RemoteHTTPHandler {
 
     private final Association association;
     private final ExecutorService executorService;

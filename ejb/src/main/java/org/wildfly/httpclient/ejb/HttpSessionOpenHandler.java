@@ -60,8 +60,7 @@ import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
  *
  * @author Stuart Douglas
  */
-class HttpSessionOpenHandler extends RemoteHTTPHandler {
-
+final class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
     private final Association association;
     private final ExecutorService executorService;

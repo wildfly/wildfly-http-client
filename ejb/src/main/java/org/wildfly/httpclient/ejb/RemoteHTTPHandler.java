@@ -33,7 +33,7 @@ import io.undertow.util.AttachmentKey;
  *
  * @author Stuart Douglas
  */
-public abstract class RemoteHTTPHandler implements HttpHandler {
+abstract class RemoteHTTPHandler implements HttpHandler {
 
     private final ExecutorService executorService;
 
