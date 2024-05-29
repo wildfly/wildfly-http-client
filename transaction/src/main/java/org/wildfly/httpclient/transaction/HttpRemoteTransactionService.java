@@ -24,15 +24,6 @@ import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
 import static org.wildfly.httpclient.transaction.Constants.XID;
-import static org.wildfly.httpclient.transaction.RequestType.UT_BEGIN;
-import static org.wildfly.httpclient.transaction.RequestType.UT_COMMIT;
-import static org.wildfly.httpclient.transaction.RequestType.UT_ROLLBACK;
-import static org.wildfly.httpclient.transaction.RequestType.XA_BEFORE_COMPLETION;
-import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
-import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
-import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
-import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
-import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
@@ -84,15 +75,10 @@ public class HttpRemoteTransactionService {
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
-        registerHandler(routingHandler, UT_BEGIN);
-        registerHandler(routingHandler, UT_COMMIT);
-        registerHandler(routingHandler, UT_ROLLBACK);
-        registerHandler(routingHandler, XA_BEFORE_COMPLETION);
-        registerHandler(routingHandler, XA_COMMIT);
-        registerHandler(routingHandler, XA_FORGET);
-        registerHandler(routingHandler, XA_PREPARE);
-        registerHandler(routingHandler, XA_RECOVER);
-        registerHandler(routingHandler, XA_ROLLBACK);
+        for (RequestType requestType : RequestType.values()) {
+            registerHandler(routingHandler, requestType);
+        }
+
         return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
@@ -101,16 +87,18 @@ public class HttpRemoteTransactionService {
     }
 
     private HttpHandler newInvocationHandler(final RequestType requestType) {
-        if (requestType == UT_BEGIN) return new BeginHandler();
-        if (requestType == UT_COMMIT) return new UTCommitHandler();
-        if (requestType == UT_ROLLBACK) return new UTRollbackHandler();
-        if (requestType == XA_BEFORE_COMPLETION) return new XABeforeCompletionHandler();
-        if (requestType == XA_COMMIT) return new XACommitHandler();
-        if (requestType == XA_FORGET) return new XAForgetHandler();
-        if (requestType == XA_PREPARE) return new XAPrepHandler();
-        if (requestType == XA_RECOVER) return new XARecoveryHandler();
-        if (requestType == XA_ROLLBACK) return new XARollbackHandler();
-        throw new IllegalStateException();
+        switch (requestType) {
+            case UT_BEGIN: return new BeginHandler();
+            case UT_COMMIT: return new UTCommitHandler();
+            case UT_ROLLBACK: return new UTRollbackHandler();
+            case XA_BEFORE_COMPLETION: return new XABeforeCompletionHandler();
+            case XA_COMMIT: return new XACommitHandler();
+            case XA_FORGET: return new XAForgetHandler();
+            case XA_PREPARE: return new XAPrepHandler();
+            case XA_RECOVER: return new XARecoveryHandler();
+            case XA_ROLLBACK: return new XARollbackHandler();
+            default: throw new IllegalStateException();
+        }
     }
 
     abstract class AbstractTransactionHandler implements HttpHandler {
