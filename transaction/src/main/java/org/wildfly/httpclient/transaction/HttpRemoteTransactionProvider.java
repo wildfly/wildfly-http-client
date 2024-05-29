@@ -18,8 +18,8 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.TransactionConstants.HTTP_SCHEME;
-import static org.wildfly.httpclient.transaction.TransactionConstants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.transaction.Constants.HTTP_SCHEME;
+import static org.wildfly.httpclient.transaction.Constants.HTTPS_SCHEME;
 
 import java.net.URI;
 

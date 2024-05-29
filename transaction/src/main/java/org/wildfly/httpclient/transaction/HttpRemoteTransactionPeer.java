@@ -41,7 +41,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
 
 /**
  * @author Stuart Douglas

@@ -22,10 +22,9 @@ import org.wildfly.httpclient.common.ContentType;
 import io.undertow.util.HttpString;
 
 /**
- * @author Stuart Douglas
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class TransactionConstants {
+final class Constants {
 
     // request headers
     static final ContentType EXCEPTION = new ContentType("application/x-wf-jbmar-exception", 1);
@@ -47,7 +46,7 @@ final class TransactionConstants {
     static final String HTTP_SCHEME = "http";
     static final String HTTPS_SCHEME = "https";
 
-    private TransactionConstants() {
+    private Constants() {
         // forbidden instantiation
     }
 

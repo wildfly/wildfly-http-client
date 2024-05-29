@@ -18,6 +18,22 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.transaction.Constants.EXCEPTION;
+import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
+import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
+import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
+import static org.wildfly.httpclient.transaction.Constants.XID;
+import static org.wildfly.httpclient.transaction.RequestType.UT_BEGIN;
+import static org.wildfly.httpclient.transaction.RequestType.UT_COMMIT;
+import static org.wildfly.httpclient.transaction.RequestType.UT_ROLLBACK;
+import static org.wildfly.httpclient.transaction.RequestType.XA_BEFORE_COMPLETION;
+import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
+import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
+import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
+import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
+import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
+
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
@@ -46,22 +62,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.function.Function;
-
-import static org.wildfly.httpclient.transaction.RequestType.UT_BEGIN;
-import static org.wildfly.httpclient.transaction.RequestType.UT_COMMIT;
-import static org.wildfly.httpclient.transaction.RequestType.UT_ROLLBACK;
-import static org.wildfly.httpclient.transaction.RequestType.XA_BEFORE_COMPLETION;
-import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
-import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
-import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
-import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
-import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
-import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
-import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
-import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
-import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 /**
  * @author Stuart Douglas
