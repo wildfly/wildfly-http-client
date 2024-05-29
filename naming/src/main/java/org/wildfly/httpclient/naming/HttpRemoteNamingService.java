@@ -18,6 +18,11 @@
 
 package org.wildfly.httpclient.naming;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
+import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
+import static org.wildfly.httpclient.naming.Constants.VALUE;
+
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
@@ -50,21 +55,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.function.Function;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
-import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
-import static org.wildfly.httpclient.naming.Constants.VALUE;
-import static org.wildfly.httpclient.naming.RequestType.BIND;
-import static org.wildfly.httpclient.naming.RequestType.CREATE_SUBCONTEXT;
-import static org.wildfly.httpclient.naming.RequestType.DESTROY_SUBCONTEXT;
-import static org.wildfly.httpclient.naming.RequestType.LIST_BINDINGS;
-import static org.wildfly.httpclient.naming.RequestType.LIST;
-import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
-import static org.wildfly.httpclient.naming.RequestType.LOOKUP;
-import static org.wildfly.httpclient.naming.RequestType.REBIND;
-import static org.wildfly.httpclient.naming.RequestType.RENAME;
-import static org.wildfly.httpclient.naming.RequestType.UNBIND;
-
 /**
  * HTTP service that handles naming invocations.
  *
@@ -95,16 +85,10 @@ public class HttpRemoteNamingService {
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
         final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
-        registerHandler(routingHandler, BIND, nameParamPathSuffix);
-        registerHandler(routingHandler, CREATE_SUBCONTEXT, nameParamPathSuffix);
-        registerHandler(routingHandler, DESTROY_SUBCONTEXT, nameParamPathSuffix);
-        registerHandler(routingHandler, LIST, nameParamPathSuffix);
-        registerHandler(routingHandler, LIST_BINDINGS, nameParamPathSuffix);
-        registerHandler(routingHandler, LOOKUP, nameParamPathSuffix);
-        registerHandler(routingHandler, LOOKUP_LINK, nameParamPathSuffix);
-        registerHandler(routingHandler, REBIND, nameParamPathSuffix);
-        registerHandler(routingHandler, RENAME, nameParamPathSuffix);
-        registerHandler(routingHandler, UNBIND, nameParamPathSuffix);
+        for (RequestType requestType : RequestType.values()) {
+            registerHandler(routingHandler, requestType, nameParamPathSuffix);
+        }
+
         return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
@@ -113,17 +97,19 @@ public class HttpRemoteNamingService {
     }
 
     private HttpHandler newInvocationHandler(final RequestType requestType) {
-        if (requestType == BIND) return new BindHandler();
-        if (requestType == CREATE_SUBCONTEXT) return new CreateSubContextHandler();
-        if (requestType == DESTROY_SUBCONTEXT) return new DestroySubcontextHandler();
-        if (requestType == LIST) return new ListHandler();
-        if (requestType == LIST_BINDINGS) return new ListBindingsHandler();
-        if (requestType == LOOKUP) return new LookupHandler();
-        if (requestType == LOOKUP_LINK) return new LookupLinkHandler();
-        if (requestType == REBIND) return new RebindHandler();
-        if (requestType == RENAME) return new RenameHandler();
-        if (requestType == UNBIND) return new UnbindHandler();
-        throw new IllegalStateException();
+        switch (requestType) {
+            case BIND: return new BindHandler();
+            case CREATE_SUBCONTEXT: return new CreateSubContextHandler();
+            case DESTROY_SUBCONTEXT: return new DestroySubcontextHandler();
+            case LIST: return new ListHandler();
+            case LIST_BINDINGS: return new ListBindingsHandler();
+            case LOOKUP: return new LookupHandler();
+            case LOOKUP_LINK: return new LookupLinkHandler();
+            case REBIND: return new RebindHandler();
+            case RENAME: return new RenameHandler();
+            case UNBIND: return new UnbindHandler();
+            default: throw new IllegalStateException();
+        }
     }
 
     private abstract class NameHandler implements HttpHandler {
