@@ -20,12 +20,15 @@ package org.wildfly.httpclient.naming;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.StatusCodes;
+import org.jboss.marshalling.ByteInput;
+import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.naming.client.AbstractContext;
 import org.wildfly.naming.client.CloseableNamingEnumeration;
@@ -74,6 +77,8 @@ import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
 import static org.wildfly.httpclient.naming.RequestType.REBIND;
 import static org.wildfly.httpclient.naming.RequestType.RENAME;
 import static org.wildfly.httpclient.naming.RequestType.UNBIND;
+import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
+import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 
 /**
  * Root naming context.
@@ -299,18 +304,15 @@ public class HttpRootContext extends AbstractContext {
                     ClassLoader old = setContextClassLoader(tccl);
                     try {
                         final Unmarshaller unmarshaller = createUnmarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
-                        unmarshaller.start(new InputStreamByteInput(input));
-                        returned = unmarshaller.readObject();
-                        // finish unmarshalling
-                        if (unmarshaller.read() != -1) {
-                            exception = HttpNamingClientMessages.MESSAGES.unexpectedDataInResponse();
+                       try (ByteInput in = new InputStreamByteInput(input)) {
+                            unmarshaller.start(in);
+                            returned = deserializeObject(unmarshaller);
+                            unmarshaller.finish();
                         }
-                        unmarshaller.finish();
 
                         if (response.getResponseCode() >= 400) {
                             exception = (Exception) returned;
                         }
-
                     } catch (Exception e) {
                         exception = e;
                     } finally {
@@ -372,11 +374,13 @@ public class HttpRootContext extends AbstractContext {
         targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, output -> {
             if (object != null) {
                 Marshaller marshaller = createMarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeObject(object);
-                marshaller.finish();
+                ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(output));
+                try (out) {
+                    marshaller.start(out);
+                    serializeObject(marshaller, object);
+                    marshaller.finish();
+                }
             }
-            IoUtils.safeClose(output);
         }, (input, response, closeable) -> {
             try {
                 result.complete(null);

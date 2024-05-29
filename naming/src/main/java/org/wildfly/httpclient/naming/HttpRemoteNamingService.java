@@ -22,6 +22,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
+import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
+import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
@@ -30,8 +32,10 @@ import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.util.Headers;
 import io.undertow.util.PathTemplateMatch;
 import io.undertow.util.StatusCodes;
-import org.jboss.marshalling.ContextClassResolver;
+import org.jboss.marshalling.ByteInput;
+import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
+import org.jboss.marshalling.ContextClassResolver;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
@@ -48,7 +52,6 @@ import javax.naming.NameClassPair;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InvalidClassException;
 import java.net.URLDecoder;
 import java.util.Collections;
@@ -226,12 +229,12 @@ public class HttpRemoteNamingService {
                 return null;
             }
             final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
-            try (InputStream inputStream = exchange.getInputStream()) {
+            try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
                 Unmarshaller unmarshaller = classResolverFilter != null ?
                         marshallerFactory.createUnmarshaller(new FilterClassResolver(classResolverFilter)):
                         marshallerFactory.createUnmarshaller();
-                unmarshaller.start(new InputStreamByteInput(inputStream));
-                Object object = unmarshaller.readObject();
+                unmarshaller.start(in);
+                Object object = deserializeObject(unmarshaller);
                 unmarshaller.finish();
                 doOperation(name, object);
             } catch (Exception e) {
@@ -254,10 +257,12 @@ public class HttpRemoteNamingService {
         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
         HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
         Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-        marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream())));
-        marshaller.writeObject(result);
-        marshaller.finish();
-        marshaller.flush();
+        ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream()));
+        try (out) {
+            marshaller.start(out);
+            serializeObject(marshaller, result);
+            marshaller.finish();
+        }
     }
 
     @Deprecated
