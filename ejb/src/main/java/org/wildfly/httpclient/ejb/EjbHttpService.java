@@ -18,11 +18,6 @@
 
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.ejb.RequestType.CANCEL;
-import static org.wildfly.httpclient.ejb.RequestType.CREATE_SESSION;
-import static org.wildfly.httpclient.ejb.RequestType.DISCOVER;
-import static org.wildfly.httpclient.ejb.RequestType.INVOKE;
-
 import io.undertow.conduits.GzipStreamSourceConduit;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.AllowedMethodsHandler;
@@ -79,10 +74,9 @@ public class EjbHttpService {
 
     public HttpHandler createHttpHandler() {
         PathHandler pathHandler = new PathHandler();
-        registerHandler(pathHandler, CANCEL);
-        registerHandler(pathHandler, CREATE_SESSION);
-        registerHandler(pathHandler, DISCOVER);
-        registerHandler(pathHandler, INVOKE);
+        for (RequestType requestType : RequestType.values()) {
+            registerHandler(pathHandler, requestType);
+        }
 
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
@@ -95,11 +89,13 @@ public class EjbHttpService {
     }
 
     private HttpHandler newInvocationHandler(final RequestType requestType) {
-        if (requestType == CANCEL) return new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags);
-        if (requestType == CREATE_SESSION) return new HttpSessionOpenHandler(association, executorService, localTransactionContext, httpServiceConfig);
-        if (requestType == DISCOVER) return new HttpDiscoveryHandler(executorService, association, httpServiceConfig);
-        if (requestType == INVOKE) return new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig);
-        throw new IllegalStateException();
+        switch (requestType) {
+            case INVOKE: return new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig);
+            case CANCEL : return new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags);
+            case CREATE_SESSION: return new HttpSessionOpenHandler(association, executorService, localTransactionContext, httpServiceConfig);
+            case DISCOVER: return new HttpDiscoveryHandler(executorService, association, httpServiceConfig);
+            default: throw new IllegalStateException();
+        }
     }
 
 }
