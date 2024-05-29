@@ -23,7 +23,6 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
@@ -48,20 +47,20 @@ import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.function.Function;
 
+import static org.wildfly.httpclient.transaction.RequestType.UT_BEGIN;
+import static org.wildfly.httpclient.transaction.RequestType.UT_COMMIT;
+import static org.wildfly.httpclient.transaction.RequestType.UT_ROLLBACK;
+import static org.wildfly.httpclient.transaction.RequestType.XA_BEFORE_COMPLETION;
+import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
+import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
+import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
+import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
+import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
 import static org.wildfly.httpclient.transaction.TransactionConstants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.TransactionConstants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.TransactionConstants.TIMEOUT;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_BEGIN_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_COMMIT_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.UT_ROLLBACK_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_BC_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_COMMIT_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_FORGET_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_PREP_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_RECOVER_PATH;
-import static org.wildfly.httpclient.transaction.TransactionConstants.XA_ROLLBACK_PATH;
 import static org.wildfly.httpclient.transaction.TransactionConstants.XID;
 
 /**
@@ -85,16 +84,33 @@ public class HttpRemoteTransactionService {
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
-        routingHandler.add(Methods.POST, UT_BEGIN_PATH, new BeginHandler());
-        routingHandler.add(Methods.POST, UT_ROLLBACK_PATH, new UTRollbackHandler());
-        routingHandler.add(Methods.POST, UT_COMMIT_PATH, new UTCommitHandler());
-        routingHandler.add(Methods.POST, XA_BC_PATH, new XABeforeCompletionHandler());
-        routingHandler.add(Methods.POST, XA_COMMIT_PATH, new XACommitHandler());
-        routingHandler.add(Methods.POST, XA_FORGET_PATH, new XAForgetHandler());
-        routingHandler.add(Methods.POST, XA_PREP_PATH, new XAPrepHandler());
-        routingHandler.add(Methods.POST, XA_ROLLBACK_PATH, new XARollbackHandler());
-        routingHandler.add(Methods.GET, XA_RECOVER_PATH, new XARecoveryHandler());
+        registerHandler(routingHandler, UT_BEGIN);
+        registerHandler(routingHandler, UT_COMMIT);
+        registerHandler(routingHandler, UT_ROLLBACK);
+        registerHandler(routingHandler, XA_BEFORE_COMPLETION);
+        registerHandler(routingHandler, XA_COMMIT);
+        registerHandler(routingHandler, XA_FORGET);
+        registerHandler(routingHandler, XA_PREPARE);
+        registerHandler(routingHandler, XA_RECOVER);
+        registerHandler(routingHandler, XA_ROLLBACK);
         return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
+    }
+
+    private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType) {
+        routingHandler.add(requestType.getMethod(), requestType.getPath(), newInvocationHandler(requestType));
+    }
+
+    private HttpHandler newInvocationHandler(final RequestType requestType) {
+        if (requestType == UT_BEGIN) return new BeginHandler();
+        if (requestType == UT_COMMIT) return new UTCommitHandler();
+        if (requestType == UT_ROLLBACK) return new UTRollbackHandler();
+        if (requestType == XA_BEFORE_COMPLETION) return new XABeforeCompletionHandler();
+        if (requestType == XA_COMMIT) return new XACommitHandler();
+        if (requestType == XA_FORGET) return new XAForgetHandler();
+        if (requestType == XA_PREPARE) return new XAPrepHandler();
+        if (requestType == XA_RECOVER) return new XARecoveryHandler();
+        if (requestType == XA_ROLLBACK) return new XARollbackHandler();
+        throw new IllegalStateException();
     }
 
     abstract class AbstractTransactionHandler implements HttpHandler {
