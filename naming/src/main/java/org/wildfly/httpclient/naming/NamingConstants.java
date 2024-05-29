@@ -32,18 +32,6 @@ final class NamingConstants {
     // context path
     static final String NAMING_CONTEXT = "/naming";
 
-    // paths
-    static final String BIND_PATH = "/bind";
-    static final String CREATE_SUBCONTEXT_PATH = "/create-subcontext";
-    static final String DESTROY_SUBCONTEXT_PATH = "/dest-subctx";
-    static final String LIST_PATH = "/list";
-    static final String LIST_BINDINGS_PATH = "/list-bindings";
-    static final String LOOKUP_PATH = "/lookup";
-    static final String LOOKUP_LINK_PATH = "/lookuplink";
-    static final String REBIND_PATH = "/rebind";
-    static final String RENAME_PATH = "/rename";
-    static final String UNBIND_PATH = "/unbind";
-
     // params
     static final String NAME_PATH_PARAMETER = "name";
     static final String NEW_QUERY_PARAMETER = "new";

@@ -23,7 +23,6 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 import io.undertow.util.PathTemplateMatch;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ContextClassResolver;
@@ -52,19 +51,19 @@ import java.util.Deque;
 import java.util.function.Function;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.NAME_PATH_PARAMETER;
 import static org.wildfly.httpclient.naming.NamingConstants.NEW_QUERY_PARAMETER;
-import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+import static org.wildfly.httpclient.naming.RequestType.BIND;
+import static org.wildfly.httpclient.naming.RequestType.CREATE_SUBCONTEXT;
+import static org.wildfly.httpclient.naming.RequestType.DESTROY_SUBCONTEXT;
+import static org.wildfly.httpclient.naming.RequestType.LIST_BINDINGS;
+import static org.wildfly.httpclient.naming.RequestType.LIST;
+import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
+import static org.wildfly.httpclient.naming.RequestType.LOOKUP;
+import static org.wildfly.httpclient.naming.RequestType.REBIND;
+import static org.wildfly.httpclient.naming.RequestType.RENAME;
+import static org.wildfly.httpclient.naming.RequestType.UNBIND;
 
 /**
  * HTTP service that handles naming invocations.
@@ -96,19 +95,36 @@ public class HttpRemoteNamingService {
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
         final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
-        routingHandler.add(Methods.POST, LOOKUP_PATH + nameParamPathSuffix, new LookupHandler());
-        routingHandler.add(Methods.GET, LOOKUP_LINK_PATH + nameParamPathSuffix, new LookupLinkHandler());
-        routingHandler.add(Methods.PUT, BIND_PATH + nameParamPathSuffix, new BindHandler());
-        routingHandler.add(Methods.PATCH, REBIND_PATH + nameParamPathSuffix, new RebindHandler());
-        routingHandler.add(Methods.DELETE, UNBIND_PATH + nameParamPathSuffix, new UnbindHandler());
-        routingHandler.add(Methods.DELETE, DESTROY_SUBCONTEXT_PATH + nameParamPathSuffix, new DestroySubcontextHandler());
-        routingHandler.add(Methods.GET, LIST_PATH + nameParamPathSuffix, new ListHandler());
-        routingHandler.add(Methods.GET, LIST_BINDINGS_PATH + nameParamPathSuffix, new ListBindingsHandler());
-        routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler());
-        routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler());
+        registerHandler(routingHandler, BIND, nameParamPathSuffix);
+        registerHandler(routingHandler, CREATE_SUBCONTEXT, nameParamPathSuffix);
+        registerHandler(routingHandler, DESTROY_SUBCONTEXT, nameParamPathSuffix);
+        registerHandler(routingHandler, LIST, nameParamPathSuffix);
+        registerHandler(routingHandler, LIST_BINDINGS, nameParamPathSuffix);
+        registerHandler(routingHandler, LOOKUP, nameParamPathSuffix);
+        registerHandler(routingHandler, LOOKUP_LINK, nameParamPathSuffix);
+        registerHandler(routingHandler, REBIND, nameParamPathSuffix);
+        registerHandler(routingHandler, RENAME, nameParamPathSuffix);
+        registerHandler(routingHandler, UNBIND, nameParamPathSuffix);
         return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
+    private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType, final String pathParameter) {
+        routingHandler.add(requestType.getMethod(), requestType.getPath() + pathParameter, newInvocationHandler(requestType));
+    }
+
+    private HttpHandler newInvocationHandler(final RequestType requestType) {
+        if (requestType == BIND) return new BindHandler();
+        if (requestType == CREATE_SUBCONTEXT) return new CreateSubContextHandler();
+        if (requestType == DESTROY_SUBCONTEXT) return new DestroySubcontextHandler();
+        if (requestType == LIST) return new ListHandler();
+        if (requestType == LIST_BINDINGS) return new ListBindingsHandler();
+        if (requestType == LOOKUP) return new LookupHandler();
+        if (requestType == LOOKUP_LINK) return new LookupLinkHandler();
+        if (requestType == REBIND) return new RebindHandler();
+        if (requestType == RENAME) return new RenameHandler();
+        if (requestType == UNBIND) return new UnbindHandler();
+        throw new IllegalStateException();
+    }
 
     private abstract class NameHandler implements HttpHandler {
 
