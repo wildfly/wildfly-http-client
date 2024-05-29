@@ -51,9 +51,9 @@ import java.util.Deque;
 import java.util.function.Function;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.wildfly.httpclient.naming.NamingConstants.NAME_PATH_PARAMETER;
-import static org.wildfly.httpclient.naming.NamingConstants.NEW_QUERY_PARAMETER;
-import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
+import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
+import static org.wildfly.httpclient.naming.Constants.VALUE;
 import static org.wildfly.httpclient.naming.RequestType.BIND;
 import static org.wildfly.httpclient.naming.RequestType.CREATE_SUBCONTEXT;
 import static org.wildfly.httpclient.naming.RequestType.DESTROY_SUBCONTEXT;

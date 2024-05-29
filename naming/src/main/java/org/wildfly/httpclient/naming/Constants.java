@@ -23,7 +23,7 @@ import org.wildfly.httpclient.common.ContentType;
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class NamingConstants {
+final class Constants {
 
     // request headers
     static final ContentType VALUE = new ContentType("application/x-wf-jndi-jbmar-value", 1);
@@ -45,7 +45,7 @@ final class NamingConstants {
     static final int HTTP_PORT = 80;
     static final int HTTPS_PORT = 443;
 
-    private NamingConstants() {
+    private Constants() {
         // forbidden instantiation
     }
 

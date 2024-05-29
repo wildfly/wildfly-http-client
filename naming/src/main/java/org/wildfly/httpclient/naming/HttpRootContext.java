@@ -60,10 +60,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_PORT;
-import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
-import static org.wildfly.httpclient.naming.NamingConstants.HTTP_PORT;
-import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+import static org.wildfly.httpclient.naming.Constants.HTTPS_PORT;
+import static org.wildfly.httpclient.naming.Constants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.naming.Constants.HTTP_PORT;
+import static org.wildfly.httpclient.naming.Constants.VALUE;
 import static org.wildfly.httpclient.naming.RequestType.BIND;
 import static org.wildfly.httpclient.naming.RequestType.CREATE_SUBCONTEXT;
 import static org.wildfly.httpclient.naming.RequestType.DESTROY_SUBCONTEXT;
