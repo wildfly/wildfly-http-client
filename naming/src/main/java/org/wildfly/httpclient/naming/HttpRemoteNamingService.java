@@ -84,16 +84,16 @@ public class HttpRemoteNamingService {
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
-        final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
         for (RequestType requestType : RequestType.values()) {
-            registerHandler(routingHandler, requestType, nameParamPathSuffix);
+            registerHandler(routingHandler, requestType);
         }
 
         return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
-    private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType, final String pathParameter) {
-        routingHandler.add(requestType.getMethod(), requestType.getPath() + pathParameter, newInvocationHandler(requestType));
+    private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType) {
+        final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
+        routingHandler.add(requestType.getMethod(), requestType.getPath() + nameParamPathSuffix, newInvocationHandler(requestType));
     }
 
     private HttpHandler newInvocationHandler(final RequestType requestType) {
