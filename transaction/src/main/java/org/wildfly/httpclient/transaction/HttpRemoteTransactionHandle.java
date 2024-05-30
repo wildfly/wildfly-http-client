@@ -18,10 +18,14 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
+import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
+
 import io.undertow.client.ClientRequest;
+import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SimpleTransactionControl;
 import org.xnio.IoUtils;
@@ -84,16 +88,11 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
                 Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeInt(id.getFormatId());
-                final byte[] gtid = id.getGlobalTransactionId();
-                marshaller.writeInt(gtid.length);
-                marshaller.write(gtid);
-                final byte[] bq = id.getBranchQualifier();
-                marshaller.writeInt(bq.length);
-                marshaller.write(bq);
-                marshaller.finish();
-                output.close();
+                try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(output))) {
+                    marshaller.start(out);
+                    serializeXid(marshaller, id);
+                    marshaller.finish();
+                }
             }, (input, response, closable) -> {
                 try {
                     result.complete(null);
@@ -152,16 +151,11 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
                 Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeInt(id.getFormatId());
-                final byte[] gtid = id.getGlobalTransactionId();
-                marshaller.writeInt(gtid.length);
-                marshaller.write(gtid);
-                final byte[] bq = id.getBranchQualifier();
-                marshaller.writeInt(bq.length);
-                marshaller.write(bq);
-                marshaller.finish();
-                output.close();
+                try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(output))) {
+                    marshaller.start(out);
+                    serializeXid(marshaller, id);
+                    marshaller.finish();
+                }
             }, (input, response, closeable) -> {
                 try {
                     result.complete(null);
