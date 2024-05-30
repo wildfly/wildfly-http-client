@@ -24,6 +24,11 @@ import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
 import static org.wildfly.httpclient.transaction.Constants.XID;
+import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.transaction.Serializer.serializeThrowable;
+import static org.wildfly.httpclient.transaction.Serializer.deserializeXid;
+import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
+import static org.wildfly.httpclient.transaction.Serializer.serializeXidArray;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
@@ -31,10 +36,10 @@ import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
+import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.common.function.ExceptionBiFunction;
 import org.wildfly.httpclient.common.ContentType;
@@ -45,7 +50,6 @@ import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
-import org.wildfly.transaction.client.SimpleXid;
 
 import javax.transaction.xa.Xid;
 import java.io.ByteArrayOutputStream;
@@ -115,17 +119,12 @@ public class HttpRemoteTransactionService {
             try {
                 HttpMarshallerFactory httpMarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
                 Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
-                unmarshaller.start(new InputStreamByteInput(exchange.getInputStream()));
-                int formatId = unmarshaller.readInt();
-                int len = unmarshaller.readInt();
-                byte[] globalId = new byte[len];
-                unmarshaller.readFully(globalId);
-                len = unmarshaller.readInt();
-                byte[] branchId = new byte[len];
-                unmarshaller.readFully(branchId);
-                SimpleXid simpleXid = new SimpleXid(formatId, globalId, branchId);
-                unmarshaller.finish();
-
+                Xid simpleXid;
+                try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
+                    unmarshaller.start(in);
+                    simpleXid = deserializeXid(unmarshaller);
+                    unmarshaller.finish();
+                }
                 ImportResult<LocalTransaction> transaction = transactionContext.findOrImportTransaction(simpleXid, 0);
                 transaction.getTransaction().performFunction((ExceptionBiFunction<ImportResult<LocalTransaction>, HttpServerExchange, Void, Exception>) (o, exchange2) -> {
                     handleImpl(exchange2, o);
@@ -155,14 +154,13 @@ public class HttpRemoteTransactionService {
                 final LocalTransaction transaction = transactionContext.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
-                marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
-                marshaller.writeInt(xid.getFormatId());
-                marshaller.writeInt(xid.getGlobalTransactionId().length);
-                marshaller.write(xid.getGlobalTransactionId());
-                marshaller.writeInt(xid.getBranchQualifier().length);
-                marshaller.write(xid.getBranchQualifier());
-                marshaller.finish();
+                final ByteOutput byteOutput = byteOutputOf(out);
+                try (byteOutput) {
+                    Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
+                    marshaller.start(byteOutput);
+                    serializeXid(marshaller, xid);
+                    marshaller.finish();
+                }
                 exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
             } catch (Exception e) {
                 internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
@@ -191,19 +189,16 @@ public class HttpRemoteTransactionService {
 
                 final Xid[] recoveryList = transactionContext.getRecoveryInterface().recover(flags, parentName);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
-                marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
-                marshaller.writeInt(recoveryList.length);
-                for (int i = 0; i < recoveryList.length; ++i) {
-                    Xid xid = recoveryList[i];
-                    marshaller.writeInt(xid.getFormatId());
-                    marshaller.writeInt(xid.getGlobalTransactionId().length);
-                    marshaller.write(xid.getGlobalTransactionId());
-                    marshaller.writeInt(xid.getBranchQualifier().length);
-                    marshaller.write(xid.getBranchQualifier());
+                ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
+                byte[] data;
+                try (byteOutput) {
+                    Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
+                    marshaller.start(byteOutput);
+                    serializeXidArray(marshaller, recoveryList);
+                    marshaller.finish();
+                    data = out.toByteArray();
                 }
-                marshaller.finish();
-                exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
+                exchange.getResponseSender().send(ByteBuffer.wrap(data));
             } catch (Exception e) {
                 internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
@@ -278,14 +273,14 @@ public class HttpRemoteTransactionService {
 
             final Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
-            // start the marshaller
-            marshaller.start(byteOutput);
-            marshaller.writeObject(e);
-            marshaller.write(0);
-            marshaller.finish();
-            marshaller.flush();
-            exchange.getResponseSender().send(ByteBuffer.wrap(outputStream.toByteArray()));
+            byte[] data;
+            try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(outputStream))) {
+                marshaller.start(out);
+                serializeThrowable(marshaller, e);
+                marshaller.finish();
+                data = outputStream.toByteArray();
+            }
+            exchange.getResponseSender().send(ByteBuffer.wrap(data));
         } catch (IOException e1) {
             HttpRemoteTransactionMessages.MESSAGES.debugf(e, "Failed to write exception");
         }
@@ -299,14 +294,14 @@ public class HttpRemoteTransactionService {
 
             final Marshaller marshaller = HttpServiceConfig.getInstance().getHttpMarshallerFactory(exchange).createMarshaller();
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
-            // start the marshaller
-            marshaller.start(byteOutput);
-            marshaller.writeObject(e);
-            marshaller.write(0);
-            marshaller.finish();
-            marshaller.flush();
-            exchange.getResponseSender().send(ByteBuffer.wrap(outputStream.toByteArray()));
+            byte[] data;
+            try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(outputStream))) {
+                marshaller.start(out);
+                serializeThrowable(marshaller, e);
+                marshaller.finish();
+                data = outputStream.toByteArray();
+            }
+            exchange.getResponseSender().send(ByteBuffer.wrap(data));
         } catch (IOException e1) {
             HttpRemoteTransactionMessages.MESSAGES.debugf(e, "Failed to write exception");
         }
