@@ -19,7 +19,12 @@
 package org.wildfly.httpclient.ejb;
 
 import static io.undertow.util.Headers.ACCEPT;
+import static io.undertow.util.Headers.ACCEPT_ENCODING;
+import static io.undertow.util.Headers.CONTENT_ENCODING;
 import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.Headers.CHUNKED;
+import static io.undertow.util.Headers.GZIP;
+import static io.undertow.util.Headers.TRANSFER_ENCODING;
 
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
@@ -55,8 +60,20 @@ final class RequestBuilder {
     private String invocationId;
     private int version = Protocol.LATEST;
     private boolean cancelIfRunning;
+    private boolean compressRequest;
+    private boolean compressResponse;
 
     // setters
+
+    RequestBuilder setCompressRequest(final boolean compressRequest) {
+        this.compressRequest = compressRequest;
+        return this;
+    }
+
+    RequestBuilder setCompressResponse(final boolean compressResponse) {
+        this.compressResponse = compressResponse;
+        return this;
+    }
 
     RequestBuilder setLocator(final EJBLocator<?> locator) {
         this.locator = locator;
@@ -128,6 +145,13 @@ final class RequestBuilder {
             if (invocationId != null) {
                 headers.put(INVOCATION_ID, invocationId);
             }
+            if (compressRequest) {
+                headers.put(CONTENT_ENCODING, GZIP.toString());
+            }
+            if (compressResponse) {
+                headers.put(ACCEPT_ENCODING, GZIP.toString());
+            }
+            headers.put(TRANSFER_ENCODING, CHUNKED.toString());
         } else if (requestType == CREATE_SESSION) {
             headers.add(ACCEPT, EJB_EXCEPTION.toString());
             headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
