@@ -21,14 +21,13 @@ import static java.security.AccessController.doPrivileged;
 import static org.jboss.ejb.client.EJBClientContext.getCurrent;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.Constants.HTTP_SCHEME;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
+import static org.wildfly.httpclient.ejb.ClientHandlers.discoveryHttpResultHandler;
+import static org.wildfly.httpclient.ejb.Utils.newUnmarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.ejb.client.EJBClientConnection;
 import org.jboss.ejb.client.EJBClientContext;
 import org.jboss.ejb.client.EJBModuleIdentifier;
-import org.jboss.marshalling.ByteInput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.discovery.AttributeValue;
 import org.wildfly.discovery.FilterSpec;
@@ -37,13 +36,13 @@ import org.wildfly.discovery.ServiceURL;
 import org.wildfly.discovery.spi.DiscoveryProvider;
 import org.wildfly.discovery.spi.DiscoveryRequest;
 import org.wildfly.discovery.spi.DiscoveryResult;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
 import org.wildfly.security.manager.WildFlySecurityManager;
-import org.xnio.IoUtils;
 
 import javax.net.ssl.SSLContext;
 import java.net.URI;
@@ -51,7 +50,9 @@ import java.security.GeneralSecurityException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -154,35 +155,27 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         }
 
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(newUri, authenticationContext, -1, "ejb", "jboss");
-        RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.DISCOVER).setVersion(targetContext.getProtocolVersion());
-        ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
-                ((result, response, closeable) -> {
-                    try {
-                        final Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(request).createUnmarshaller();
-                        final ByteInput in = new InputStreamByteInput(result);
-                        Set<EJBModuleIdentifier> modules;
-                        try (in) {
-                            unmarshaller.start(in);
-                            modules = deserializeSet(unmarshaller);
-                            unmarshaller.finish();
-                        }
-                        for (EJBModuleIdentifier ejbModuleIdentifier : modules) {
-                            ServiceURL url = createServiceURL(newUri, ejbModuleIdentifier);
-                            serviceURLCache.add(url);
-                        }
-                    } catch (Exception e) {
-                        EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
-                    } finally {
-                        outstandingLatch.countDown();
-                        IoUtils.safeClose(closeable);
-                    }
-                }),
-                (e) -> {
-                    EjbHttpClientMessages.MESSAGES.unableToPerformEjbDiscovery(e);
-                    outstandingLatch.countDown();
-                },
-                Constants.EJB_DISCOVERY_RESPONSE, null);
+        final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.DISCOVER).setVersion(targetContext.getProtocolVersion());
+        final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        final CompletableFuture<Set<EJBModuleIdentifier>> result = new CompletableFuture<>();
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final Unmarshaller unmarshaller = newUnmarshaller(marshallerFactory, result);
+        if (unmarshaller != null) {
+            targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                    discoveryHttpResultHandler(unmarshaller, result),
+                    result::completeExceptionally, Constants.EJB_DISCOVERY_RESPONSE, null);
+        }
+        try {
+            Set<EJBModuleIdentifier> modules = result.get();
+            for (EJBModuleIdentifier ejbModuleIdentifier : modules) {
+                ServiceURL url = createServiceURL(newUri, ejbModuleIdentifier);
+                serviceURLCache.add(url);
+            }
+        } catch (InterruptedException| ExecutionException e) {
+            result.completeExceptionally(e);
+        } finally {
+            outstandingLatch.countDown();
+        }
     }
 
     private ServiceURL createServiceURL(final URI newUri, final EJBModuleIdentifier moduleIdentifier) {
