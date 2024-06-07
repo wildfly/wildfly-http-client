@@ -19,14 +19,15 @@
 package org.wildfly.httpclient.ejb;
 
 import static java.security.AccessController.doPrivileged;
+import static org.wildfly.httpclient.ejb.ClientHandlers.cancelInvocationResponseFunction;
+import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpResultHandler;
+import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionResponseFunction;
+import static org.wildfly.httpclient.ejb.ClientHandlers.emptyHttpResultHandler;
+import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpMarshaller;
+import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionHttpMarshaller;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_PORT;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.Constants.HTTP_PORT;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
-import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
-import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
-import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
 import static org.wildfly.httpclient.ejb.TransactionInfo.localTransaction;
 import static org.wildfly.httpclient.ejb.TransactionInfo.nullTransaction;
 import static org.wildfly.httpclient.ejb.TransactionInfo.remoteTransaction;
@@ -41,11 +42,7 @@ import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.ejb.client.EJBReceiverSessionCreationContext;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
-import org.jboss.marshalling.ByteInput;
-import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -59,7 +56,6 @@ import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.RemoteTransaction;
 import org.wildfly.transaction.client.RemoteTransactionContext;
 import org.wildfly.transaction.client.XAOutflowHandle;
-import org.xnio.IoUtils;
 
 import jakarta.ejb.Asynchronous;
 import javax.net.ssl.SSLContext;
@@ -74,7 +70,6 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -94,13 +89,6 @@ class HttpEJBReceiver extends EJBReceiver {
 
     static {
         AUTH_CONTEXT_CLIENT = AccessController.doPrivileged((PrivilegedAction<AuthenticationContextConfigurationClient>) () -> new AuthenticationContextConfigurationClient());
-    }
-
-    private static final Set<String> WELL_KNOWN_KEYS;
-
-    static {
-        WELL_KNOWN_KEYS = new HashSet<>();
-        WELL_KNOWN_KEYS.add("jboss.source.address");
     }
 
     private final AttachmentKey<EjbContextData> EJB_CONTEXT_DATA = AttachmentKey.create(EjbContextData.class);
@@ -183,62 +171,11 @@ class HttpEJBReceiver extends EJBReceiver {
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
         Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
         TransactionInfo transactionInfo = getTransactionInfo(clientInvocationContext.getTransaction(), targetContext.getUri());
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, (output -> {
-                    try (ByteOutput byteOutput = Marshalling.createByteOutput(output)) {
-                        marshaller.start(byteOutput);
-                        serializeTransaction(marshaller, transactionInfo);
-                        serializeObjectArray(marshaller, clientInvocationContext.getParameters());
-                        serializeMap(marshaller, clientInvocationContext.getContextData());
-                        marshaller.finish();
-                    } finally {
-                        IoUtils.safeClose(output);
-                    }
-                }),
-
-                ((input, response, closeable) -> {
-                        receiverContext.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
-                            @Override
-                            public Object getResult() throws Exception {
-                                Object returned;
-                                try {
-                                    final Map<String, Object> attachments;
-                                    final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
-                                    final ByteInput in = new InputStreamByteInput(input);
-                                    try (in) {
-                                        unmarshaller.start(in);
-                                        returned = deserializeObject(unmarshaller);
-                                        attachments = deserializeMap(unmarshaller);
-                                        unmarshaller.finish();
-                                    }
-
-                                    // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
-                                    Set<String> returnedContextDataKeys = (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
-                                    if(returnedContextDataKeys != null) {
-                                        clientInvocationContext.getContextData().keySet().removeIf(k -> (!k.equals(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY)));
-                                    }
-                                    Set<String> returnedKeys =  (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
-
-                                    // If there are any attachments, add them to the client invocation's context data
-                                    if (attachments != null) {
-                                        for (Map.Entry<String, Object> entry : attachments.entrySet()) {
-                                            if (entry.getValue() != null &&
-                                                    ((returnedKeys != null && returnedKeys.contains(entry.getKey())) || WELL_KNOWN_KEYS.contains(entry.getKey()))) {
-                                                clientInvocationContext.getContextData().put(entry.getKey(), entry.getValue());
-                                            }
-                                        }
-                                    }
-                                } finally {
-                                    IoUtils.safeClose(closeable);
-                                }
-                                return returned;
-                            }
-
-                            @Override
-                            public void discardResult() {
-                                IoUtils.safeClose(closeable);
-                            }
-                        });
-                }),
+        Object[] parameters = clientInvocationContext.getParameters();
+        Map<String, Object> contextData = clientInvocationContext.getContextData();
+        final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpMarshaller(marshaller, transactionInfo, parameters, contextData),
+                invokeHttpResultHandler(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
 
@@ -275,26 +212,11 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         TransactionInfo transactionInfo = getTransactionInfo(ContextTransactionManager.getInstance().getTransaction(), targetContext.getUri());
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
-                    Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
-                    marshaller.start(Marshalling.createByteOutput(output));
-                    serializeTransaction(marshaller, transactionInfo);
-                    marshaller.finish();
-                },
-                ((unmarshaller, response, c) -> {
-                    try {
-                        String sessionId = response.getResponseHeaders().getFirst(Constants.EJB_SESSION_ID);
-                        if (sessionId == null) {
-                            result.completeExceptionally(EjbHttpClientMessages.MESSAGES.noSessionIdInResponse());
-                        } else {
-                            SessionID sessionID = SessionID.createSessionID(Base64.getUrlDecoder().decode(sessionId));
-                            result.complete(sessionID);
-                        }
-                    } finally {
-                        IoUtils.safeClose(c);
-                    }
-                })
-                , result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
+        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration,
+                createSessionHttpMarshaller(marshaller, transactionInfo),
+                emptyHttpResultHandler(result, createSessionResponseFunction()),
+                result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
 
         return result.get();
     }
@@ -339,14 +261,9 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setVersion(targetContext.getProtocolVersion());
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, null, (stream, response, closeable) -> {
-            try {
-                result.complete(true);
-                IoUtils.safeClose(stream);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, throwable -> result.complete(false), null, null);
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                emptyHttpResultHandler(result, cancelInvocationResponseFunction()),
+                result::completeExceptionally, null, null);
         try {
             return result.get();
         } catch (InterruptedException | ExecutionException e) {
