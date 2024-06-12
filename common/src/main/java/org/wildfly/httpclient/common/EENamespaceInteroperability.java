@@ -46,6 +46,7 @@ import java.util.List;
 import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
 import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 
 /**
@@ -57,6 +58,7 @@ import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
  *
  * @author Flavia Rainone
  * @author Richard Opalka
+ * @author Richard Achmatowicz
  */
 final class EENamespaceInteroperability {
     /**
@@ -86,7 +88,12 @@ final class EENamespaceInteroperability {
 
     /**
      * Wraps the HTTP server handler into an EE namespace interoperable handler. Such handler implements the
-     * EE namespace interoperability at the server side before delegating to the wrapped {@code httpHandler}
+     * EE namespace interoperability at the server side before delegating to the wrapped {@code httpHandler}.
+     * The resulting handler handles the EE namespace interoperability according to the value of  {@link
+     * #EE_NAMESPACE_INTEROPERABLE_MODE}. It accepts {@code javax} namespace requests at the path prefix {@code
+     * "/v1"}, while {@code jakarta} namespace requests are received at the path prefix {@code "/v2"}. Both
+     * requests are forwarded to {@code handler}, but in case of {@code "/v1"} the {@code javax} namespace is
+     * converted to {@code jakarta}.
      *
      * @param httpHandler the handler to be wrapped
      * @return handler the ee namespace interoperability handler
@@ -95,10 +102,43 @@ final class EENamespaceInteroperability {
         return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(httpHandler), new JakartaNamespaceHandler(httpHandler));
     }
 
-    static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
+    /**
+     * Wraps the multi-versioned HTTP server handlers into an EE namespace interoperable handler. Such handler
+     * implements the EE namespace interoperability at the server side before delegating to the wrapped HTTP
+     * handler. The resulting handler handles the EE namespace interoperability according to the value of
+     * {@link #EE_NAMESPACE_INTEROPERABLE_MODE}. It accepts {@code javax} namespace requests at the path prefix
+     * {@code "/v1"}, while {@code jakarta} namespace requests are received at the subsequent path prefixes
+     * {@code "/v2"}, {@code "/v3"}, and so on. Requests to {@code "/v1"} and {@code "/v2"} path prefixes will be
+     * forwarded to {@code multiVersionedProtocolHandlers[0]}, while {@code "/v3"} will be forwarded to {@code
+     * multiVersionedProtocolHandlers[1]}. The sequence of paths follows until each multi-versioned handler
+     * {@code multiVersionedProtocolHandlers[N]} is associated with a prefix path {@code "/v&lt;N+2&gt;"}.
+     *
+     * @param multiVersionedProtocolHandlers the multiple handlers to be wrapped.
+     * @return handler the ee namespace interoperability handler
+     */
+    static HttpHandler createInteroperabilityHandler(HttpHandler... multiVersionedProtocolHandlers) {
+        assert multiVersionedProtocolHandlers.length > 0;
+        HttpHandler[] versionedJakartaNamespaceHandlers = new HttpHandler[multiVersionedProtocolHandlers.length];
+        for (int i = 0; i < multiVersionedProtocolHandlers.length; i++) {
+            versionedJakartaNamespaceHandlers[i] = new JakartaNamespaceHandler(multiVersionedProtocolHandlers[i]);
+        }
+        return createProtocolVersionHttpHandler(new EENamespaceInteroperabilityHandler(multiVersionedProtocolHandlers[0]), versionedJakartaNamespaceHandlers);
+    }
+
+    private static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler latestProtocolHandler) {
         final PathHandler versionPathHandler = new PathHandler();
         versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
         versionPathHandler.addPrefixPath(VERSION_TWO_PATH, latestProtocolHandler);
+        return versionPathHandler;
+    }
+
+    private static HttpHandler createProtocolVersionHttpHandler(HttpHandler interoperabilityHandler, HttpHandler... versionedProtocolHandlers) {
+        final PathHandler versionPathHandler = new PathHandler();
+        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, interoperabilityHandler);
+        int version = 2;
+        for (HttpHandler versionedProtocolHandler: versionedProtocolHandlers) {
+            versionPathHandler.addPrefixPath(VERSION_PATH + version++, versionedProtocolHandler);
+        }
         return versionPathHandler;
     }
 
@@ -176,7 +216,7 @@ final class EENamespaceInteroperability {
                     default:
                         // connection already set as Jakarta namespace, default factory can be used for marshalling
                         // (no transformation needed)
-                        request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
+                        // request.getRequestHeaders().put(PROTOCOL_VERSION, LATEST_VERSION);
                         request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
                 }
                 super.sendRequest(request, new ClientCallback<ClientExchange>() {
@@ -209,18 +249,27 @@ final class EENamespaceInteroperability {
                             // this method adds the factory to the request instead of response, this is more efficient
                             // we prevent adding when jakartaEE is already true and creating a new entry in the response attachment map
                             final ClientResponse response = result.getResponse();
-                            if (protocolVersion == -1) {
+                            final String versionHeaderValue = response.getResponseHeaders().getFirst(PROTOCOL_VERSION);
+                            final int serverProtocolVersion = versionHeaderValue == null ? 0 : Integer.valueOf(versionHeaderValue);
+
+                             if (protocolVersion == -1) {
                                 // we need to check for protocol version header to define the protocol version of the pool
-                                if (LATEST_VERSION.equals(response.getResponseHeaders().getFirst(PROTOCOL_VERSION))) {
-                                    // this indicates this is the first response server sends, set the protocol to 2
-                                    protocolVersion = Protocol.LATEST;
-                                    // overwrite previous attachment, no transformation is needed for this connection any more
-                                    result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                                } else {
+                                if (versionHeaderValue == null || serverProtocolVersion == 1) {
+                                    // legacy server
                                     protocolVersion = Protocol.JAVAEE_PROTOCOL_VERSION;
                                     //regarding marsh. factory key, do nothing, the connection is not Jakarta and the marshalling factory provider is already interoperable
+                                } else if (Protocol.LATEST <= serverProtocolVersion) {
+                                    // this indicates this is the first response server sends, set the protocol to 2
+                                    protocolVersion = Protocol.LATEST;
+                                    // overwrite previous attachment, no transformation is needed for this connection anymore
+                                    result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
+                                } else  {
+                                    // exception - client version greater than server version won't work
+                                    IOException e = HttpClientMessages.MESSAGES.protocolVersionIncompatibility(Protocol.LATEST, serverProtocolVersion);
+                                    responseListener.failed(e);
                                 }
-
+                                // remove the response header for the protocol version as we are finished with it
+                                response.getResponseHeaders().remove(PROTOCOL_VERSION);
                             } // else: do nothing, request already contains the default marshalling factory
                             responseListener.completed(result);
                         }
@@ -304,6 +353,24 @@ final class EENamespaceInteroperability {
     Server side EE namespace interoperability
      */
 
+    public static class EENamespaceInteroperabilityProtocolVersionHandler implements HttpHandler {
+
+        private final HttpHandler next;
+
+        EENamespaceInteroperabilityProtocolVersionHandler(HttpHandler next) {
+            this.next = next;
+        }
+
+        @Override
+        public void handleRequest(HttpServerExchange exchange) throws Exception {
+            // if a PROTOCOL_VERSION header is present, we need to respond with our protocol version
+            if (exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION) != null) {
+                exchange.getResponseHeaders().add(PROTOCOL_VERSION, LATEST_VERSION);
+            }
+            next.handleRequest(exchange);
+        }
+    }
+
     private static class EENamespaceInteroperabilityHandler implements HttpHandler {
 
         private final HttpHandler next;
@@ -314,9 +381,9 @@ final class EENamespaceInteroperability {
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
-            if (LATEST_VERSION.equals(exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION))) {
-                // respond that this end also supports version two
-                exchange.getResponseHeaders().add(PROTOCOL_VERSION, LATEST_VERSION);
+            // the first message, identified by its PROTOCOL_VERSION header, requires special handling depending on client being v1 or v2+
+            String clientVersion = exchange.getRequestHeaders().getFirst(PROTOCOL_VERSION);
+            if (clientVersion != null && Integer.parseInt(clientVersion) >= Protocol.JAKARTAEE_PROTOCOL_VERSION) {
                 // transformation is required for unmarshalling because client is on EE namespace interoperable mode
                 exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
                 // no transformation required for marshalling, server is sending response in Jakarta
