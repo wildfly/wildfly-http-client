@@ -68,7 +68,6 @@ import jakarta.transaction.RollbackException;
 import jakarta.transaction.SystemException;
 import jakarta.transaction.Transaction;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.security.AccessController;
@@ -84,7 +83,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * EJB receiver for invocations over HTTP.
@@ -187,20 +185,14 @@ class HttpEJBReceiver extends EJBReceiver {
         Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
         TransactionInfo transactionInfo = getTransactionInfo(clientInvocationContext.getTransaction(), targetContext.getUri());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, (output -> {
-                    OutputStream data = output;
-                    if (compressRequest) {
-                        data = new GZIPOutputStream(data);
-                    }
-                    try {
-                        try (ByteOutput byteOutput = Marshalling.createByteOutput(data)) {
-                            marshaller.start(byteOutput);
-                            serializeTransaction(marshaller, transactionInfo);
-                            serializeObjectArray(marshaller, clientInvocationContext.getParameters());
-                            serializeMap(marshaller, clientInvocationContext.getContextData());
-                            marshaller.finish();
-                        }
+                    try (ByteOutput byteOutput = Marshalling.createByteOutput(output)) {
+                        marshaller.start(byteOutput);
+                        serializeTransaction(marshaller, transactionInfo);
+                        serializeObjectArray(marshaller, clientInvocationContext.getParameters());
+                        serializeMap(marshaller, clientInvocationContext.getContextData());
+                        marshaller.finish();
                     } finally {
-                        IoUtils.safeClose(data);
+                        IoUtils.safeClose(output);
                     }
                 }),
 
