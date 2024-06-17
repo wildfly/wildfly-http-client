@@ -50,6 +50,11 @@ public final class HeadersHelper {
         request.getRequestHeaders().put(headerName, headerValue);
     }
 
+    public static String getRequestHeader(final ClientRequest request, final HttpString headerName) {
+        if (request == null || headerName == null) return null;
+        return request.getRequestHeaders().getFirst(headerName);
+    }
+
     public static void putResponseHeader(final HttpServerExchange exchange, final HttpString headerName, final String headerValue) {
         if (exchange == null || headerName == null) return;
         exchange.getResponseHeaders().put(headerName, headerValue);

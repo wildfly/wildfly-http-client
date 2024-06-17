@@ -29,6 +29,7 @@ import static io.undertow.util.Headers.SET_COOKIE;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
 import static org.wildfly.httpclient.common.HeadersHelper.addRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.containsRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
@@ -69,6 +70,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Http target context used by client side.
@@ -168,7 +170,7 @@ public class HttpTargetContext extends AbstractAttachable {
         connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, getContextClassLoader()), failureHandler::handleFailure, false, sslContext);
     }
 
-    private void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
+    private void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, final ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
         if (sessionId != null) {
             addRequestHeader(request, COOKIE, JSESSIONID + "=" + sessionId);
         }
@@ -360,7 +362,16 @@ public class HttpTargetContext extends AbstractAttachable {
 
                                 // marshall the locator and method params
                                 // start the marshaller
-                                httpMarshaller.marshall(outputStream);
+                                boolean compress = false;
+                                String encoding = getRequestHeader(request, CONTENT_ENCODING);
+                                if (encoding != null) {
+                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+                                    if (GZIP.toString().equals(lowerEncoding)) {
+                                        compress = true;
+                                    }
+                                }
+
+                                httpMarshaller.marshall(compress ? new GZIPOutputStream(outputStream) : outputStream);
 
                             } catch (Exception e) {
                                 try {
