@@ -203,9 +203,7 @@ class HttpEJBReceiver extends EJBReceiver {
                         receiverContext.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                             @Override
                             public Object getResult() throws Exception {
-
-                                Exception exception = null;
-                                Object returned = null;
+                                Object returned;
                                 try {
                                     final Map<String, Object> attachments;
                                     final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
@@ -233,20 +231,10 @@ class HttpEJBReceiver extends EJBReceiver {
                                             }
                                         }
                                     }
-
-                                    if (response.getResponseCode() >= 400) {
-                                        throw (Exception) returned;
-                                    }
-                                } catch (Exception e) {
-                                    exception = e;
                                 } finally {
                                     IoUtils.safeClose(closeable);
                                 }
-                                if (exception != null) {
-                                    throw exception;
-                                } else {
-                                    return returned;
-                                }
+                                return returned;
                             }
 
                             @Override
