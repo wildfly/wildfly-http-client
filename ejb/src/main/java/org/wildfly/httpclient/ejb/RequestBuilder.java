@@ -32,10 +32,6 @@ import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
 import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
 import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
-import static org.wildfly.httpclient.ejb.RequestType.CANCEL_INVOCATION;
-import static org.wildfly.httpclient.ejb.RequestType.CREATE_SESSION;
-import static org.wildfly.httpclient.ejb.RequestType.DISCOVER;
-import static org.wildfly.httpclient.ejb.RequestType.START_INVOCATION;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.net.URLEncoder.encode;
@@ -130,35 +126,43 @@ final class RequestBuilder {
     }
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
-        if (requestType == START_INVOCATION) request.setPath(getStartEjbInvocationRequestPath(prefix));
-        else if (requestType == CREATE_SESSION) request.setPath(getCreateSessionEjbRequestPath(prefix));
-        else if (requestType == DISCOVER) request.setPath(getDiscoverEjbRequestPath(prefix));
-        else if (requestType == CANCEL_INVOCATION) request.setPath(getCancelEjbInvocationRequestPath(prefix));
-        else throw new IllegalStateException();
+        switch (requestType) {
+            case START_INVOCATION: request.setPath(getStartEjbInvocationRequestPath(prefix)); break;
+            case CREATE_SESSION: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
+            case DISCOVER: request.setPath(getDiscoverEjbRequestPath(prefix)); break;
+            case CANCEL_INVOCATION: request.setPath(getCancelEjbInvocationRequestPath(prefix)); break;
+            default: throw new IllegalStateException();
+        }
     }
 
     private void setRequestHeaders(final ClientRequest request) {
         final HeaderMap headers = request.getRequestHeaders();
-        if (requestType == START_INVOCATION) {
-            headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
-            headers.put(CONTENT_TYPE, INVOCATION.toString());
-            if (invocationId != null) {
-                headers.put(INVOCATION_ID, invocationId);
-            }
-            if (compressRequest) {
-                headers.put(CONTENT_ENCODING, GZIP.toString());
-            }
-            if (compressResponse) {
-                headers.put(ACCEPT_ENCODING, GZIP.toString());
-            }
-            headers.put(TRANSFER_ENCODING, CHUNKED.toString());
-        } else if (requestType == CREATE_SESSION) {
-            headers.add(ACCEPT, EJB_EXCEPTION.toString());
-            headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
-        } else if (requestType == DISCOVER) {
-            headers.add(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
-        } else if (requestType != CANCEL_INVOCATION) {
-            throw new IllegalStateException();
+        switch (requestType) {
+            case START_INVOCATION: {
+                headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+                headers.put(CONTENT_TYPE, INVOCATION.toString());
+                if (invocationId != null) {
+                    headers.put(INVOCATION_ID, invocationId);
+                }
+                if (compressRequest) {
+                    headers.put(CONTENT_ENCODING, GZIP.toString());
+                }
+                if (compressResponse) {
+                    headers.put(ACCEPT_ENCODING, GZIP.toString());
+                }
+                headers.put(TRANSFER_ENCODING, CHUNKED.toString());
+            } break;
+            case CREATE_SESSION: {
+                headers.add(ACCEPT, EJB_EXCEPTION.toString());
+                headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
+            } break;
+            case DISCOVER: {
+                headers.add(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
+            } break;
+            case CANCEL_INVOCATION: {
+                // no headers to be added
+            } break;
+            default: throw new IllegalStateException();
         }
     }
 
