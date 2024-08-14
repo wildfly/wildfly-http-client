@@ -33,7 +33,6 @@ import static org.wildfly.httpclient.ejb.TransactionInfo.remoteTransaction;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.AttachmentKey;
-import io.undertow.util.StatusCodes;
 import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBLocator;
@@ -197,9 +196,6 @@ class HttpEJBReceiver extends EJBReceiver {
                 }),
 
                 ((input, response, closeable) -> {
-                        if (response.getResponseCode() == StatusCodes.ACCEPTED && clientInvocationContext.getInvokedMethod().getReturnType() == void.class) {
-                            ejbData.asyncMethods.add(clientInvocationContext.getInvokedMethod());
-                        }
                         receiverContext.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                             @Override
                             public Object getResult() throws Exception {
