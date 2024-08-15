@@ -44,6 +44,10 @@ import org.wildfly.httpclient.common.Protocol;
 import java.lang.reflect.Method;
 
 /**
+ * HTTP EJB module client request builder. Encapsulates all information needed to create HTTP EJB client requests.
+ * Use setter methods (those returning {@link RequestBuilder}) to configure the builder.
+ * Once configured {@link #createRequest(String)} method must be called to build HTTP client request.
+ *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 final class RequestBuilder {
@@ -58,8 +62,6 @@ final class RequestBuilder {
     private boolean cancelIfRunning;
     private boolean compressRequest;
     private boolean compressResponse;
-
-    // setters
 
     RequestBuilder setCompressRequest(final boolean compressRequest) {
         this.compressRequest = compressRequest;
@@ -110,8 +112,6 @@ final class RequestBuilder {
         this.cancelIfRunning = cancelIfRunning;
         return this;
     }
-
-    // helper methods
 
     ClientRequest createRequest(final String prefix) {
         final ClientRequest clientRequest = new ClientRequest();
