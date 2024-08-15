@@ -34,6 +34,10 @@ import org.wildfly.httpclient.common.Protocol;
 import javax.naming.Name;
 
 /**
+ * HTTP JNDI module client request builder. Encapsulates all information needed to create HTTP JNDI client requests.
+ * Use setter methods (those returning {@link RequestBuilder}) to configure the builder.
+ * Once configured {@link #createRequest(String)} method must be called to build HTTP client request.
+ *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 final class RequestBuilder {
