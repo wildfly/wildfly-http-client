@@ -29,13 +29,42 @@ import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 import io.undertow.util.HttpString;
 
 /**
+ * HTTP EJB module invocation types. Each invocation type has {@linkplain #getName() name}, {@linkplain #getMethod() method}
+ * and {@linkplain #getPath() path}. An invocation can be one of the following types:
+ * <ul>
+ *     <li>{@link #INVOKE}<br>
+ *     Start EJB method invocation.
+ *     </li>
+ *     <li>{@link #CANCEL}<br>
+ *     Cancel EJB method invocation.
+ *     </li>
+ *     <li>{@link #OPEN}<br>
+ *     Create EJB session bean.
+ *     </li>
+ *     <li>{@link #DISCOVER}<br>
+ *     Discover available EJB beans.
+ *     </li>
+ * </ul>
+ *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 enum RequestType {
 
+    /**
+     * {@code INVOKE} invocation type: used to start EJB method invocation via HTTP protocol.
+     */
     INVOKE(POST, EJB_INVOKE_PATH),
+    /**
+     * {@code CANCEL} invocation type: used to cancel EJB method invocation via HTTP protocol.
+     */
     CANCEL(DELETE, EJB_CANCEL_PATH),
+    /**
+     * {@code OPEN} invocation type: used to create EJB session bean via HTTP protocol.
+     */
     OPEN(POST, EJB_OPEN_PATH),
+    /**
+     * {@code DISCOVER} invocation type: used to discover available EJB beans via HTTP protocol.
+     */
     DISCOVER(GET, EJB_DISCOVER_PATH);
 
     private final HttpString method;
@@ -46,11 +75,27 @@ enum RequestType {
         this.path = path;
     }
 
-    HttpString getMethod() {
+    /**
+     * Returns the name of this invocation.
+     * @return this invocation {@linkplain #name()}.
+     */
+    final String getName() {
+        return name();
+    }
+
+    /**
+     * Returns the HTTP request method used by this invocation.
+     * @return this invocation HTTP request method.
+     */
+    final HttpString getMethod() {
         return method;
     }
 
-    String getPath() {
+    /**
+     * Returns the HTTP request subpath used by this invocation.
+     * @return this invocation HTTP request subpath.
+     */
+    final String getPath() {
         return path;
     }
 
