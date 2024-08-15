@@ -33,9 +33,9 @@ import io.undertow.util.HttpString;
  */
 enum RequestType {
 
-    START_INVOCATION(POST, EJB_INVOKE_PATH),
-    CANCEL_INVOCATION(DELETE, EJB_CANCEL_PATH),
-    CREATE_SESSION(POST, EJB_OPEN_PATH),
+    INVOKE(POST, EJB_INVOKE_PATH),
+    CANCEL(DELETE, EJB_CANCEL_PATH),
+    OPEN(POST, EJB_OPEN_PATH),
     DISCOVER(GET, EJB_DISCOVER_PATH);
 
     private final HttpString method;

@@ -148,7 +148,7 @@ class HttpEJBReceiver extends EJBReceiver {
         RequestBuilder builder = new RequestBuilder()
                 .setCompressRequest(compressRequest)
                 .setCompressResponse(compressResponse)
-                .setRequestType(RequestType.START_INVOCATION)
+                .setRequestType(RequestType.INVOKE)
                 .setLocator(locator)
                 .setMethod(clientInvocationContext.getInvokedMethod())
                 .setView(clientInvocationContext.getViewClass().getName())
@@ -283,7 +283,7 @@ class HttpEJBReceiver extends EJBReceiver {
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
         RequestBuilder builder = new RequestBuilder()
-                .setRequestType(RequestType.CREATE_SESSION)
+                .setRequestType(RequestType.OPEN)
                 .setLocator(locator)
                 .setView(locator.getViewType().getName())
                 .setVersion(targetContext.getProtocolVersion());
@@ -345,7 +345,7 @@ class HttpEJBReceiver extends EJBReceiver {
         }
         targetContext.awaitSessionId(false, authenticationConfiguration);
         RequestBuilder builder = new RequestBuilder()
-                .setRequestType(RequestType.CANCEL_INVOCATION)
+                .setRequestType(RequestType.CANCEL)
                 .setLocator(locator)
                 .setCancelIfRunning(cancelIfRunning)
                 .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID))

@@ -127,10 +127,10 @@ final class RequestBuilder {
 
     private void setRequestPath(final ClientRequest request, final String prefix) {
         switch (requestType) {
-            case START_INVOCATION: request.setPath(getStartEjbInvocationRequestPath(prefix)); break;
-            case CREATE_SESSION: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
+            case INVOKE: request.setPath(getStartEjbInvocationRequestPath(prefix)); break;
+            case OPEN: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
             case DISCOVER: request.setPath(getDiscoverEjbRequestPath(prefix)); break;
-            case CANCEL_INVOCATION: request.setPath(getCancelEjbInvocationRequestPath(prefix)); break;
+            case CANCEL: request.setPath(getCancelEjbInvocationRequestPath(prefix)); break;
             default: throw new IllegalStateException();
         }
     }
@@ -138,7 +138,7 @@ final class RequestBuilder {
     private void setRequestHeaders(final ClientRequest request) {
         final HeaderMap headers = request.getRequestHeaders();
         switch (requestType) {
-            case START_INVOCATION: {
+            case INVOKE: {
                 headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
                 headers.put(CONTENT_TYPE, INVOCATION.toString());
                 if (invocationId != null) {
@@ -152,14 +152,14 @@ final class RequestBuilder {
                 }
                 headers.put(TRANSFER_ENCODING, CHUNKED.toString());
             } break;
-            case CREATE_SESSION: {
+            case OPEN: {
                 headers.add(ACCEPT, EJB_EXCEPTION.toString());
                 headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
             } break;
             case DISCOVER: {
                 headers.add(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
             } break;
-            case CANCEL_INVOCATION: {
+            case CANCEL: {
                 // no headers to be added
             } break;
             default: throw new IllegalStateException();
