@@ -17,10 +17,17 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static java.security.AccessController.doPrivileged;
+import static org.jboss.ejb.client.EJBClientContext.getCurrent;
+import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.ejb.Constants.HTTP_SCHEME;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
+
 import io.undertow.client.ClientRequest;
 import org.jboss.ejb.client.EJBClientConnection;
 import org.jboss.ejb.client.EJBClientContext;
 import org.jboss.ejb.client.EJBModuleIdentifier;
+import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.discovery.AttributeValue;
@@ -49,15 +56,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static java.security.AccessController.doPrivileged;
-import static org.jboss.ejb.client.EJBClientContext.getCurrent;
-import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
-import static org.wildfly.httpclient.ejb.Constants.HTTP_SCHEME;
-
 /**
  * @author <a href="mailto:tadamski@redhat.com">Tomasz Adamski</a>
  */
-
 public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
 
     private static final AuthenticationContextConfigurationClient AUTH_CONFIGURATION_CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
@@ -159,12 +160,14 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
                 ((result, response, closeable) -> {
                     try {
                         final Unmarshaller unmarshaller = targetContext.getHttpMarshallerFactory(request).createUnmarshaller();
-
-                        unmarshaller.start(new InputStreamByteInput(result));
-                        int size = unmarshaller.readInt();
-
-                        for (int i = 0; i < size; i++) {
-                            EJBModuleIdentifier ejbModuleIdentifier = (EJBModuleIdentifier) unmarshaller.readObject();
+                        final ByteInput in = new InputStreamByteInput(result);
+                        Set<EJBModuleIdentifier> modules;
+                        try (in) {
+                            unmarshaller.start(in);
+                            modules = deserializeSet(unmarshaller);
+                            unmarshaller.finish();
+                        }
+                        for (EJBModuleIdentifier ejbModuleIdentifier : modules) {
                             ServiceURL url = createServiceURL(newUri, ejbModuleIdentifier);
                             serviceURLCache.add(url);
                         }

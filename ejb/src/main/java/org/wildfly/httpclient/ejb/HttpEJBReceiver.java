@@ -18,6 +18,19 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static java.security.AccessController.doPrivileged;
+import static org.wildfly.httpclient.ejb.Constants.HTTPS_PORT;
+import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.ejb.Constants.HTTP_PORT;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
+import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
+import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
+import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
+import static org.wildfly.httpclient.ejb.TransactionInfo.localTransaction;
+import static org.wildfly.httpclient.ejb.TransactionInfo.nullTransaction;
+import static org.wildfly.httpclient.ejb.TransactionInfo.remoteTransaction;
+
 import io.undertow.client.ClientRequest;
 import io.undertow.util.AttachmentKey;
 import io.undertow.util.StatusCodes;
@@ -29,6 +42,7 @@ import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.ejb.client.EJBReceiverSessionCreationContext;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
+import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
@@ -53,10 +67,7 @@ import javax.net.ssl.SSLContext;
 import jakarta.transaction.RollbackException;
 import jakarta.transaction.SystemException;
 import jakarta.transaction.Transaction;
-import javax.transaction.xa.Xid;
-import java.io.DataOutput;
 import java.io.IOException;
-import java.io.ObjectInput;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -65,7 +76,6 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -75,11 +85,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPOutputStream;
-
-import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.ejb.Constants.HTTPS_PORT;
-import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
-import static org.wildfly.httpclient.ejb.Constants.HTTP_PORT;
 
 /**
  * EJB receiver for invocations over HTTP.
@@ -179,13 +184,21 @@ class HttpEJBReceiver extends EJBReceiver {
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
+        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        TransactionInfo transactionInfo = getTransactionInfo(clientInvocationContext.getTransaction(), targetContext.getUri());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, (output -> {
                     OutputStream data = output;
                     if (compressRequest) {
                         data = new GZIPOutputStream(data);
                     }
                     try {
-                        marshalEJBRequest(Marshalling.createByteOutput(data), clientInvocationContext, targetContext, request);
+                        try (ByteOutput byteOutput = Marshalling.createByteOutput(data)) {
+                            marshaller.start(byteOutput);
+                            serializeTransaction(marshaller, transactionInfo);
+                            serializeObjectArray(marshaller, clientInvocationContext.getParameters());
+                            serializeMap(marshaller, clientInvocationContext.getContextData());
+                            marshaller.finish();
+                        }
                     } finally {
                         IoUtils.safeClose(data);
                     }
@@ -202,18 +215,15 @@ class HttpEJBReceiver extends EJBReceiver {
                                 Exception exception = null;
                                 Object returned = null;
                                 try {
-
+                                    final Map<String, Object> attachments;
                                     final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
-
-                                    unmarshaller.start(new InputStreamByteInput(input));
-                                    returned = unmarshaller.readObject();
-                                    // read the attachments
-                                    final Map<String, Object> attachments = readAttachments(unmarshaller);
-                                    // finish unmarshalling
-                                    if (unmarshaller.read() != -1) {
-                                        exception = EjbHttpClientMessages.MESSAGES.unexpectedDataInResponse();
+                                    final ByteInput in = new InputStreamByteInput(input);
+                                    try (in) {
+                                        unmarshaller.start(in);
+                                        returned = deserializeObject(unmarshaller);
+                                        attachments = deserializeMap(unmarshaller);
+                                        unmarshaller.finish();
                                     }
-                                    unmarshaller.finish();
 
                                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
                                     Set<String> returnedContextDataKeys = (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
@@ -288,10 +298,11 @@ class HttpEJBReceiver extends EJBReceiver {
                 .setView(locator.getViewType().getName())
                 .setVersion(targetContext.getProtocolVersion());
         ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        TransactionInfo transactionInfo = getTransactionInfo(ContextTransactionManager.getInstance().getTransaction(), targetContext.getUri());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
                     Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
                     marshaller.start(Marshalling.createByteOutput(output));
-                    writeTransaction(ContextTransactionManager.getInstance().getTransaction(), marshaller, targetContext.getUri());
+                    serializeTransaction(marshaller, transactionInfo);
                     marshaller.finish();
                 },
                 ((unmarshaller, response, c) -> {
@@ -375,107 +386,21 @@ class HttpEJBReceiver extends EJBReceiver {
         return httpMarshallerFactory.createUnmarshaller(new HttpProtocolV1ObjectResolver(uri), HttpProtocolV1ObjectTable.INSTANCE);
     }
 
-    private void marshalEJBRequest(ByteOutput byteOutput, EJBClientInvocationContext clientInvocationContext, HttpTargetContext targetContext, ClientRequest clientRequest) throws IOException, RollbackException, SystemException {
-        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(clientRequest));
-        marshaller.start(byteOutput);
-        writeTransaction(clientInvocationContext.getTransaction(), marshaller, targetContext.getUri());
-
-
-        Object[] methodParams = clientInvocationContext.getParameters();
-        if (methodParams != null && methodParams.length > 0) {
-            for (final Object methodParam : methodParams) {
-                marshaller.writeObject(methodParam);
-            }
-        }
-        // write out the context data
-        final Map<String, Object> contextData = clientInvocationContext.getContextData();
-        // no private or public data to write out
-        if (contextData == null) {
-            marshaller.writeByte(0);
-        } else {
-            final int totalAttachments = contextData.size();
-            PackedInteger.writePackedInteger(marshaller, totalAttachments);
-            // write out public (application specific) context data
-            for (Map.Entry<String, Object> invocationContextData : contextData.entrySet()) {
-                marshaller.writeObject(invocationContextData.getKey());
-                marshaller.writeObject(invocationContextData.getValue());
-            }
-        }
-        // finish marshalling
-        marshaller.finish();
-    }
-
-
-    private XAOutflowHandle writeTransaction(final Transaction transaction, final DataOutput dataOutput, URI uri) throws IOException, RollbackException, SystemException {
-
+    private TransactionInfo getTransactionInfo(final Transaction transaction, final URI uri) throws RollbackException, SystemException {
         if (transaction == null) {
-            dataOutput.writeByte(0);
-            return null;
+            return nullTransaction();
         } else if (transaction instanceof RemoteTransaction) {
             final RemoteTransaction remoteTransaction = (RemoteTransaction) transaction;
             remoteTransaction.setLocation(uri);
-            final XidProvider ir = remoteTransaction.getProviderInterface(XidProvider.class);
-            if (ir == null) throw EjbHttpClientMessages.MESSAGES.cannotEnlistTx();
-            Xid xid = ir.getXid();
-            dataOutput.writeByte(1);
-            dataOutput.writeInt(xid.getFormatId());
-            final byte[] gtid = xid.getGlobalTransactionId();
-            dataOutput.writeInt(gtid.length);
-            dataOutput.write(gtid);
-            final byte[] bq = xid.getBranchQualifier();
-            dataOutput.writeInt(bq.length);
-            dataOutput.write(bq);
-            return null;
+            final XidProvider xidProvider = remoteTransaction.getProviderInterface(XidProvider.class);
+            if (xidProvider == null) throw EjbHttpClientMessages.MESSAGES.cannotEnlistTx();
+            return remoteTransaction(xidProvider.getXid());
         } else if (transaction instanceof LocalTransaction) {
             final LocalTransaction localTransaction = (LocalTransaction) transaction;
             final XAOutflowHandle outflowHandle = transactionContext.outflowTransaction(uri, localTransaction);
-            final Xid xid = outflowHandle.getXid();
-            dataOutput.writeByte(2);
-            dataOutput.writeInt(xid.getFormatId());
-            final byte[] gtid = xid.getGlobalTransactionId();
-            dataOutput.writeInt(gtid.length);
-            dataOutput.write(gtid);
-            final byte[] bq = xid.getBranchQualifier();
-            dataOutput.writeInt(bq.length);
-            dataOutput.write(bq);
-            dataOutput.writeInt(outflowHandle.getRemainingTime());
-            return outflowHandle;
+            return localTransaction(outflowHandle.getXid(), outflowHandle.getRemainingTime());
         } else {
             throw EjbHttpClientMessages.MESSAGES.cannotEnlistTx();
-        }
-    }
-
-    private static Map<String, Object> readAttachments(final ObjectInput input) throws IOException, ClassNotFoundException {
-        final int numAttachments = PackedInteger.readPackedInteger(input);
-        if (numAttachments == 0) {
-            return null;
-        }
-        final Map<String, Object> attachments = new HashMap<>(numAttachments);
-        for (int i = 0; i < numAttachments; i++) {
-            // read the key
-            final String key = (String) input.readObject();
-            // read the attachment value
-            final Object val = input.readObject();
-            attachments.put(key, val);
-        }
-        return attachments;
-    }
-
-    private static class StaticResultProducer implements EJBReceiverInvocationContext.ResultProducer {
-        private final Object ret;
-
-        public StaticResultProducer(Object ret) {
-            this.ret = ret;
-        }
-
-        @Override
-        public Object getResult() throws Exception {
-            return ret;
-        }
-
-        @Override
-        public void discardResult() {
-
         }
     }
 
