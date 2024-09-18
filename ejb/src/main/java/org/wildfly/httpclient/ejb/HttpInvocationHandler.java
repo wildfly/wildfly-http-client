@@ -18,6 +18,14 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION;
+import static org.wildfly.httpclient.ejb.Constants.JSESSIONID_COOKIE_NAME;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeObjectArray;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeTransaction;
+import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
+import static org.wildfly.httpclient.ejb.Serializer.serializeObject;
+
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.Cookie;
 import io.undertow.util.Headers;
@@ -46,7 +54,6 @@ import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
@@ -63,14 +70,10 @@ import java.io.InvalidClassException;
 import java.io.OutputStream;
 import java.net.SocketAddress;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
-
-import static org.wildfly.httpclient.ejb.Constants.INVOCATION;
-import static org.wildfly.httpclient.ejb.Constants.JSESSIONID_COOKIE_NAME;
 
 /**
  * Http handler for EJB invocations.
@@ -156,48 +159,19 @@ final class HttpInvocationHandler extends RemoteHTTPHandler {
 
                 @Override
                 public Resolved getRequestContent(final ClassLoader classLoader) throws IOException, ClassNotFoundException {
-
-                    Object[] methodParams = new Object[parameterTypeNames.length];
                     final Class<?> view = Class.forName(viewName, false, classLoader);
                     final HttpMarshallerFactory unmarshallingFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
                     final Unmarshaller unmarshaller = unmarshallingFactory.createUnmarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
 
                     try (InputStream inputStream = exchange.getInputStream()) {
                         unmarshaller.start(new InputStreamByteInput(inputStream));
-                        ReceivedTransaction txConfig = readTransaction(unmarshaller);
-
-
-                        final Transaction transaction;
-                        if (txConfig == null || localTransactionContext == null) { //the TX context may be null in unit tests
-                            transaction = null;
-                        } else {
-                            try {
-                                ImportResult<LocalTransaction> result = localTransactionContext.findOrImportTransaction(txConfig.getXid(), txConfig.getRemainingTime());
-                                transaction = result.getTransaction();
-                            } catch (XAException e) {
-                                throw new IllegalStateException(e); //TODO: what to do here?
-                            }
-                        }
-                        for (int i = 0; i < parameterTypeNames.length; ++i) {
-                            methodParams[i] = unmarshaller.readObject();
-                        }
-                        final Map<String, Object> contextData;
-                        final int attachmentCount = PackedInteger.readPackedInteger(unmarshaller);
-                        if (attachmentCount > 0) {
-                            contextData = new HashMap<>();
-                            for (int i = 0; i < attachmentCount; ++i) {
-                                Object o = unmarshaller.readObject();
-                                String key = (String) o;
-                                Object value = unmarshaller.readObject();
-                                contextData.put(key, value);
-                            }
-                        } else {
-                            contextData = new HashMap<>();
-                        }
-                        contextData.put(EJBClient.SOURCE_ADDRESS_KEY, exchange.getConnection().getPeerAddress());
-
+                        final TransactionInfo txnInfo = deserializeTransaction(unmarshaller);
+                        final Object[] methodParams = new Object[parameterTypeNames.length];
+                        deserializeObjectArray(unmarshaller, methodParams);
+                        final Map<String, Object> contextData = deserializeMap(unmarshaller);
                         unmarshaller.finish();
 
+                        contextData.put(EJBClient.SOURCE_ADDRESS_KEY, exchange.getConnection().getPeerAddress());
                         EJBLocator<?> locator;
                         if (EJBHome.class.isAssignableFrom(view)) {
                             locator = new EJBHomeLocator(view, app, module, bean, distinct, Affinity.LOCAL); //TODO: what is the correct affinity?
@@ -210,6 +184,17 @@ final class HttpInvocationHandler extends RemoteHTTPHandler {
 
                         final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpMarshallerFactory(exchange);
                         final Marshaller marshaller = marshallerFactory.createMarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
+                        final Transaction transaction;
+                        if ((txnInfo.getType() == TransactionInfo.NULL_TRANSACTION) || localTransactionContext == null) { //the TX context may be null in unit tests
+                            transaction = null;
+                        } else {
+                            try {
+                                ImportResult<LocalTransaction> result = localTransactionContext.findOrImportTransaction(txnInfo.getXid(), txnInfo.getRemainingTime());
+                                transaction = result.getTransaction();
+                            } catch (XAException e) {
+                                throw new IllegalStateException(e); //TODO: what to do here?
+                            }
+                        }
                         return new ResolvedInvocation(contextData, methodParams, locator, exchange, marshaller, sessionAffinity, transaction, identifier);
                     } catch (IOException | ClassNotFoundException e) {
                         throw e;
@@ -387,18 +372,13 @@ final class HttpInvocationHandler extends RemoteHTTPHandler {
 //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
 //                                    }
                 OutputStream outputStream = exchange.getOutputStream();
-                final ByteOutput byteOutput = new NoFlushByteOutput(Marshalling.createByteOutput(outputStream));
-                // start the marshaller
-                marshaller.start(byteOutput);
-                marshaller.writeObject(result);
-                // TODO: Do we really need to send this back?
-                PackedInteger.writePackedInteger(marshaller, contextData.size());
-                for(Map.Entry<String, Object> entry : contextData.entrySet()) {
-                    marshaller.writeObject(entry.getKey());
-                    marshaller.writeObject(entry.getValue());
+                final ByteOutput byteOutput = Marshalling.createByteOutput(outputStream);
+                try (byteOutput) {
+                    marshaller.start(byteOutput);
+                    serializeObject(marshaller, result);
+                    serializeMap(marshaller, contextData);
+                    marshaller.finish();
                 }
-                marshaller.finish();
-                marshaller.flush();
                 exchange.endExchange();
             } catch (Exception e) {
                 HttpServerHelper.sendException(exchange, httpServiceConfig, 500, e);

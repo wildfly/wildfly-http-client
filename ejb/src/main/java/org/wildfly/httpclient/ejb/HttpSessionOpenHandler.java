@@ -54,6 +54,7 @@ import java.util.concurrent.ExecutorService;
 
 import static org.wildfly.httpclient.ejb.Constants.JSESSIONID_COOKIE_NAME;
 import static org.wildfly.httpclient.ejb.Constants.SESSION_OPEN;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeTransaction;
 
 /**
  * Http handler for open session requests.
@@ -107,14 +108,14 @@ final class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
         exchange.dispatch(executorService, () -> {
-            final ReceivedTransaction txConfig;
+            final TransactionInfo txnInfo;
             try {
                 final HttpMarshallerFactory httpUnmarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
                 final Unmarshaller unmarshaller = httpUnmarshallerFactory.createUnmarshaller(HttpProtocolV1ObjectTable.INSTANCE);
 
                 try (InputStream inputStream = exchange.getInputStream()) {
                     unmarshaller.start(new InputStreamByteInput(inputStream));
-                    txConfig = readTransaction(unmarshaller);
+                    txnInfo = deserializeTransaction(unmarshaller);
                     unmarshaller.finish();
                 }
             } catch (Exception e) {
@@ -122,11 +123,11 @@ final class HttpSessionOpenHandler extends RemoteHTTPHandler {
                 return;
             }
             final Transaction transaction;
-            if (txConfig == null || localTransactionContext == null) { //the TX context may be null in unit tests
+            if (txnInfo.getType() == TransactionInfo.NULL_TRANSACTION || localTransactionContext == null) { //the TX context may be null in unit tests
                 transaction = null;
             } else {
                 try {
-                    ImportResult<LocalTransaction> result = localTransactionContext.findOrImportTransaction(txConfig.getXid(), txConfig.getRemainingTime());
+                    ImportResult<LocalTransaction> result = localTransactionContext.findOrImportTransaction(txnInfo.getXid(), txnInfo.getRemainingTime());
                     transaction = result.getTransaction();
                 } catch (XAException e) {
                     throw new IllegalStateException(e); //TODO: what to do here?
@@ -136,7 +137,7 @@ final class HttpSessionOpenHandler extends RemoteHTTPHandler {
             association.receiveSessionOpenRequest(new SessionOpenRequest() {
                 @Override
                 public boolean hasTransaction() {
-                    return txConfig != null;
+                    return txnInfo != null;
                 }
 
                 @Override
