@@ -18,51 +18,11 @@
 
 package org.wildfly.httpclient.naming;
 
-import io.undertow.client.ClientRequest;
-import io.undertow.util.StatusCodes;
-import org.jboss.marshalling.ByteInput;
-import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
-import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
-import org.wildfly.httpclient.common.WildflyHttpContext;
-import org.wildfly.naming.client.AbstractContext;
-import org.wildfly.naming.client.CloseableNamingEnumeration;
-import org.wildfly.naming.client.ExhaustedDestinationsException;
-import org.wildfly.naming.client.NamingOperation;
-import org.wildfly.naming.client.ProviderEnvironment;
-import org.wildfly.naming.client.RetryContext;
-import org.wildfly.naming.client._private.Messages;
-import org.wildfly.naming.client.util.FastHashtable;
-import org.wildfly.security.auth.client.AuthenticationConfiguration;
-import org.wildfly.security.auth.client.AuthenticationContext;
-import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
-import org.xnio.IoUtils;
-
-import javax.naming.Binding;
-import javax.naming.CommunicationException;
-import javax.naming.Context;
-import javax.naming.Name;
-import javax.naming.NameClassPair;
-import javax.naming.NameNotFoundException;
-import javax.naming.NamingException;
-import javax.net.ssl.SSLContext;
-import java.io.IOException;
-import java.net.URI;
-import java.security.AccessController;
-import java.security.GeneralSecurityException;
-import java.security.PrivilegedAction;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.ServiceLoader;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
 import static java.security.AccessController.doPrivileged;
+import static org.wildfly.httpclient.naming.ClassLoaderUtils.getContextClassLoader;
+import static org.wildfly.httpclient.naming.ClientHandlers.emptyHttpResultHandler;
+import static org.wildfly.httpclient.naming.ClientHandlers.optionalObjectHttpResultHandler;
+import static org.wildfly.httpclient.naming.ClientHandlers.objectHttpMarshaller;
 import static org.wildfly.httpclient.naming.Constants.HTTPS_PORT;
 import static org.wildfly.httpclient.naming.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.naming.Constants.HTTP_PORT;
@@ -77,8 +37,45 @@ import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
 import static org.wildfly.httpclient.naming.RequestType.REBIND;
 import static org.wildfly.httpclient.naming.RequestType.RENAME;
 import static org.wildfly.httpclient.naming.RequestType.UNBIND;
-import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
-import static org.wildfly.httpclient.naming.Serializer.serializeObject;
+import static org.wildfly.httpclient.naming.Utils.newMarshaller;
+import static org.wildfly.httpclient.naming.Utils.newUnmarshaller;
+
+import io.undertow.client.ClientRequest;
+import org.jboss.marshalling.Marshaller;
+import org.jboss.marshalling.ObjectResolver;
+import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.WildflyHttpContext;
+import org.wildfly.naming.client.AbstractContext;
+import org.wildfly.naming.client.CloseableNamingEnumeration;
+import org.wildfly.naming.client.ExhaustedDestinationsException;
+import org.wildfly.naming.client.NamingOperation;
+import org.wildfly.naming.client.ProviderEnvironment;
+import org.wildfly.naming.client.RetryContext;
+import org.wildfly.naming.client._private.Messages;
+import org.wildfly.naming.client.util.FastHashtable;
+import org.wildfly.security.auth.client.AuthenticationConfiguration;
+import org.wildfly.security.auth.client.AuthenticationContext;
+import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
+
+import javax.naming.Binding;
+import javax.naming.CommunicationException;
+import javax.naming.Context;
+import javax.naming.Name;
+import javax.naming.NameClassPair;
+import javax.naming.NameNotFoundException;
+import javax.naming.NamingException;
+import javax.net.ssl.SSLContext;
+import java.io.IOException;
+import java.net.URI;
+import java.security.GeneralSecurityException;
+import java.security.PrivilegedAction;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.ServiceLoader;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Root naming context.
@@ -91,12 +88,6 @@ public class HttpRootContext extends AbstractContext {
     private static final int MAX_NOT_FOUND_RETRY = Integer.getInteger("org.wildfly.httpclient.naming.max-retries", 8);
 
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
-    private static final PrivilegedAction<ClassLoader> GET_TCCL_ACTION = new PrivilegedAction<ClassLoader>() {
-        @Override
-        public ClassLoader run() {
-            return Thread.currentThread().getContextClassLoader();
-        }
-    };
     private final HttpNamingProvider httpNamingProvider;
     private final String scheme;
 
@@ -177,18 +168,8 @@ public class HttpRootContext extends AbstractContext {
         return new HttpRemoteContext(this, name.toString());
     }
 
-    private static Marshaller createMarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
-        if (helper != null) {
-            return httpMarshallerFactory.createMarshaller(helper.getObjectResolver(uri));
-        }
-        return httpMarshallerFactory.createMarshaller();
-    }
-
-    private static Unmarshaller createUnmarshaller(URI uri, HttpMarshallerFactory httpMarshallerFactory) throws IOException {
-        if (helper != null) {
-            return httpMarshallerFactory.createUnmarshaller(helper.getObjectResolver(uri));
-        }
-        return httpMarshallerFactory.createUnmarshaller();
+    private static ObjectResolver getObjectResolver(final URI uri) {
+        return helper != null ? helper.getObjectResolver(uri) : null;
     }
 
     private <T, R> R performWithRetry(NamingOperation<T, R> function, ProviderEnvironment environment, RetryContext context, Name name, T param) throws NamingException {
@@ -274,7 +255,6 @@ public class HttpRootContext extends AbstractContext {
     }
 
     private Object performOperation(Name name, URI providerUri, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
-        final CompletableFuture<Object> result = new CompletableFuture<>();
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
         AuthenticationContextConfigurationClient client = CLIENT;
@@ -288,50 +268,19 @@ public class HttpRootContext extends AbstractContext {
             e2.initCause(e);
             throw e2;
         }
-        final ClassLoader tccl = getContextClassLoader();
-        targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, null, (input, response, closeable) -> {
-            try {
-                if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
-                    result.complete(new HttpRemoteContext(HttpRootContext.this, name.toString()));
-                    IoUtils.safeClose(input);
-                    return;
-                }
 
-                httpNamingProvider.performExceptionAction((a, b) -> {
-
-                    Exception exception = null;
-                    Object returned = null;
-                    ClassLoader old = setContextClassLoader(tccl);
-                    try {
-                        final Unmarshaller unmarshaller = createUnmarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
-                       try (ByteInput in = new InputStreamByteInput(input)) {
-                            unmarshaller.start(in);
-                            returned = deserializeObject(unmarshaller);
-                            unmarshaller.finish();
-                        }
-
-                        if (response.getResponseCode() >= 400) {
-                            exception = (Exception) returned;
-                        }
-                    } catch (Exception e) {
-                        exception = e;
-                    } finally {
-                        setContextClassLoader(old);
-                    }
-                    if (exception != null) {
-                        result.completeExceptionally(exception);
-                    } else {
-                        result.complete(returned);
-                    }
-                    return null;
-                }, null, null);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, result::completeExceptionally, VALUE, null, true);
-
+        final CompletableFuture<Object> result = new CompletableFuture<>();
+        final ObjectResolver objectResolver = getObjectResolver(providerUri);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(clientRequest);
+        final Unmarshaller unmarshaller = newUnmarshaller(objectResolver, marshallerFactory, result);
+        if (unmarshaller != null) {
+            targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, null,
+                    optionalObjectHttpResultHandler(unmarshaller, result, httpNamingProvider, getContextClassLoader()),
+                    result::completeExceptionally, VALUE, null, true);
+        }
         try {
-            return result.get();
+            Object ret = result.get();
+            return ret == null ? new HttpRemoteContext(HttpRootContext.this, name.toString()) : ret;
         } catch (InterruptedException e) {
             NamingException namingException = new NamingException(e.getMessage());
             namingException.initCause(e);
@@ -357,7 +306,6 @@ public class HttpRootContext extends AbstractContext {
     }
 
     private void performOperation(URI providerUri, Object object, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
-        final CompletableFuture<Object> result = new CompletableFuture<>();
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
         AuthenticationContextConfigurationClient client = CLIENT;
@@ -371,24 +319,15 @@ public class HttpRootContext extends AbstractContext {
             e2.initCause(e);
             throw e2;
         }
-        targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, output -> {
-            if (object != null) {
-                Marshaller marshaller = createMarshaller(providerUri, targetContext.getHttpMarshallerFactory(clientRequest));
-                ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(output));
-                try (out) {
-                    marshaller.start(out);
-                    serializeObject(marshaller, object);
-                    marshaller.finish();
-                }
-            }
-        }, (input, response, closeable) -> {
-            try {
-                result.complete(null);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, result::completeExceptionally, null, null);
 
+        final CompletableFuture<Object> result = new CompletableFuture<>();
+        final ObjectResolver objectResolver = getObjectResolver(providerUri);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(clientRequest);
+        final Marshaller marshaller = newMarshaller(objectResolver, marshallerFactory, result);
+        if (marshaller != null) {
+            targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration,
+                    object != null ? objectHttpMarshaller(marshaller, object) : null, emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+        }
         try {
             result.get();
         } catch (InterruptedException e) {
@@ -418,29 +357,4 @@ public class HttpRootContext extends AbstractContext {
         return scheme == null || scheme.isEmpty() ? "" : scheme + ":";
     }
 
-    static ClassLoader getContextClassLoader() {
-        if(System.getSecurityManager() == null) {
-            return Thread.currentThread().getContextClassLoader();
-        } else {
-            return AccessController.doPrivileged(GET_TCCL_ACTION);
-        }
-    }
-
-    static ClassLoader setContextClassLoader(final ClassLoader cl) {
-
-        if(System.getSecurityManager() == null) {
-            ClassLoader old = Thread.currentThread().getContextClassLoader();
-            Thread.currentThread().setContextClassLoader(cl);
-            return old;
-        } else {
-            return AccessController.doPrivileged(new PrivilegedAction<ClassLoader>() {
-                @Override
-                public ClassLoader run() {
-                    ClassLoader old = Thread.currentThread().getContextClassLoader();
-                    Thread.currentThread().setContextClassLoader(cl);
-                    return old;
-                }
-            });
-        }
-    }
 }
