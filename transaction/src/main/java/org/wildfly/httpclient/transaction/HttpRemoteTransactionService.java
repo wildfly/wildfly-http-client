@@ -154,7 +154,7 @@ public class HttpRemoteTransactionService {
                 final LocalTransaction transaction = transactionContext.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final ByteOutput byteOutput = byteOutputOf(out);
+                final ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
                 try (byteOutput) {
                     Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
                     marshaller.start(byteOutput);

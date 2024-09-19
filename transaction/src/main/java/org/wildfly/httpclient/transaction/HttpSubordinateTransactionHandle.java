@@ -18,24 +18,23 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
+import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
 import static org.wildfly.httpclient.transaction.Constants.READ_ONLY;
 import static org.wildfly.httpclient.transaction.RequestType.XA_BEFORE_COMPLETION;
 import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
 import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
-import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
+import static org.wildfly.httpclient.transaction.Utils.newMarshaller;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
-import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
-import org.xnio.IoUtils;
 
 import javax.net.ssl.SSLContext;
 import javax.transaction.xa.XAException;
@@ -107,25 +106,15 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     }
 
     private <T> T processOperation(RequestType requestType, Function<ClientResponse, T> resultFunction, Boolean onePhase) throws XAException {
-        final CompletableFuture<T> result = new CompletableFuture<>();
-
         final RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setVersion(targetContext.getProtocolVersion()).setOnePhase(onePhase);
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
-            Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
-            try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(output))) {
-                marshaller.start(out);
-                serializeXid(marshaller, id);
-                marshaller.finish();
-            }
-        }, (input, response, closeable) -> {
-            try {
-                result.complete(resultFunction != null ? resultFunction.apply(response) : null);
-            } finally {
-                IoUtils.safeClose(closeable);
-            }
-        }, result::completeExceptionally, null, null);
-
+        final CompletableFuture<T> result = new CompletableFuture<>();
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final Marshaller marshaller = newMarshaller(marshallerFactory, result);
+        if (marshaller != null) {
+            targetContext.sendRequest(request, sslContext, authenticationConfiguration,
+                    xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, resultFunction), result::completeExceptionally, null, null);
+        }
         try {
             try {
                 return result.get();
