@@ -79,7 +79,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final CompletableFuture<Void> result = new CompletableFuture<>();
             statusRef.set(Status.STATUS_COMMITTING);
 
-            RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_COMMIT).setVersion(targetContext.getProtocolVersion());
+            final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_COMMIT).setVersion(targetContext.getProtocolVersion());
             final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
 
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
@@ -147,7 +147,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final CompletableFuture<Void> result = new CompletableFuture<>();
             statusRef.set(Status.STATUS_COMMITTING);
 
-            RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_ROLLBACK).setVersion(targetContext.getProtocolVersion());
+            final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_ROLLBACK).setVersion(targetContext.getProtocolVersion());
             final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
 
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {

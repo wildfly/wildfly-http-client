@@ -106,7 +106,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     private <T> T processOperation(RequestType requestType, Function<ClientResponse, T> resultFunction, Boolean onePhase) throws XAException {
         final CompletableFuture<T> result = new CompletableFuture<>();
 
-        RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setVersion(targetContext.getProtocolVersion()).setOnePhase(onePhase);
+        final RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setVersion(targetContext.getProtocolVersion()).setOnePhase(onePhase);
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
             Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
