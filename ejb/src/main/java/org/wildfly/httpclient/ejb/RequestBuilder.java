@@ -128,7 +128,7 @@ final class RequestBuilder {
     private void setRequestPath(final ClientRequest request, final String prefix) {
         switch (requestType) {
             case INVOKE: request.setPath(getStartEjbInvocationRequestPath(prefix)); break;
-            case OPEN: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
+            case CREATE_SESSION: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
             case DISCOVER: request.setPath(getDiscoverEjbRequestPath(prefix)); break;
             case CANCEL: request.setPath(getCancelEjbInvocationRequestPath(prefix)); break;
             default: throw new IllegalStateException();
@@ -152,7 +152,7 @@ final class RequestBuilder {
                 }
                 headers.put(TRANSFER_ENCODING, CHUNKED.toString());
             } break;
-            case OPEN: {
+            case CREATE_SESSION: {
                 headers.add(ACCEPT, EJB_EXCEPTION.toString());
                 headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
             } break;

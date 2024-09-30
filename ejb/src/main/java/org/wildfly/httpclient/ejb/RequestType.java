@@ -38,7 +38,7 @@ import io.undertow.util.HttpString;
  *     <li>{@link #CANCEL}<br>
  *     Cancel EJB method invocation.
  *     </li>
- *     <li>{@link #OPEN}<br>
+ *     <li>{@link #CREATE_SESSION}<br>
  *     Create EJB session bean.
  *     </li>
  *     <li>{@link #DISCOVER}<br>
@@ -61,7 +61,7 @@ enum RequestType {
     /**
      * {@code OPEN} invocation type: used to create EJB session bean via HTTP protocol.
      */
-    OPEN(POST, EJB_OPEN_PATH),
+    CREATE_SESSION(POST, EJB_OPEN_PATH),
     /**
      * {@code DISCOVER} invocation type: used to discover available EJB beans via HTTP protocol.
      */

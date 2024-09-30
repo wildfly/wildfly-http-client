@@ -283,7 +283,7 @@ class HttpEJBReceiver extends EJBReceiver {
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
         RequestBuilder builder = new RequestBuilder()
-                .setRequestType(RequestType.OPEN)
+                .setRequestType(RequestType.CREATE_SESSION)
                 .setLocator(locator)
                 .setView(locator.getViewType().getName())
                 .setVersion(targetContext.getProtocolVersion());
