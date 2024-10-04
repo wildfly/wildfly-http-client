@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.wildfly.common.context.ContextManager;
 import org.wildfly.common.context.Contextual;
+import org.xnio.Options;
 import org.xnio.OptionMap;
 import org.xnio.XnioWorker;
 import io.undertow.UndertowOptions;
@@ -44,6 +45,7 @@ import io.undertow.server.DefaultByteBufferPool;
 public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
 
     private static final int LEAK_DETECTION = Integer.getInteger("org.wildfly.http-client.buffer-leak-detection", 0);
+    private static final boolean TCP_NODELAY = Boolean.getBoolean("org.wildfly.httpclient.tcp-nodelay");
 
     /**
      * The context manager for HTTP endpoints.
@@ -111,7 +113,12 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             if (context != null) {
                 return context;
             }
-            HttpConnectionPool pool = new HttpConnectionPool(maxConnections, maxStreamsPerConnection, worker, this.pool, OptionMap.create(UndertowOptions.ENABLE_HTTP2, enableHttp2), new HostPool(uri), idleTimeout);
+
+            // add in org.xnio.Options.TCP_NODELAY setting (see WEJBHTTP-144)
+            OptionMap uriConnectionPoolOptions = OptionMap.create(UndertowOptions.ENABLE_HTTP2, enableHttp2, Options.TCP_NODELAY, TCP_NODELAY);
+            HttpClientMessages.MESSAGES.infof("WildflyHttpContext: using connection pool option map for URI %s: %s", uri, uriConnectionPoolOptions);
+
+            HttpConnectionPool pool = new HttpConnectionPool(maxConnections, maxStreamsPerConnection, worker, this.pool, uriConnectionPoolOptions, new HostPool(uri), idleTimeout);
             uriConnectionPools.put(uri, context = new HttpTargetContext(pool, eagerlyAcquireAffinity, uri));
             context.init();
             return context;
@@ -174,7 +181,12 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
                 if(sb.getEnableHttp2() != null) {
                     http2 = sb.getEnableHttp2();
                 }
-                ConfigSection connection = new ConfigSection(new HttpTargetContext(new HttpConnectionPool(sb.getMaxConnections() > 0 ? sb.getMaxConnections() : maxConnections, sb.getMaxStreamsPerConnection() > 0 ? sb.getMaxStreamsPerConnection() : maxStreamsPerConnection, worker, pool, OptionMap.create(UndertowOptions.ENABLE_HTTP2, http2), hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout), eager, sb.getUri()), sb.getUri());
+
+                // add in org.xnio.Options.TCP_NODELAY setting (see WEJBHTTP-144)
+                OptionMap connectionPoolOptions = OptionMap.create(UndertowOptions.ENABLE_HTTP2, http2, Options.TCP_NODELAY, TCP_NODELAY);
+                HttpClientMessages.MESSAGES.infof("WildflyHttpContext: using connection pool option map for URI %s: %s", sb.getUri(), connectionPoolOptions);
+
+                ConfigSection connection = new ConfigSection(new HttpTargetContext(new HttpConnectionPool(sb.getMaxConnections() > 0 ? sb.getMaxConnections() : maxConnections, sb.getMaxStreamsPerConnection() > 0 ? sb.getMaxStreamsPerConnection() : maxStreamsPerConnection, worker, pool, connectionPoolOptions, hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout), eager, sb.getUri()), sb.getUri());
                 connections[i] = connection;
             }
             return new WildflyHttpContext(connections, maxConnections, maxStreamsPerConnection, idleTimeout, eagerlyAcquireSession == null ? false : eagerlyAcquireSession, worker, pool, enableHttp2 == null ? true : enableHttp2);
