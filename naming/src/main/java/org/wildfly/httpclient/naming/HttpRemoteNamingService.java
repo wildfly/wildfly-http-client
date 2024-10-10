@@ -18,16 +18,24 @@
 
 package org.wildfly.httpclient.naming;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
+import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
+import static org.wildfly.httpclient.naming.Constants.VALUE;
+import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
+import static org.wildfly.httpclient.naming.Serializer.serializeObject;
+
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 import io.undertow.util.PathTemplateMatch;
 import io.undertow.util.StatusCodes;
-import org.jboss.marshalling.ContextClassResolver;
+import org.jboss.marshalling.ByteInput;
+import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
+import org.jboss.marshalling.ContextClassResolver;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
@@ -44,27 +52,11 @@ import javax.naming.NameClassPair;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InvalidClassException;
 import java.net.URLDecoder;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.function.Function;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.NAME_PATH_PARAMETER;
-import static org.wildfly.httpclient.naming.NamingConstants.NEW_QUERY_PARAMETER;
-import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
 
 /**
  * HTTP service that handles naming invocations.
@@ -95,20 +87,33 @@ public class HttpRemoteNamingService {
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
-        final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
-        routingHandler.add(Methods.POST, LOOKUP_PATH + nameParamPathSuffix, new LookupHandler());
-        routingHandler.add(Methods.GET, LOOKUP_LINK_PATH + nameParamPathSuffix, new LookupLinkHandler());
-        routingHandler.add(Methods.PUT, BIND_PATH + nameParamPathSuffix, new BindHandler());
-        routingHandler.add(Methods.PATCH, REBIND_PATH + nameParamPathSuffix, new RebindHandler());
-        routingHandler.add(Methods.DELETE, UNBIND_PATH + nameParamPathSuffix, new UnbindHandler());
-        routingHandler.add(Methods.DELETE, DESTROY_SUBCONTEXT_PATH + nameParamPathSuffix, new DestroySubcontextHandler());
-        routingHandler.add(Methods.GET, LIST_PATH + nameParamPathSuffix, new ListHandler());
-        routingHandler.add(Methods.GET, LIST_BINDINGS_PATH + nameParamPathSuffix, new ListBindingsHandler());
-        routingHandler.add(Methods.PATCH, RENAME_PATH + nameParamPathSuffix, new RenameHandler());
-        routingHandler.add(Methods.PUT, CREATE_SUBCONTEXT_PATH + nameParamPathSuffix, new CreateSubContextHandler());
+        for (RequestType requestType : RequestType.values()) {
+            registerHandler(routingHandler, requestType);
+        }
+
         return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
+    private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType) {
+        final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
+        routingHandler.add(requestType.getMethod(), requestType.getPath() + nameParamPathSuffix, newInvocationHandler(requestType));
+    }
+
+    private HttpHandler newInvocationHandler(final RequestType requestType) {
+        switch (requestType) {
+            case BIND: return new BindHandler();
+            case CREATE_SUBCONTEXT: return new CreateSubContextHandler();
+            case DESTROY_SUBCONTEXT: return new DestroySubcontextHandler();
+            case LIST: return new ListHandler();
+            case LIST_BINDINGS: return new ListBindingsHandler();
+            case LOOKUP: return new LookupHandler();
+            case LOOKUP_LINK: return new LookupLinkHandler();
+            case REBIND: return new RebindHandler();
+            case RENAME: return new RenameHandler();
+            case UNBIND: return new UnbindHandler();
+            default: throw new IllegalStateException();
+        }
+    }
 
     private abstract class NameHandler implements HttpHandler {
 
@@ -224,12 +229,12 @@ public class HttpRemoteNamingService {
                 return null;
             }
             final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
-            try (InputStream inputStream = exchange.getInputStream()) {
+            try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
                 Unmarshaller unmarshaller = classResolverFilter != null ?
                         marshallerFactory.createUnmarshaller(new FilterClassResolver(classResolverFilter)):
                         marshallerFactory.createUnmarshaller();
-                unmarshaller.start(new InputStreamByteInput(inputStream));
-                Object object = unmarshaller.readObject();
+                unmarshaller.start(in);
+                Object object = deserializeObject(unmarshaller);
                 unmarshaller.finish();
                 doOperation(name, object);
             } catch (Exception e) {
@@ -252,10 +257,12 @@ public class HttpRemoteNamingService {
         exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
         HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
         Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-        marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream())));
-        marshaller.writeObject(result);
-        marshaller.finish();
-        marshaller.flush();
+        ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream()));
+        try (out) {
+            marshaller.start(out);
+            serializeObject(marshaller, result);
+            marshaller.finish();
+        }
     }
 
     @Deprecated

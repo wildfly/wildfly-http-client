@@ -18,7 +18,7 @@
 
 package org.wildfly.httpclient.naming;
 
-import static org.wildfly.httpclient.naming.NamingConstants.JAVA_SCHEME;
+import static org.wildfly.httpclient.naming.Constants.JAVA_SCHEME;
 
 import javax.naming.Context;
 import javax.naming.NamingException;

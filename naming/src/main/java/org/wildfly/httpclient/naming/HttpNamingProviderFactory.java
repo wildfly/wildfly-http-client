@@ -18,8 +18,8 @@
 
 package org.wildfly.httpclient.naming;
 
-import static org.wildfly.httpclient.naming.NamingConstants.HTTP_SCHEME;
-import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
+import static org.wildfly.httpclient.naming.Constants.HTTP_SCHEME;
+import static org.wildfly.httpclient.naming.Constants.HTTPS_SCHEME;
 
 import javax.naming.NamingException;
 
