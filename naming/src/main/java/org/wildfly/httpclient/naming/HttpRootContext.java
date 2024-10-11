@@ -19,9 +19,6 @@
 package org.wildfly.httpclient.naming;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.util.Headers;
-import io.undertow.util.HttpString;
-import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
@@ -52,10 +49,7 @@ import javax.naming.NameNotFoundException;
 import javax.naming.NamingException;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
@@ -66,23 +60,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.EXCEPTION;
 import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_PORT;
 import static org.wildfly.httpclient.naming.NamingConstants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.naming.NamingConstants.HTTP_PORT;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.NAMING_CONTEXT;
-import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
 import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+import static org.wildfly.httpclient.naming.RequestType.BIND;
+import static org.wildfly.httpclient.naming.RequestType.CREATE_SUBCONTEXT;
+import static org.wildfly.httpclient.naming.RequestType.DESTROY_SUBCONTEXT;
+import static org.wildfly.httpclient.naming.RequestType.LIST;
+import static org.wildfly.httpclient.naming.RequestType.LIST_BINDINGS;
+import static org.wildfly.httpclient.naming.RequestType.LOOKUP;
+import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
+import static org.wildfly.httpclient.naming.RequestType.REBIND;
+import static org.wildfly.httpclient.naming.RequestType.RENAME;
+import static org.wildfly.httpclient.naming.RequestType.UNBIND;
 
 /**
  * Root naming context.
@@ -130,55 +121,54 @@ public class HttpRootContext extends AbstractContext {
 
     @Override
     protected Object lookupNative(Name name) throws NamingException {
-        return processInvocation(name, Methods.POST, LOOKUP_PATH);
+        return processInvocation(LOOKUP, name);
     }
 
     @Override
     protected Object lookupLinkNative(Name name) throws NamingException {
-        return processInvocation(name, Methods.POST, LOOKUP_LINK_PATH);
+        return processInvocation(LOOKUP_LINK, name);
     }
 
     @Override
     protected CloseableNamingEnumeration<NameClassPair> listNative(Name name) throws NamingException {
-        Collection<NameClassPair> result = (Collection<NameClassPair>) processInvocation(name, Methods.GET, LIST_PATH);
+        Collection<NameClassPair> result = (Collection<NameClassPair>) processInvocation(LIST, name);
         return CloseableNamingEnumeration.fromIterable(result);
     }
 
     @Override
     protected CloseableNamingEnumeration<Binding> listBindingsNative(Name name) throws NamingException {
-        Collection<Binding> result = (Collection<Binding>) processInvocation(name, Methods.GET, LIST_BINDINGS_PATH);
+        Collection<Binding> result = (Collection<Binding>) processInvocation(LIST_BINDINGS, name);
         return CloseableNamingEnumeration.fromIterable(result);
     }
 
     @Override
     protected void bindNative(Name name, Object obj) throws NamingException {
-        processInvocation(name, Methods.PUT, obj, BIND_PATH, null);
+        processInvocation(BIND, name, null, obj);
     }
 
     @Override
     protected void rebindNative(Name name, Object obj) throws NamingException {
-        processInvocation(name, Methods.PATCH, obj, REBIND_PATH, null);
+        processInvocation(REBIND, name, null, obj);
     }
 
     @Override
     protected void unbindNative(Name name) throws NamingException {
-        processInvocation(name, Methods.DELETE, null, UNBIND_PATH, null);
+        processInvocation(UNBIND, name, null, null);
     }
 
     @Override
     protected void renameNative(Name oldName, Name newName) throws NamingException {
-        //TODO no result expected
-        processInvocation(oldName, Methods.PATCH, null, RENAME_PATH, newName);
+        processInvocation(RENAME, oldName, newName, null);
     }
 
     @Override
     protected void destroySubcontextNative(Name name) throws NamingException {
-        processInvocation(name, Methods.DELETE, null, DESTROY_SUBCONTEXT_PATH, null);
+        processInvocation(DESTROY_SUBCONTEXT, name, null, null);
     }
 
     @Override
     protected Context createSubcontextNative(Name name) throws NamingException {
-        processInvocation(name, Methods.PUT, CREATE_SUBCONTEXT_PATH);
+        processInvocation(CREATE_SUBCONTEXT, name);
         return new HttpRemoteContext(this, name.toString());
     }
 
@@ -253,38 +243,29 @@ public class HttpRootContext extends AbstractContext {
         environment.updateBlocklist(location);
     }
 
-    private Object processInvocation(Name name, HttpString method, String pathSegment) throws NamingException {
+    private Object processInvocation(RequestType requestType, Name name) throws NamingException {
+        return processInvocation(requestType, name, null, null, true);
+    }
+
+    private void processInvocation(RequestType requestType, Name name, Name newName, Object object) throws NamingException {
+        processInvocation(requestType, name, newName, object, false);
+    }
+
+    private Object processInvocation(RequestType requestType, Name name, Name newName, Object object, final boolean expectedValue) throws NamingException {
         ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
         final RetryContext context = canRetry(environment) ? new RetryContext() : null;
         return performWithRetry((contextOrNull, name1, param) -> {
-
-            try {
-                HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
-                final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(peerIdentity.getUri());
-                StringBuilder sb = new StringBuilder();
-                String uriPath = peerIdentity.getUri().getPath();
-                sb.append(uriPath);
-                if (!uriPath.endsWith("/")) {
-                    sb.append("/");
-                }
-                sb.append(NAMING_CONTEXT);
-                sb.append(VERSION_PATH);
-                sb.append(targetContext.getProtocolVersion());
-                sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
-
-                final ClientRequest clientRequest = new ClientRequest()
-                        .setPath(sb.toString())
-                        .setMethod(method);
-                clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
-
-                return performOperation(name1, peerIdentity.getUri(), targetContext, clientRequest);
-
-            } catch (UnsupportedEncodingException e) {
-                NamingException namingException = new NamingException(e.getMessage());
-                namingException.initCause(e);
-                throw namingException;
+            HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
+            URI uri = peerIdentity.getUri();
+            final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
+            RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setName(name).setNewName(newName).setObject(object).setVersion(targetContext.getProtocolVersion());
+            final ClientRequest request = builder.createRequest(uri.getPath());
+            if (expectedValue) {
+                return performOperation(name1, uri, targetContext, request);
             }
-        }, environment, context, name, null);
+            performOperation(uri, object, targetContext, request);
+            return null;
+        }, environment, context, name, object);
     }
 
     private Object performOperation(Name name, URI providerUri, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
@@ -367,50 +348,6 @@ public class HttpRootContext extends AbstractContext {
                 throw namingException;
             }
         }
-    }
-
-
-    private void processInvocation(Name name, HttpString method, Object object, String pathSegment, Name newName) throws NamingException {
-        ProviderEnvironment environment = httpNamingProvider.getProviderEnvironment();
-        final RetryContext context = canRetry(environment) ? new RetryContext() : null;
-        performWithRetry((contextOrNull, name1, param) -> {
-            HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
-            try {
-                URI uri = peerIdentity.getUri();
-                final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
-                StringBuilder sb = new StringBuilder();
-                String uriPath = uri.getPath();
-                sb.append(uriPath);
-
-                if (!uriPath.endsWith("/")) {
-                    sb.append("/");
-                }
-                sb.append(NAMING_CONTEXT);
-                sb.append(VERSION_PATH);
-                sb.append(targetContext.getProtocolVersion());
-                sb.append(pathSegment).append("/").append(URLEncoder.encode(name.toString(), StandardCharsets.UTF_8.name()));
-                if (newName != null) {
-                    sb.append("?new=");
-                    sb.append(URLEncoder.encode(newName.toString(), StandardCharsets.UTF_8.name()));
-                }
-                final ClientRequest clientRequest = new ClientRequest()
-                        .setPath(sb.toString())
-                        .setMethod(method);
-
-                clientRequest.getRequestHeaders().put(Headers.ACCEPT, VALUE + "," + EXCEPTION);
-                if (object != null) {
-                    clientRequest.getRequestHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
-                }
-                performOperation(uri, object, targetContext, clientRequest);
-                return null;
-
-            } catch (UnsupportedEncodingException e) {
-                NamingException namingException = new NamingException(e.getMessage());
-                namingException.initCause(e);
-                throw namingException;
-            }
-        }, environment, context, name, object);
-
     }
 
     private boolean canRetry(ProviderEnvironment environment) {
