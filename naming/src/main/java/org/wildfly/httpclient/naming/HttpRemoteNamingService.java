@@ -46,7 +46,6 @@ import javax.naming.NamingException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidClassException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Collections;
 import java.util.Deque;
@@ -185,13 +184,9 @@ public class HttpRemoteNamingService {
                 exchange.endExchange();
                 return null;
             }
-            try {
-                String nn = URLDecoder.decode(newName.getFirst(), UTF_8.name());
-                localContext.rename(name, nn);
-                return null;
-            } catch (UnsupportedEncodingException e) {
-                throw new RuntimeException(e);
-            }
+            String nn = URLDecoder.decode(newName.getFirst(), UTF_8);
+            localContext.rename(name, nn);
+            return null;
         }
     }
 
