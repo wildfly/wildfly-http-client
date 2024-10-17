@@ -25,16 +25,6 @@ import static io.undertow.util.Methods.GET;
 import static io.undertow.util.Methods.PATCH;
 import static io.undertow.util.Methods.POST;
 import static io.undertow.util.Methods.PUT;
-import static org.wildfly.httpclient.naming.NamingConstants.BIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.CREATE_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.DESTROY_SUBCONTEXT_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LIST_BINDINGS_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.LOOKUP_LINK_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.REBIND_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.RENAME_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.UNBIND_PATH;
 
 /**
  * HTTP JNDI module invocation types. Each invocation type has {@linkplain #getName() name}, {@linkplain #getMethod() method}
@@ -79,43 +69,43 @@ enum RequestType {
     /**
      * {@code BIND} invocation type: used to bind a name to an object via HTTP protocol.
      */
-    BIND(PUT, BIND_PATH),
+    BIND(PUT, "/bind"),
     /**
      * {@code CREATE_SUBCONTEXT} invocation type: used to create and bind a new context via HTTP protocol.
      */
-    CREATE_SUBCONTEXT(PUT, CREATE_SUBCONTEXT_PATH),
+    CREATE_SUBCONTEXT(PUT, "/create-subcontext"),
     /**
      * {@code DESTROY_SUBCONTEXT} invocation type: used to destroy the named context and remove it from the namespace via HTTP protocol.
      */
-    DESTROY_SUBCONTEXT(DELETE, DESTROY_SUBCONTEXT_PATH),
+    DESTROY_SUBCONTEXT(DELETE, "/dest-subctx"),
     /**
      * {@code LIST} invocation type: used to enumerate the names bound in the named context, along with the class names of objects bound to them via HTTP protocol.
      */
-    LIST(GET, LIST_PATH),
+    LIST(GET, "/list"),
     /**
      * {@code LIST_BINDINGS} invocation type: used to numerate the names bound in the named context, along with the objects bound to them via HTTP protocol.
      */
-    LIST_BINDINGS(GET, LIST_BINDINGS_PATH),
+    LIST_BINDINGS(GET, "/list-bindings"),
     /**
      * {@code LOOKUP} invocation type: used to retrieve the named object via HTTP protocol.
      */
-    LOOKUP(POST, LOOKUP_PATH),
+    LOOKUP(POST, "/lookup"),
     /**
      * {@code LOOKUP_LINK} invocation type: used to retrieves the named object, following links via HTTP protocol.
      */
-    LOOKUP_LINK(POST, LOOKUP_LINK_PATH),
+    LOOKUP_LINK(POST, "/lookuplink"),
     /**
      * {@code REBIND} invocation type: used to bind a name to an object, overwriting any existing binding via HTTP protocol.
      */
-    REBIND(PATCH, REBIND_PATH),
+    REBIND(PATCH, "/rebind"),
     /**
      * {@code RENAME} invocation type: used to bind a new name to the object bound to an old name, and unbind the old name via HTTP protocol.
      */
-    RENAME(PATCH, RENAME_PATH),
+    RENAME(PATCH, "/rename"),
     /**
      * {@code UNBIND} invocation type: used to unbind the named object via HTTP protocol.
      */
-    UNBIND(DELETE, UNBIND_PATH);
+    UNBIND(DELETE, "/unbind");
 
     private final HttpString method;
     private final String path;
