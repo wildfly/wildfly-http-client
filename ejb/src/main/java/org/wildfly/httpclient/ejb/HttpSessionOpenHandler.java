@@ -52,16 +52,16 @@ import java.util.Base64;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
-import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+import static org.wildfly.httpclient.ejb.Constants.JSESSIONID_COOKIE_NAME;
+import static org.wildfly.httpclient.ejb.Constants.SESSION_OPEN;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeTransaction;
 
 /**
  * Http handler for open session requests.
  *
  * @author Stuart Douglas
  */
-class HttpSessionOpenHandler extends RemoteHTTPHandler {
-
+final class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
     private final Association association;
     private final ExecutorService executorService;
@@ -108,14 +108,14 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
 
         final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
         exchange.dispatch(executorService, () -> {
-            final ReceivedTransaction txConfig;
+            final TransactionInfo txnInfo;
             try {
                 final HttpMarshallerFactory httpUnmarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
                 final Unmarshaller unmarshaller = httpUnmarshallerFactory.createUnmarshaller(HttpProtocolV1ObjectTable.INSTANCE);
 
                 try (InputStream inputStream = exchange.getInputStream()) {
                     unmarshaller.start(new InputStreamByteInput(inputStream));
-                    txConfig = readTransaction(unmarshaller);
+                    txnInfo = deserializeTransaction(unmarshaller);
                     unmarshaller.finish();
                 }
             } catch (Exception e) {
@@ -123,11 +123,11 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                 return;
             }
             final Transaction transaction;
-            if (txConfig == null || localTransactionContext == null) { //the TX context may be null in unit tests
+            if (txnInfo.getType() == TransactionInfo.NULL_TRANSACTION || localTransactionContext == null) { //the TX context may be null in unit tests
                 transaction = null;
             } else {
                 try {
-                    ImportResult<LocalTransaction> result = localTransactionContext.findOrImportTransaction(txConfig.getXid(), txConfig.getRemainingTime());
+                    ImportResult<LocalTransaction> result = localTransactionContext.findOrImportTransaction(txnInfo.getXid(), txnInfo.getRemainingTime());
                     transaction = result.getTransaction();
                 } catch (XAException e) {
                     throw new IllegalStateException(e); //TODO: what to do here?
@@ -137,7 +137,7 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
             association.receiveSessionOpenRequest(new SessionOpenRequest() {
                 @Override
                 public boolean hasTransaction() {
-                    return txConfig != null;
+                    return txnInfo != null;
                 }
 
                 @Override
@@ -219,8 +219,8 @@ class HttpSessionOpenHandler extends RemoteHTTPHandler {
                         exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
                     }
 
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_RESPONSE_NEW_SESSION.toString());
-                    exchange.getResponseHeaders().put(EjbConstants.EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
+                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, Constants.EJB_RESPONSE_NEW_SESSION.toString());
+                    exchange.getResponseHeaders().put(Constants.EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
 
                     exchange.setStatusCode(StatusCodes.NO_CONTENT);
                     exchange.endExchange();
