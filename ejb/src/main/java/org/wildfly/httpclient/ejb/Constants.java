@@ -22,10 +22,9 @@ import org.wildfly.httpclient.common.ContentType;
 import io.undertow.util.HttpString;
 
 /**
- * @author Stuart Douglas
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class EjbConstants {
+final class Constants {
 
     // request headers
     static final ContentType INVOCATION_ACCEPT = new ContentType("application/x-wf-ejb-response", 1);
@@ -41,13 +40,8 @@ final class EjbConstants {
     static final HttpString EJB_SESSION_ID = new HttpString("x-wf-ejb-jbmar-session-id");
     static final HttpString INVOCATION_ID = new HttpString("X-wf-invocation-id");
 
-    // paths
-    static final String EJB_CANCEL_PATH = "/cancel";
-    static final String EJB_DISCOVER_PATH = "/discover";
-    static final String EJB_INVOKE_PATH = "/invoke";
-    static final String EJB_OPEN_PATH = "/open";
-
-    static final String DISCOVERY_PATH_PREFIX =  "/ejb";
+    // context path
+    static final String EJB_CONTEXT = "/ejb";
 
     // cookies
     static final String JSESSIONID_COOKIE_NAME = "JSESSIONID";
@@ -60,7 +54,7 @@ final class EjbConstants {
     static final int HTTP_PORT = 80;
     static final int HTTPS_PORT = 443;
 
-    private EjbConstants() {
+    private Constants() {
         // forbidden instantiation
     }
 

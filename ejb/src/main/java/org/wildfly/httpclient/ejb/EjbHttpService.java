@@ -27,7 +27,6 @@ import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 import io.undertow.server.handlers.encoding.RequestEncodingHandler;
 import io.undertow.util.Headers;
-import io.undertow.util.Methods;
 import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.CancelHandle;
 import org.wildfly.httpclient.common.HttpServiceConfig;
@@ -37,11 +36,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
-
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 
 /**
  * HTTP service that handles EJB calls.
@@ -80,17 +74,28 @@ public class EjbHttpService {
 
     public HttpHandler createHttpHandler() {
         PathHandler pathHandler = new PathHandler();
-        pathHandler.addPrefixPath(EJB_INVOKE_PATH, new AllowedMethodsHandler(
-                new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig), Methods.POST))
-                .addPrefixPath(EJB_OPEN_PATH, new AllowedMethodsHandler(
-                        new HttpSessionOpenHandler(association, executorService, localTransactionContext, httpServiceConfig), Methods.POST))
-                .addPrefixPath(EJB_CANCEL_PATH, new AllowedMethodsHandler(new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags), Methods.DELETE))
-                .addPrefixPath(EJB_DISCOVER_PATH, new AllowedMethodsHandler(
-                        new HttpDiscoveryHandler(executorService, association, httpServiceConfig), Methods.GET));
+        for (RequestType requestType : RequestType.values()) {
+            registerHandler(pathHandler, requestType);
+        }
+
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
         requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
         return httpServiceConfig.wrap(requestEncodingHandler);
+    }
+
+    private void registerHandler(final PathHandler pathHandler, final RequestType requestType) {
+        pathHandler.addPrefixPath(requestType.getPath(), new AllowedMethodsHandler(newInvocationHandler(requestType), requestType.getMethod()));
+    }
+
+    private HttpHandler newInvocationHandler(final RequestType requestType) {
+        switch (requestType) {
+            case INVOKE: return new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig);
+            case CANCEL : return new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags);
+            case CREATE_SESSION: return new HttpSessionOpenHandler(association, executorService, localTransactionContext, httpServiceConfig);
+            case DISCOVER: return new HttpDiscoveryHandler(executorService, association, httpServiceConfig);
+            default: throw new IllegalStateException();
+        }
     }
 
 }

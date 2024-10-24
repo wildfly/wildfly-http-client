@@ -21,10 +21,6 @@ package org.wildfly.httpclient.ejb;
 import static io.undertow.util.Methods.DELETE;
 import static io.undertow.util.Methods.GET;
 import static io.undertow.util.Methods.POST;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_CANCEL_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVER_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_INVOKE_PATH;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_OPEN_PATH;
 
 import io.undertow.util.HttpString;
 
@@ -38,7 +34,7 @@ import io.undertow.util.HttpString;
  *     <li>{@link #CANCEL}<br>
  *     Cancel EJB method invocation.
  *     </li>
- *     <li>{@link #OPEN}<br>
+ *     <li>{@link #CREATE_SESSION}<br>
  *     Create EJB session bean.
  *     </li>
  *     <li>{@link #DISCOVER}<br>
@@ -53,19 +49,19 @@ enum RequestType {
     /**
      * {@code INVOKE} invocation type: used to start EJB method invocation via HTTP protocol.
      */
-    INVOKE(POST, EJB_INVOKE_PATH),
+    INVOKE(POST, "/invoke"),
     /**
      * {@code CANCEL} invocation type: used to cancel EJB method invocation via HTTP protocol.
      */
-    CANCEL(DELETE, EJB_CANCEL_PATH),
+    CANCEL(DELETE, "/cancel"),
     /**
      * {@code OPEN} invocation type: used to create EJB session bean via HTTP protocol.
      */
-    OPEN(POST, EJB_OPEN_PATH),
+    CREATE_SESSION(POST, "/open"),
     /**
      * {@code DISCOVER} invocation type: used to discover available EJB beans via HTTP protocol.
      */
-    DISCOVER(GET, EJB_DISCOVER_PATH);
+    DISCOVER(GET, "/discover");
 
     private final HttpString method;
     private final String path;

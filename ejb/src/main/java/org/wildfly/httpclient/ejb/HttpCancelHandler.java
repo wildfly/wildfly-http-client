@@ -18,7 +18,7 @@
 
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.JSESSIONID_COOKIE_NAME;
+import static org.wildfly.httpclient.ejb.Constants.JSESSIONID_COOKIE_NAME;
 
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -35,7 +35,7 @@ import io.undertow.util.StatusCodes;
 /**
  * @author Stuart Douglas
  */
-class HttpCancelHandler extends RemoteHTTPHandler {
+final class HttpCancelHandler extends RemoteHTTPHandler {
 
     private final Association association;
     private final ExecutorService executorService;

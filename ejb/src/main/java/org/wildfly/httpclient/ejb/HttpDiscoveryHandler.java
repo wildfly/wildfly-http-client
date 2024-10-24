@@ -18,15 +18,17 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.Serializer.serializeSet;
+import static org.wildfly.httpclient.ejb.ByteOutputs.byteOutputOf;
+
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import org.jboss.ejb.client.EJBModuleIdentifier;
 import org.jboss.ejb.server.Association;
 import org.jboss.ejb.server.ModuleAvailabilityListener;
+import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -40,8 +42,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author <a href="mailto:tadamski@redhat.com">Tomasz Adamski</a>
  */
-
-public class HttpDiscoveryHandler extends RemoteHTTPHandler {
+final class HttpDiscoveryHandler extends RemoteHTTPHandler {
 
     private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
     private final HttpServiceConfig httpServiceConfig;
@@ -69,17 +70,19 @@ public class HttpDiscoveryHandler extends RemoteHTTPHandler {
 
     @Override
     protected void handleInternal(HttpServerExchange exchange) throws Exception {
-        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EjbConstants.EJB_DISCOVERY_RESPONSE.toString());
+        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, Constants.EJB_DISCOVERY_RESPONSE.toString());
+        byte[] data;
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange)
                 .createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
-        marshaller.start(new NoFlushByteOutput(Marshalling.createByteOutput(out)));
-        marshaller.writeInt(availableModules.size());
-        for (EJBModuleIdentifier ejbModuleIdentifier : availableModules) {
-            marshaller.writeObject(ejbModuleIdentifier);
+        ByteOutput byteOutput = byteOutputOf(out);
+        try (byteOutput) {
+            marshaller.start(byteOutput);
+            serializeSet(marshaller, availableModules);
+            marshaller.finish();
+            data = out.toByteArray();
         }
-        marshaller.finish();
-        marshaller.flush();
-        exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
+        exchange.getResponseSender().send(ByteBuffer.wrap(data));
     }
+
 }
