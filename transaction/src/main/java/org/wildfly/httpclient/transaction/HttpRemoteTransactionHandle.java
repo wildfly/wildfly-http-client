@@ -18,13 +18,16 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
+import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
+import static org.wildfly.httpclient.transaction.Utils.newMarshaller;
+
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
+import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SimpleTransactionControl;
-import org.xnio.IoUtils;
 
 import javax.net.ssl.SSLContext;
 import jakarta.transaction.HeuristicMixedException;
@@ -76,31 +79,18 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             if (oldVal != Status.STATUS_ACTIVE) {
                 throw HttpRemoteTransactionMessages.MESSAGES.invalidTxnState();
             }
-            final CompletableFuture<Void> result = new CompletableFuture<>();
             statusRef.set(Status.STATUS_COMMITTING);
 
             final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_COMMIT).setVersion(targetContext.getProtocolVersion());
             final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
 
-            targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeInt(id.getFormatId());
-                final byte[] gtid = id.getGlobalTransactionId();
-                marshaller.writeInt(gtid.length);
-                marshaller.write(gtid);
-                final byte[] bq = id.getBranchQualifier();
-                marshaller.writeInt(bq.length);
-                marshaller.write(bq);
-                marshaller.finish();
-                output.close();
-            }, (input, response, closable) -> {
-                try {
-                    result.complete(null);
-                } finally {
-                    IoUtils.safeClose(closable);
-                }
-            }, result::completeExceptionally, null, null);
+            final CompletableFuture<Void> result = new CompletableFuture<>();
+            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+            final Marshaller marshaller = newMarshaller(marshallerFactory, result);
+            if (marshaller != null) {
+                targetContext.sendRequest(request, sslContext, authenticationConfiguration,
+                        xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+            }
 
             try {
                 result.get();
@@ -144,31 +134,18 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             }
             statusRef.set(Status.STATUS_ROLLING_BACK);
 
-            final CompletableFuture<Void> result = new CompletableFuture<>();
             statusRef.set(Status.STATUS_COMMITTING);
 
             final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_ROLLBACK).setVersion(targetContext.getProtocolVersion());
             final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
 
-            targetContext.sendRequest(request, sslContext, authenticationConfiguration, output -> {
-                Marshaller marshaller = targetContext.getHttpMarshallerFactory(request).createMarshaller();
-                marshaller.start(Marshalling.createByteOutput(output));
-                marshaller.writeInt(id.getFormatId());
-                final byte[] gtid = id.getGlobalTransactionId();
-                marshaller.writeInt(gtid.length);
-                marshaller.write(gtid);
-                final byte[] bq = id.getBranchQualifier();
-                marshaller.writeInt(bq.length);
-                marshaller.write(bq);
-                marshaller.finish();
-                output.close();
-            }, (input, response, closeable) -> {
-                try {
-                    result.complete(null);
-                } finally {
-                    IoUtils.safeClose(closeable);
-                }
-            }, result::completeExceptionally, null, null);
+            final CompletableFuture<Void> result = new CompletableFuture<>();
+            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+            final Marshaller marshaller = newMarshaller(marshallerFactory, result);
+            if (marshaller != null) {
+                targetContext.sendRequest(request, sslContext, authenticationConfiguration,
+                        xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+            }
 
             try {
                 result.get();
