@@ -103,27 +103,42 @@ public class HttpRemoteTransactionService {
         }
     }
 
-    abstract class AbstractTransactionHandler implements HttpHandler {
+    abstract static class ValidatingTransactionHandler implements HttpHandler {
+        protected abstract boolean isValidRequest(HttpServerExchange exchange);
+        protected abstract void processRequest(HttpServerExchange exchange);
 
         @Override
-        public final void handleRequest(HttpServerExchange exchange) throws Exception {
-            ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
+        public final void handleRequest(final HttpServerExchange exchange) throws Exception {
+            if (isValidRequest(exchange)) {
+                processRequest(exchange);
+            }
+        }
+    }
+
+    abstract class AbstractTransactionHandler extends ValidatingTransactionHandler {
+        @Override
+        protected boolean isValidRequest(final HttpServerExchange exchange) {
+            final ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
             if (contentType == null || contentType.getVersion() != 1 || !contentType.getType().equals(XID.getType())) {
                 exchange.setStatusCode(StatusCodes.BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s has incorrect or missing content type", exchange);
-                return;
+                return false;
             }
+            return true;
+        }
 
+        @Override
+        protected void processRequest(final HttpServerExchange exchange) {
             try {
-                HttpMarshallerFactory httpMarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
-                Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
+                final HttpMarshallerFactory httpMarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
+                final Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
                 Xid simpleXid;
                 try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
                     unmarshaller.start(in);
                     simpleXid = deserializeXid(unmarshaller);
                     unmarshaller.finish();
                 }
-                ImportResult<LocalTransaction> transaction = transactionContext.findOrImportTransaction(simpleXid, 0);
+                final ImportResult<LocalTransaction> transaction = transactionContext.findOrImportTransaction(simpleXid, 0);
                 transaction.getTransaction().performFunction((ExceptionBiFunction<ImportResult<LocalTransaction>, HttpServerExchange, Void, Exception>) (o, exchange2) -> {
                     handleImpl(exchange2, o);
                     return null;
@@ -136,17 +151,22 @@ public class HttpRemoteTransactionService {
         protected abstract void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> localTransactionImportResult) throws Exception;
     }
 
-    class BeginHandler implements HttpHandler {
+    class BeginHandler extends ValidatingTransactionHandler {
+        @Override
+        protected boolean isValidRequest(final HttpServerExchange exchange) {
+            final String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
+            if (timeoutString == null) {
+                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TIMEOUT);
+                return false;
+            }
+            return true;
+        }
 
         @Override
-        public void handleRequest(HttpServerExchange exchange) throws Exception {
+        protected void processRequest(final HttpServerExchange exchange) {
             try {
-                String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
-                if (timeoutString == null) {
-                    exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TIMEOUT);
-                    return;
-                }
+                final String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
                 final Integer timeout = Integer.parseInt(timeoutString);
                 exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, NEW_TRANSACTION.toString());
                 final LocalTransaction transaction = transactionContext.beginTransaction(timeout);
@@ -166,28 +186,34 @@ public class HttpRemoteTransactionService {
         }
     }
 
-    class XARecoveryHandler implements HttpHandler {
+    class XARecoveryHandler extends ValidatingTransactionHandler {
 
         @Override
-        public void handleRequest(HttpServerExchange exchange) throws Exception {
-            try {
-                String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
-                if (flagsStringString == null) {
-                    exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_FLAGS);
-                    return;
-                }
-                final int flags = Integer.parseInt(flagsStringString);
-                String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
-                if (parentName == null) {
-                    exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                    HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_PARENT_NAME);
-                    return;
-                }
+        protected boolean isValidRequest(HttpServerExchange exchange) {
+            String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
+            if (flagsStringString == null) {
+                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_FLAGS);
+                return false;
+            }
+            String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
+            if (parentName == null) {
+                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_PARENT_NAME);
+                return false;
+            }
+            return true;
+        }
 
+        @Override
+        protected void processRequest(HttpServerExchange exchange) {
+            try {
+                final String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
+                final int flags = Integer.parseInt(flagsStringString);
+                final String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
                 final Xid[] recoveryList = transactionContext.getRecoveryInterface().recover(flags, parentName);
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
+                final ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
                 byte[] data;
                 try (byteOutput) {
                     Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
@@ -204,7 +230,6 @@ public class HttpRemoteTransactionService {
     }
 
     class UTRollbackHandler extends AbstractTransactionHandler {
-
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getTransaction().rollback();
@@ -212,7 +237,6 @@ public class HttpRemoteTransactionService {
     }
 
     class UTCommitHandler extends AbstractTransactionHandler {
-
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getTransaction().commit();
@@ -220,7 +244,6 @@ public class HttpRemoteTransactionService {
     }
 
     class XABeforeCompletionHandler extends AbstractTransactionHandler {
-
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().beforeCompletion();
@@ -228,7 +251,6 @@ public class HttpRemoteTransactionService {
     }
 
     class XAForgetHandler extends AbstractTransactionHandler {
-
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().forget();
@@ -236,7 +258,6 @@ public class HttpRemoteTransactionService {
     }
 
     class XAPrepHandler extends AbstractTransactionHandler {
-
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().prepare();
@@ -244,7 +265,6 @@ public class HttpRemoteTransactionService {
     }
 
     class XARollbackHandler extends AbstractTransactionHandler {
-
         @Override
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().rollback();
