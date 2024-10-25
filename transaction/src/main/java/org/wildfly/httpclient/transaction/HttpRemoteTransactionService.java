@@ -18,14 +18,13 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.Constants.EXCEPTION;
+import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
 import static org.wildfly.httpclient.transaction.Constants.XID;
 import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
-import static org.wildfly.httpclient.transaction.Serializer.serializeThrowable;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXid;
 import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
 import static org.wildfly.httpclient.transaction.Serializer.serializeXidArray;
@@ -53,7 +52,6 @@ import org.wildfly.transaction.client.LocalTransactionContext;
 
 import javax.transaction.xa.Xid;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.function.Function;
@@ -131,7 +129,7 @@ public class HttpRemoteTransactionService {
                     return null;
                 }, transaction, exchange);
             } catch (Exception e) {
-                internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -163,7 +161,7 @@ public class HttpRemoteTransactionService {
                 }
                 exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
             } catch (Exception e) {
-                internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
     }
@@ -200,7 +198,7 @@ public class HttpRemoteTransactionService {
                 }
                 exchange.getResponseSender().send(ByteBuffer.wrap(data));
             } catch (Exception e) {
-                internalSendException(exchange, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
     }
@@ -263,47 +261,6 @@ public class HttpRemoteTransactionService {
                 onePhase = Boolean.parseBoolean(opc.poll());
             }
             transaction.getControl().commit(onePhase);
-        }
-    }
-
-    private void internalSendException(HttpServerExchange exchange, int status, Throwable e) {
-        try {
-            exchange.setStatusCode(status);
-            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EXCEPTION.toString());
-
-            final Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            byte[] data;
-            try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(outputStream))) {
-                marshaller.start(out);
-                serializeThrowable(marshaller, e);
-                marshaller.finish();
-                data = outputStream.toByteArray();
-            }
-            exchange.getResponseSender().send(ByteBuffer.wrap(data));
-        } catch (IOException e1) {
-            HttpRemoteTransactionMessages.MESSAGES.debugf(e, "Failed to write exception");
-        }
-    }
-
-    @Deprecated
-    public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
-        try {
-            exchange.setStatusCode(status);
-            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EXCEPTION.toString());
-
-            final Marshaller marshaller = HttpServiceConfig.getInstance().getHttpMarshallerFactory(exchange).createMarshaller();
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            byte[] data;
-            try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(outputStream))) {
-                marshaller.start(out);
-                serializeThrowable(marshaller, e);
-                marshaller.finish();
-                data = outputStream.toByteArray();
-            }
-            exchange.getResponseSender().send(ByteBuffer.wrap(data));
-        } catch (IOException e1) {
-            HttpRemoteTransactionMessages.MESSAGES.debugf(e, "Failed to write exception");
         }
     }
 }

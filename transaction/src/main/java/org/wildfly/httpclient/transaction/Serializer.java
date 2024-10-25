@@ -71,9 +71,4 @@ final class Serializer {
         return ret;
     }
 
-    static void serializeThrowable(final ObjectOutput out, final Throwable t) throws IOException {
-        out.writeObject(t);
-        out.write(0);
-    }
-
 }
