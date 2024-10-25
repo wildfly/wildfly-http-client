@@ -131,7 +131,15 @@ public class HttpRemoteNamingService {
                 } else if (result instanceof Context) {
                     exchange.setStatusCode(StatusCodes.NO_CONTENT);
                 } else {
-                    doMarshall(exchange, result);
+                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
+                    HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
+                    Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
+                    ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream()));
+                    try (out) {
+                        marshaller.start(out);
+                        serializeObject(marshaller, result);
+                        marshaller.finish();
+                    }
                 }
             } catch (Throwable e) {
                 sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
@@ -250,18 +258,6 @@ public class HttpRemoteNamingService {
 
         protected void doOperation(String name, Object object) throws NamingException {
             localContext.bind(name, object);
-        }
-    }
-
-    private void doMarshall(HttpServerExchange exchange, Object result) throws IOException {
-        exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
-        HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
-        Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-        ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream()));
-        try (out) {
-            marshaller.start(out);
-            serializeObject(marshaller, result);
-            marshaller.finish();
         }
     }
 
