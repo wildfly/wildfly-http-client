@@ -101,21 +101,34 @@ public class HttpRemoteNamingService {
 
     private HttpHandler newInvocationHandler(final RequestType requestType) {
         switch (requestType) {
-            case BIND: return new BindHandler();
-            case CREATE_SUBCONTEXT: return new CreateSubContextHandler();
-            case DESTROY_SUBCONTEXT: return new DestroySubcontextHandler();
-            case LIST: return new ListHandler();
-            case LIST_BINDINGS: return new ListBindingsHandler();
-            case LOOKUP: return new LookupHandler();
-            case LOOKUP_LINK: return new LookupLinkHandler();
-            case REBIND: return new RebindHandler();
-            case RENAME: return new RenameHandler();
-            case UNBIND: return new UnbindHandler();
+            case BIND: return new BindHandler(localContext, httpServiceConfig, classResolverFilter);
+            case CREATE_SUBCONTEXT: return new CreateSubContextHandler(localContext, httpServiceConfig);
+            case DESTROY_SUBCONTEXT: return new DestroySubcontextHandler(localContext, httpServiceConfig);
+            case LIST: return new ListHandler(localContext, httpServiceConfig);
+            case LIST_BINDINGS: return new ListBindingsHandler(localContext, httpServiceConfig);
+            case LOOKUP: return new LookupHandler(localContext, httpServiceConfig);
+            case LOOKUP_LINK: return new LookupLinkHandler(localContext, httpServiceConfig);
+            case REBIND: return new RebindHandler(localContext, httpServiceConfig, classResolverFilter);
+            case RENAME: return new RenameHandler(localContext, httpServiceConfig);
+            case UNBIND: return new UnbindHandler(localContext, httpServiceConfig);
             default: throw new IllegalStateException();
         }
     }
 
-    private abstract class NameHandler implements HttpHandler {
+    private abstract static class NameHandler implements HttpHandler {
+        protected final Context localContext;
+        protected final HttpServiceConfig httpServiceConfig;
+        protected final Function<String, Boolean> classResolverFilter;
+
+        private NameHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            this(localContext, httpServiceConfig, null);
+        }
+
+        private NameHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
+            this.localContext = localContext;
+            this.httpServiceConfig = httpServiceConfig;
+            this.classResolverFilter = classResolverFilter;
+        }
 
         @Override
         public final void handleRequest(HttpServerExchange exchange) throws Exception {
@@ -149,7 +162,10 @@ public class HttpRemoteNamingService {
         protected abstract Object doOperation(HttpServerExchange exchange, String name) throws NamingException;
     }
 
-    private final class LookupHandler extends NameHandler {
+    private static final class LookupHandler extends NameHandler {
+        private LookupHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
 
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
@@ -157,7 +173,10 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private final class LookupLinkHandler extends NameHandler {
+    private static final class LookupLinkHandler extends NameHandler {
+        private LookupLinkHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
 
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
@@ -165,14 +184,22 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private class CreateSubContextHandler extends NameHandler {
+    private static final class CreateSubContextHandler extends NameHandler {
+        private CreateSubContextHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             return localContext.createSubcontext(name);
         }
     }
 
-    private class UnbindHandler extends NameHandler {
+    private static final class UnbindHandler extends NameHandler {
+        private UnbindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             localContext.unbind(name);
@@ -180,7 +207,11 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private class ListBindingsHandler extends NameHandler {
+    private static final class ListBindingsHandler extends NameHandler {
+        private ListBindingsHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             final NamingEnumeration<Binding> namingEnumeration = localContext.listBindings(name);
@@ -188,7 +219,11 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private class RenameHandler extends NameHandler {
+    private static final class RenameHandler extends NameHandler {
+        private RenameHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             Deque<String> newName = exchange.getQueryParameters().get(NEW_QUERY_PARAMETER);
@@ -203,7 +238,11 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private class DestroySubcontextHandler extends NameHandler {
+    private static final class DestroySubcontextHandler extends NameHandler {
+        private DestroySubcontextHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             localContext.destroySubcontext(name);
@@ -211,7 +250,11 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private class ListHandler extends NameHandler {
+    private static final class ListHandler extends NameHandler {
+        private ListHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
+            super(localContext, httpServiceConfig);
+        }
+
         @Override
         protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             final NamingEnumeration<NameClassPair> namingEnumeration = localContext.list(name);
@@ -220,6 +263,10 @@ public class HttpRemoteNamingService {
     }
 
     private class RebindHandler extends BindHandler {
+        private RebindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
+            super(localContext, httpServiceConfig, classResolverFilter);
+        }
+
 
         @Override
         protected void doOperation(String name, Object object) throws NamingException {
@@ -227,9 +274,13 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private class BindHandler extends NameHandler {
+    private static class BindHandler extends NameHandler {
+        private BindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
+            super(localContext, httpServiceConfig, classResolverFilter);
+        }
+
         @Override
-        protected final Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
             ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
             if (contentType == null || !contentType.getType().equals(VALUE.getType()) || contentType.getVersion() != 1) {
                 exchange.setStatusCode(StatusCodes.BAD_REQUEST);
@@ -270,7 +321,7 @@ public class HttpRemoteNamingService {
         HttpServerHelper.sendException(exchange, httpServiceConfig, status, e);
     }
 
-    private static class FilterClassResolver extends ContextClassResolver {
+    private static final class FilterClassResolver extends ContextClassResolver {
         private final Function<String, Boolean> filter;
 
         private FilterClassResolver(Function<String, Boolean> filter) {
