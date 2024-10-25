@@ -18,72 +18,35 @@
 
 package org.wildfly.httpclient.naming;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
-import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
-import static org.wildfly.httpclient.naming.Constants.VALUE;
-import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
-import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 
 import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.BlockingHandler;
-import io.undertow.util.Headers;
-import io.undertow.util.PathTemplateMatch;
-import io.undertow.util.StatusCodes;
-import org.jboss.marshalling.ByteInput;
-import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
-import org.jboss.marshalling.ContextClassResolver;
-import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
-import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
-import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 
-import javax.naming.Binding;
 import javax.naming.Context;
-import javax.naming.NameClassPair;
-import javax.naming.NamingEnumeration;
-import javax.naming.NamingException;
-import java.io.IOException;
-import java.io.InvalidClassException;
-import java.net.URLDecoder;
-import java.util.Collections;
-import java.util.Deque;
 import java.util.function.Function;
 
 /**
  * HTTP service that handles naming invocations.
  *
  * @author Stuart Douglas
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public class HttpRemoteNamingService {
-
-    private final Context localContext;
-    private final Function<String, Boolean> classResolverFilter;
     private final HttpServiceConfig httpServiceConfig;
+    private final ServerHandlers serverHandlers;
 
-    @Deprecated
-    public HttpRemoteNamingService(Context localContext) {
-        this(localContext,  HttpServiceConfig.getInstance(), null);
+    public HttpRemoteNamingService(final Context localContext, final Function<String, Boolean> classResolverFilter) {
+        this (localContext, classResolverFilter, HttpServiceConfig.getInstance());
     }
 
-    public HttpRemoteNamingService(Context localContext, Function<String, Boolean> classResolverFilter) {
-        this (localContext, HttpServiceConfig.getInstance(), classResolverFilter);
-    }
-
-    HttpRemoteNamingService(Context localContext, final HttpServiceConfig httpServiceConfig, Function<String, Boolean> classResolverFilter) {
-        this.localContext = localContext;
+    private HttpRemoteNamingService(final Context localContext, final Function<String, Boolean> classResolverFilter, final HttpServiceConfig httpServiceConfig) {
         this.httpServiceConfig = httpServiceConfig;
-        this.classResolverFilter = classResolverFilter;
+        this.serverHandlers = ServerHandlers.newInstance(localContext, classResolverFilter, httpServiceConfig);
     }
-
 
     public HttpHandler createHandler() {
         RoutingHandler routingHandler = new RoutingHandler();
@@ -96,266 +59,6 @@ public class HttpRemoteNamingService {
 
     private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType) {
         final String nameParamPathSuffix = "/{" + NAME_PATH_PARAMETER + "}";
-        routingHandler.add(requestType.getMethod(), requestType.getPath() + nameParamPathSuffix, newInvocationHandler(requestType));
-    }
-
-    private HttpHandler newInvocationHandler(final RequestType requestType) {
-        switch (requestType) {
-            case BIND: return new BindHandler(localContext, httpServiceConfig, classResolverFilter);
-            case CREATE_SUBCONTEXT: return new CreateSubContextHandler(localContext, httpServiceConfig);
-            case DESTROY_SUBCONTEXT: return new DestroySubcontextHandler(localContext, httpServiceConfig);
-            case LIST: return new ListHandler(localContext, httpServiceConfig);
-            case LIST_BINDINGS: return new ListBindingsHandler(localContext, httpServiceConfig);
-            case LOOKUP: return new LookupHandler(localContext, httpServiceConfig);
-            case LOOKUP_LINK: return new LookupLinkHandler(localContext, httpServiceConfig);
-            case REBIND: return new RebindHandler(localContext, httpServiceConfig, classResolverFilter);
-            case RENAME: return new RenameHandler(localContext, httpServiceConfig);
-            case UNBIND: return new UnbindHandler(localContext, httpServiceConfig);
-            default: throw new IllegalStateException();
-        }
-    }
-
-    private abstract static class NameHandler implements HttpHandler {
-        protected final Context localContext;
-        protected final HttpServiceConfig httpServiceConfig;
-        protected final Function<String, Boolean> classResolverFilter;
-
-        private NameHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            this(localContext, httpServiceConfig, null);
-        }
-
-        private NameHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
-            this.localContext = localContext;
-            this.httpServiceConfig = httpServiceConfig;
-            this.classResolverFilter = classResolverFilter;
-        }
-
-        @Override
-        public final void handleRequest(HttpServerExchange exchange) throws Exception {
-            PathTemplateMatch params = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY);
-            String name = URLDecoder.decode(params.getParameters().get(NAME_PATH_PARAMETER), UTF_8.name());
-            try {
-                Object result = doOperation(exchange, name);
-                if (exchange.isComplete()) {
-                    return;
-                }
-                if (result == null) {
-                    exchange.setStatusCode(StatusCodes.OK);
-                } else if (result instanceof Context) {
-                    exchange.setStatusCode(StatusCodes.NO_CONTENT);
-                } else {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
-                    HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
-                    Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-                    ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream()));
-                    try (out) {
-                        marshaller.start(out);
-                        serializeObject(marshaller, result);
-                        marshaller.finish();
-                    }
-                }
-            } catch (Throwable e) {
-                sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
-            }
-        }
-
-        protected abstract Object doOperation(HttpServerExchange exchange, String name) throws NamingException;
-    }
-
-    private static final class LookupHandler extends NameHandler {
-        private LookupHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            return localContext.lookup(name);
-        }
-    }
-
-    private static final class LookupLinkHandler extends NameHandler {
-        private LookupLinkHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            return localContext.lookupLink(name);
-        }
-    }
-
-    private static final class CreateSubContextHandler extends NameHandler {
-        private CreateSubContextHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            return localContext.createSubcontext(name);
-        }
-    }
-
-    private static final class UnbindHandler extends NameHandler {
-        private UnbindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            localContext.unbind(name);
-            return null;
-        }
-    }
-
-    private static final class ListBindingsHandler extends NameHandler {
-        private ListBindingsHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            final NamingEnumeration<Binding> namingEnumeration = localContext.listBindings(name);
-            return Collections.list(namingEnumeration);
-        }
-    }
-
-    private static final class RenameHandler extends NameHandler {
-        private RenameHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            Deque<String> newName = exchange.getQueryParameters().get(NEW_QUERY_PARAMETER);
-            if (newName == null || newName.isEmpty()) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                exchange.endExchange();
-                return null;
-            }
-            String nn = URLDecoder.decode(newName.getFirst(), UTF_8);
-            localContext.rename(name, nn);
-            return null;
-        }
-    }
-
-    private static final class DestroySubcontextHandler extends NameHandler {
-        private DestroySubcontextHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            localContext.destroySubcontext(name);
-            return null;
-        }
-    }
-
-    private static final class ListHandler extends NameHandler {
-        private ListHandler(final Context localContext, final HttpServiceConfig httpServiceConfig) {
-            super(localContext, httpServiceConfig);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            final NamingEnumeration<NameClassPair> namingEnumeration = localContext.list(name);
-            return Collections.list(namingEnumeration);
-        }
-    }
-
-    private class RebindHandler extends ClassFilteringHandler {
-        private RebindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
-            super(localContext, httpServiceConfig, classResolverFilter);
-        }
-
-
-        @Override
-        protected void doOperation(String name, Object object) throws NamingException {
-            localContext.rebind(name, object);
-        }
-    }
-
-    private class BindHandler extends ClassFilteringHandler {
-        private BindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
-            super(localContext, httpServiceConfig, classResolverFilter);
-        }
-
-
-        @Override
-        protected void doOperation(String name, Object object) throws NamingException {
-            localContext.bind(name, object);
-        }
-    }
-
-    private abstract static class ClassFilteringHandler extends NameHandler {
-        private ClassFilteringHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
-            super(localContext, httpServiceConfig, classResolverFilter);
-        }
-
-        @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
-            if (contentType == null || !contentType.getType().equals(VALUE.getType()) || contentType.getVersion() != 1) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
-                exchange.endExchange();
-                return null;
-            }
-            final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
-            try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
-                Unmarshaller unmarshaller = classResolverFilter != null ?
-                        marshallerFactory.createUnmarshaller(new FilterClassResolver(classResolverFilter)):
-                        marshallerFactory.createUnmarshaller();
-                unmarshaller.start(in);
-                Object object = deserializeObject(unmarshaller);
-                unmarshaller.finish();
-                doOperation(name, object);
-            } catch (Exception e) {
-                if (e instanceof NamingException) {
-                    throw (NamingException)e;
-                }
-                NamingException nm = new NamingException(e.getMessage());
-                nm.initCause(e);
-                throw nm;
-            }
-            return null;
-        }
-
-        protected abstract void doOperation(String name, Object object) throws NamingException;
-    }
-
-    @Deprecated
-    public static void sendException(HttpServerExchange exchange, int status, Throwable e) throws IOException {
-        HttpServerHelper.sendException(exchange, HttpServiceConfig.getInstance(), status, e);
-    }
-
-    public static void sendException(HttpServerExchange exchange, HttpServiceConfig httpServiceConfig, int status, Throwable e) throws IOException {
-        HttpServerHelper.sendException(exchange, httpServiceConfig, status, e);
-    }
-
-    private static final class FilterClassResolver extends ContextClassResolver {
-        private final Function<String, Boolean> filter;
-
-        private FilterClassResolver(Function<String, Boolean> filter) {
-            this.filter = filter;
-        }
-
-        @Override
-        public Class<?> resolveClass(Unmarshaller unmarshaller, String name, long serialVersionUID) throws IOException, ClassNotFoundException {
-            checkFilter(name);
-            return super.resolveClass(unmarshaller, name, serialVersionUID);
-        }
-
-        @Override
-        public Class<?> resolveProxyClass(Unmarshaller unmarshaller, String[] interfaces) throws IOException, ClassNotFoundException {
-            for (String name : interfaces) {
-                checkFilter(name);
-            }
-            return super.resolveProxyClass(unmarshaller, interfaces);
-        }
-
-        private void checkFilter(String className) throws InvalidClassException {
-            if (filter.apply(className) != Boolean.TRUE) {
-                throw HttpNamingClientMessages.MESSAGES.cannotResolveFilteredClass(className);
-            }
-        }
+        routingHandler.add(requestType.getMethod(), requestType.getPath() + nameParamPathSuffix, serverHandlers.handlerOf(requestType));
     }
 }
