@@ -262,7 +262,7 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private class RebindHandler extends BindHandler {
+    private class RebindHandler extends ClassFilteringHandler {
         private RebindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
             super(localContext, httpServiceConfig, classResolverFilter);
         }
@@ -274,8 +274,20 @@ public class HttpRemoteNamingService {
         }
     }
 
-    private static class BindHandler extends NameHandler {
+    private class BindHandler extends ClassFilteringHandler {
         private BindHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
+            super(localContext, httpServiceConfig, classResolverFilter);
+        }
+
+
+        @Override
+        protected void doOperation(String name, Object object) throws NamingException {
+            localContext.bind(name, object);
+        }
+    }
+
+    private abstract static class ClassFilteringHandler extends NameHandler {
+        private ClassFilteringHandler(final Context localContext, final HttpServiceConfig httpServiceConfig, final Function<String, Boolean> classResolverFilter) {
             super(localContext, httpServiceConfig, classResolverFilter);
         }
 
@@ -307,9 +319,7 @@ public class HttpRemoteNamingService {
             return null;
         }
 
-        protected void doOperation(String name, Object object) throws NamingException {
-            localContext.bind(name, object);
-        }
+        protected abstract void doOperation(String name, Object object) throws NamingException;
     }
 
     @Deprecated
