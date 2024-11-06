@@ -1,4 +1,4 @@
-= Wildfly Service Invocation over HTTP Specification (v2)
+= Wildfly Service Invocation over HTTP Specification, Version 2
 :Author:    Richard Achmatowicz
 :Email:     <rachmato@redhat.com>
 :Date:      2024
@@ -24,13 +24,13 @@ TODO: do we hard code the 'river' marshalling strategy or do we require a header
 
 == Protocol
 
-The protocol is based on HTTP, and is intended to be used over both HTTP/1.1 and HTTP/2. All services are mapped a location in the _Cluster Service Context Path_ which by default is +/wildfly-services+. This context path is configurable per connector, and can be disabled entirely. Each specific protocol will be mapped to a sub location inside the service context path. For example EJB will be mapped to +/wildfly-services/ejb/+.
+The protocol is based on HTTP, and is intended to be used over both HTTP/1.1 and HTTP/2. All services are mapped a location in the _HTTP Invoker Context Path_ which by default is +/wildfly-services+. This context path is configurable per connector, and can be disabled entirely. Each specific protocol will be mapped to a sub location inside the invoker context path. For example EJB will be mapped to +/wildfly-services/ejb/+.
 
 All invocations share some common elements no matter the underlying service that are detailed here.
 
 Note that when using multiple servers/clusters with different deployments behind the same load balancer it will be necessary to map each cluster to a different path. For instance if you have 5 servers serving application A and 7 servers serving application B each group of servers must have a different context path configured so that the load balancer knows where to send the requests.
 
-Some services will use the +JSESSIONID+ cookie to set an affinity with a particular node. If this cookie is sent its path must be equal to the cluster service context path.
+Some services will use the +JSESSIONID+ cookie to set an affinity with a particular node. If this cookie is sent its path must be equal to the HTTP invoker context path.
 
 === Versioning
 
@@ -38,7 +38,7 @@ All requests are versioned, with the version specified in the +Content-Type+ hea
 
 === Request and Response Type
 
-The request and response type is specified through the content type header. All types should be of the form +application/x-wf-$\{type}; version=$version+. In this version of the specification all message versions are version 1.
+The request and response type is specified through the content type header. All types should be of the form +application/x-wf-$\{type}; version=$version+. In this version of the specification, all message versions are version 2.
 
 === Compression
 
@@ -75,7 +75,7 @@ to jakarta.* (in Jakarta EE), it is now possible for four separate scenarios to 
 * a Jakarta EE client with a Java EE server
 * a Jakarta EE client with a Jakarta EE server
 
-Both the client and the server must agree on how to marshal and unmarshal the classes exchanged, in a way that respects package name differences. A new interoperability protocol
+Both the client and the server must agree on how to marshal and unmarshal the classes exchanged, in a way that respects package name differences. A new _interoperability protocol_
 was introduced to facilitate this agreement. The protocol involves the coordinated use two sets of marshalers:
 
 * interoperability marshaller (marshals package names javax.* to jakarta.* )
@@ -83,14 +83,15 @@ was introduced to facilitate this agreement. The protocol involves the coordinat
 * default marshaller (no special package name treatment)
 * default unmarshaller (no special package name treatment)
 
-The interoperability protocol is designed to be completed on the first request response cycle of a connection. Once protocol has completed, it ensures that for all subsequent request response
-cycles on that connection, the appropriate marshaller and unmarshaller is used on the client side and the appropriate unmarshaller and marshaller is used on the server side.
+The interoperability protocol is designed to be completed on the first request/response cycle of a connection between a client and server. Once protocol has completed,
+it ensures that for all subsequent request/response cycles on that connection, the appropriate marshaller and unmarshaller is used on the client side and the appropriate
+unmarshaller and marshaller is used on the server side.
 
 The current implementation of the interoperability protocol uses a single additional header, x-wf-version, and makes use of the context path version to identify the marshalling choices determined
 by the interoperability protocol:
 
-* v1 => client uses interoperability marshaller and default unmarshaller, server uses default unmarshaller and interoperability marshaller
-* v1 => client uses default marshaller and default unmarshaller, server uses default unmarshaller and default marshaller
+* v1 => client uses interoperability marshaller and default Jakarta EE unmarshaller, server uses default Jakarta EE unmarshaller and interoperability marshaller
+* v2 => client uses default Jakarta EE marshaller and default Jakarta EE unmarshaller, server uses default Jakarta EE unmarshaller and default Jakarta EE marshaller
 
 The detailed implementation of the interoperability protocol is beyond the scope of this document.
 
@@ -101,19 +102,24 @@ The detailed implementation of the interoperability protocol is beyond the scope
 ==== Session Affinity
 
 Method:: ++GET++
+Message Type:: None
 URI:: +/common/v2/affinity+
 Additional Required Headers::
++x-wf-version: 2  (first request on a conection only)+
 Request Body::
 The request body is empty.
-
+Notes::
 This message generates a session id, that can be used to make sure requests end up at the same backend node.
 
 === Response Messages
 
 ==== Session Affinity Result
 
-Required Headers::
+Message Type:: None
+Additional Required Headers::
 +Set-Cookie: JSESSIONID=\{sessionAffinityKey}+
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+
 Response Body:: None
 Response Codes::
  * +202+ Returned for a successful invocation
@@ -132,7 +138,7 @@ Response Codes::
 
 == EJB Protocol
 
-The EJB protocol is mapped to the +/ejb+ context inside the service context path. When specifying the URI for a request all fields are required, if they are null or empty they should be replaced with a ‘-’ character.
+The EJB protocol is mapped to the +/ejb+ context inside the HTTP invoker context path. When specifying the URI for a request all fields are required, if they are null or empty they should be replaced with a ‘-’ character.
 
 This protocol has been designed to work with the existing EJB client API.
 
@@ -141,19 +147,21 @@ Cancellation support is provided through the use of a client side invocation id 
 === Request Messages
 
 ==== EJB Invocation
-Message Type:: +application/x-wf-jbmar-invocation+
+
 Method:: +POST+
+Message Type:: +application/x-wf-jbmar-invocation+
 URI:: +/ejb/v2/invoke/\{applicationName}/\{moduleName}/\{distinctName}/\{beanName}/\{sfsbSessionId}/\{viewClass}/\{methodName}/\{paramType1}/\{paramType1}/...+
 Additional Required Headers::
-+Accept: application/x-wf-ejb-jbmar-response;version=1,application/x-wf-jbmar-exception;version=1+
++x-wf-version: 2 (first request on a conection only)+, +
++Accept:application/x-wf-ejb-jbmar-response;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
-+Cookie: JSESSIONID=\{sessionAffinityKey}+
-X-wf-invocation-id: {invocationId}
++Cookie: JSESSIONID=\{sessionAffinityKey}+, +
++X-wf-invocation-id: {invocationId}+
 Request Body::
 The request body is serialized with JBoss Marshalling. The first item is a serialized transaction, which consists of a byte to indicate if a transaction is present (0 for not present, 1 for remote, 2 for locally outflowed).
 If the transaction byte is 1 or 2 then it will be followed by an integer and two byte arrays, which represent the format, global and branch parts of an Xid.
-
 The method body consists of n parameter values, serialized using JBoss Marshalling, followed by a serialized attachments map of the form +Map<String, Object>+.
+
 Notes::
 This message sends a request to the server. If the request completes successfully (or is submitted successfully in the case of a void returning async EJB methods) the server will respond with an +x-wf-ejb-jbmar-response response+. If an error occurred the server will respond with an +x-wf-jbmar-exception+ response.
 
@@ -167,6 +175,7 @@ Method:: +POST+
 Message Type:: +application/x-wf-jbmar-sess-open+
 URI:: +/ejb/v2/open/\{applicationName}/\{moduleName}/\{distinctName}/\{beanName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
@@ -176,23 +185,26 @@ The request body contains a serialized transaction (see the invocation message f
 ==== EJB Cancel
 
 Method:: ++DELETE++
+Message Type:: None
 URI:: +/ejb/v2/cancel/\{applicationName}/\{moduleName}/\{distinctName}/{beanName}/\{invocation-id}\{interupt-if-running}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
 Request Body::
 The request body is empty.
-
+Notes::
 This message cancels an async request.
 
 ==== EJB Discovery
 
 Method:: ++GET++
+Message Type:: None
 URI:: +/ejb/v2/discover+
 Additional Required Headers::
-None
++x-wf-version: 2 (first request on a conection only)+
 Request Body::
 The request body is empty.
-
+Notes::
 This message initiates a discovery request to a cluster of nodes behind a load balancer.
 
 
@@ -201,7 +213,8 @@ This message initiates a discovery request to a cluster of nodes behind a load b
 ==== EJB Response
 
 Message Type:: +application/x-wf-ejb-jbmar-response+
-Optional Headers::
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+, +
 +Set-Cookie: JSESSIONID=\{sessionAffinityKey}+
 Response Body::
 For non void methods the response body contains the serialized response object, followed by the serialized attachments map. For void methods the serialized object will be the serialized representation of +null+.
@@ -211,12 +224,13 @@ Response Codes::
 
 ==== EJB New Session
 
-Required Headers::
+Message Type:: None
+Additional Required Headers::
 +x-wf-ejb-session-id: \{newSessionId}+
-Optional Headers::
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+, +
 +Set-Cookie: JSESSIONID=\{sessionAffinityKey}+
-Response Body::
-None
+Response Body:: None
 Response Codes::
  * +204+ Returned for a successful invocation
 Notes::
@@ -224,6 +238,10 @@ In most cases it is expected that session affinity will be used to make sure tha
 
 ==== EJB Cancelled
 
+Message Type:: None
+Additional Required Headers:: None
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+
 Response Body:: None
 Response Codes:: 
  * +202+ Returned for a successful invocation
@@ -232,6 +250,9 @@ Response Codes::
 === EJB Discovery Response
 
 Message Type:: +application/x-wf-ejb-jbmar-discovery-response+
+Additional Required Headers:: None
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+
 Response Body::
 The response body contains the serialized list of available modules, the size of the list followed by the list of module identifiers. Note that if no modules
 are deployed, the size may be zero and the list empty.
@@ -249,8 +270,10 @@ The JNDI protocol provides similar functionality to the existing remote JNDI imp
 ==== JNDI Lookup
 
 Method:: +POST+
+Message Type:: None
 URI:: +/naming/v2/lookup/\{jndiName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-value;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
@@ -263,20 +286,24 @@ Note that because JNDI lookups are not idempotent this method is a +POST+, rathe
 
 ==== JNDI Lookup Link
 
-Method:: GET
+Method:: +GET+
+Message Type:: None
 URI:: +/naming/v2/lookuplink/\{jndiName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-value;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers:: Cookie: JSESSIONID=\{sessionAffinityKey}
 Request Body:: The request body is empty
-Notes:: This message sends a JNDI Lookup Link request to the server. If the request completes successfully the server will respond with an +x-wf-jndi-jbmar-value response+. If an error occurred the server will respond with an +x-wf-jbmar-exception+ response.
+Notes::
+This message sends a JNDI Lookup Link request to the server. If the request completes successfully the server will respond with an +x-wf-jndi-jbmar-value response+. If an error occurred the server will respond with an +x-wf-jbmar-exception+ response.
 
 ==== JNDI Bind
 
+Method:: +PUT+
 Message Type:: +application/x-wf-jndi-jbmar-value+
-Method:: PUT
 URI:: +/naming/v2/bind/\{jndiName}+
-Additional Required Headers:: 
+Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-result;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers:: 
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
@@ -284,10 +311,12 @@ Request Body::
 Serialized representation of the object to bind
 
 ==== JNDI Rebind
-Message Type:: +application/x-wf-jndi-jbmar-value+
+
 Method:: +PATCH+
+Message Type:: +application/x-wf-jndi-jbmar-value+
 URI:: +/naming/v2/rebind/\{jndiName}+
-Additional Required Headers:: 
+Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-result;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers:: 
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
@@ -297,78 +326,86 @@ Serialized representation of the object to rebind
 ==== JNDI Unbind
 
 Method:: ++DELETE++
+Message Type:: None
 URI:: +/naming/v2/unbind/\{jndiName}+
-Additional Required Headers:: 
+Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-result;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
-Request Body::
-None
+Request Body:: None
 
 ==== JNDI Destroy Subcontext
 
 Method:: +DELETE+
+Message Type:: None
 URI:: +/naming/v2/dest-subctx\{jndiName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-result;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
-Request Body::
-None
+Request Body:: None
 
 ==== JNDI List
 
 Method:: +GET+
+Message Type:: None
 URI:: +/naming/v2/list/\{jndiName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-value;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
-Request Body::
-None
+Request Body:: None
 Notes::
 The response messages are the same as for a normal lookup, but contains a serialized +NamingEnumeration+.
 
 ==== JNDI List Bindings
 
 Method:: +GET+
+Message Type:: None
 URI:: +/naming/v2/list-bindings/\{jndiName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jndi-jbmar-value;version=1,application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
-Request Body::
-None
+Request Body:: None
 Notes::
 The response messages are the same as for a normal lookup, but contains a serialized NamingEnumeration
 
 ==== JNDI Rename
+
 Method:: +PATCH+
+Message Type:: None
 URI:: +/naming/v2/rename/\{jndiName}&new=\{newName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
-Request Body::
-None
+Request Body:: None
 
 ==== JNDI Create Subcontext
 
 Method:: +PUT+
+Message Type:: None
 URI:: +/naming/v2/create-subcontext/\{jndiName}+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
-Request Body::
-None
+Request Body:: None
 
 === JNDI Response Messages
 
 ==== JNDI Value
 
 Message Type:: +application/x-wf-jndi-jbmar-value+
-Optional Headers::
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+, +
 +Set-Cookie: JSESSIONID=\{sessionAffinityKey}+
 Response Body::
 The serialized lookup result
@@ -377,16 +414,22 @@ Response Codes::
 
 
 ==== JNDI Context
-Response Body::
-Empty
+
+Message Type:: None
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+
+Response Body:: Empty
 Response Codes::
  * +204+ No Content
 Notes::
 This response is used to indicate that the result of the lookup was a Context object.
 
 ==== JNDI Result
-Response Body::
-Empty
+
+Message Type:: None
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+
+Response Body:: Empty
 Response Codes::
  * +200+ Success
 Notes::
@@ -399,8 +442,10 @@ This response is only used to indicate success for void returning methods.
 ==== Transaction Begin
 
 Method:: +POST+
+Message Type:: None
 URI:: +/txn/v2/ut/begin+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jbmar-exception;version=1,application/x-wf-jbmar-new-txn;version=1+
 x-wf-txn-timeout: {timeout}
 Additional Optional Headers::
@@ -414,7 +459,8 @@ Method:: +POST+
 Message Type:: +application/x-wf-jbmar-xid;version=1+
 URI:: +/txn/v2/ut/commit+
 Additional Required Headers::
-+Accept: application/x-wf-jbmar-exception;version=1+
++x-wf-version: 2 (first request on a conection only)+, +
++Accept: application/x-wf-jbmar-exception;version=1+, +
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
 Request Body::
 JBoss marshalling representation of formatId, global ID and branch ID (the components of an XID).
@@ -426,7 +472,8 @@ Method:: +POST+
 Message Type:: +application/x-wf-jbmar-xid;version=1+
 URI:: +/txn/v2/\{type}/rollback+
 Additional Required Headers::
-+Accept: application/x-wf-jbmar-exception;version=1+
++x-wf-version: 2 (first request on a conection only)+, +
++Accept: application/x-wf-jbmar-exception;version=1+, +
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
 Request Body::
 JBoss marshalling representation of formatId, global ID and branch ID (the components of an XID).
@@ -437,7 +484,8 @@ Method:: +POST+
 Message Type:: +application/x-wf-jbmar-xid;version=1+
 URI:: +/txn/v2/xa/bc+
 Additional Required Headers::
-+Accept: application/x-wf-jbmar-exception;version=1+
++x-wf-version: 2 (first request on a conection only)+, +
++Accept: application/x-wf-jbmar-exception;version=1+, +
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
 Request Body::
 JBoss marshalling representation of formatId, global ID and branch ID (the components of an XID).
@@ -448,11 +496,12 @@ Method:: +POST+
 Message Type:: +application/x-wf-jbmar-xid;version=1+
 URI:: +/txn/v2/xa/prep+
 Additional Required Headers::
-+Accept: application/x-wf-jbmar-exception;version=1+
++x-wf-version: 2 (first request on a conection only)+, +
++Accept: application/x-wf-jbmar-exception;version=1+, +
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
 Request Body::
 JBoss marshalling representation of formatId, global ID and branch ID (the components of an XID).
-
+Notes::
 The response to this message can contain the x-wf-txn-read-only header, which is used to indicate the
 read only status of the result. If it is missing it is assumed to not be read only.
 
@@ -462,7 +511,8 @@ Method:: +POST+
 Message Type:: +application/x-wf-jbmar-xid;version=1+
 URI:: +/txn/v2/xa/commit(?opc=true)?+
 Additional Required Headers::
-+Accept: application/x-wf-jbmar-exception;version=1+
++x-wf-version: 2 (first request on a conection only)+, +
++Accept: application/x-wf-jbmar-exception;version=1+, +
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
 Request Body::
 The request body is empty.
@@ -476,6 +526,7 @@ Method:: +POST+
 Message Type:: +application/x-wf-jbmar-xid;version=1+
 URI:: +/txn/v2/xa/forget+
 Additional Required Headers::
++x-wf-version: 2 (first request on a conection only)+, +
 +Accept: application/x-wf-jbmar-exception;version=1+
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
@@ -485,10 +536,12 @@ JBoss marshalling representation of formatId, global ID and branch ID (the compo
 ==== Distributed Transaction Recovery
 
 Method:: +GET+
+Message Type:: None
 URI:: +/txn/v2/xa/recover+
 Additional Required Headers::
-+Accept: text/x-wf-txn-jbmar-xid-list;version=1,application/x-wf-jbmar-exception;version=1+
-x-wf-txn-parent-name: The parent node name
++x-wf-version: 2 (first request on a conection only)+, +
++Accept: text/x-wf-txn-jbmar-xid-list;version=1,application/x-wf-jbmar-exception;version=1+, +
+x-wf-txn-parent-name: The parent node name, +
 x-wf-txn-recovery-flags: The recovery flags as a base 10 integer
 Additional Optional Headers::
 +Cookie: JSESSIONID=\{sessionAffinityKey}+
@@ -501,12 +554,12 @@ The request body is empty.
 ==== Begin Transaction
 
 Message Type:: +application/x-wf-jbmar-new-txn;version=1+
-Required Headers::
+Additional Required Headers::
 +x-wf-txn-jbmar-id: \{transactionId}+
-Optional Headers::
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+, +
 +Set-Cookie: JSESSIONID=\{sessionAffinityKey}+
 Response Body::
-
 Jboss marshalling representation of formatId, global ID and branch ID (the components of an XID).
 
 Response Codes::
@@ -514,9 +567,11 @@ Response Codes::
 
 ==== New Transaction
 
-Required Headers::
+Message Type:: None
+Additional Required Headers::
 +x-wf-txn-jbmar-id: \{transactionId}+
-Optional Headers::
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+, +
 +Set-Cookie: JSESSIONID=\{sessionAffinityKey}+
 Response Body::
 None
@@ -525,12 +580,14 @@ Response Codes::
 
 ==== Transaction Result
 
-Response Body::
-Empty
+Message Type:: None
+Response Body:: Empty
 Response Codes::
  * +204+ Success
-Optional Headers::
-x-wf-txn-jbmar-xa-read-only:true :: If this is present then the XA result was read only (only relevant for the prepare operation)
+Additional Required Headers:: None
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+, +
++x-wf-txn-jbmar-xa-read-only:true+ :: If this is present then the XA result was read only (only relevant for the prepare operation)
 Notes::
 This response is used to indicate operation success
 
@@ -538,7 +595,9 @@ This response is used to indicate operation success
 ==== Transaction XIDS
 
 Message Type:: +text/x-wf-txn-jbmar-xid-list+
-Optional Headers::
+Additional Required Headers:: None
+Additional Optional Headers::
++x-wf-version: {server negotiated interop version} (first response on a conection only)+, +
 +Set-Cookie: JSESSIONID=\{sessionAffinityKey}+
 Response Body::
 Newline separated list of prepared but not submitted transactions
