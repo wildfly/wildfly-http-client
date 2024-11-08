@@ -356,13 +356,6 @@ final class ServerHandlers {
             });
         }
 
-        private static String handleDash(String s) {
-            if (s.equals("-")) {
-                return "";
-            }
-            return s;
-        }
-
         class ResolvedInvocation implements InvocationRequest.Resolved {
             private final Map<String, Object> contextData;
             private final Object[] methodParams;
@@ -521,14 +514,6 @@ final class ServerHandlers {
                 handle.cancel(cancelIdRunning);
             }
         }
-
-        private static String handleDash(String s) {
-            if (s.equals("-")) {
-                return "";
-            }
-            return s;
-        }
-
     }
 
     private static final class HttpSessionOpenHandler extends AbstractEjbHandler {
@@ -702,13 +687,6 @@ final class ServerHandlers {
                 });
             });
         }
-
-        private static String handleDash(String s) {
-            if (s.equals("-")) {
-                return "";
-            }
-            return s;
-        }
     }
 
     private static final class HttpDiscoveryHandler extends AbstractEjbHandler {
@@ -783,5 +761,9 @@ final class ServerHandlers {
         }
 
         protected abstract void handleInternal(HttpServerExchange exchange) throws Exception;
+
+        protected static String handleDash(final String s) {
+            return "-".equals(s) ? "" : s;
+        }
     }
 }
