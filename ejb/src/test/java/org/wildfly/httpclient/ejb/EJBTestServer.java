@@ -67,7 +67,7 @@ public class EJBTestServer extends HTTPTestServer {
 
     @Override
     protected void registerPaths(PathHandler servicesHandler) {
-        servicesHandler.addPrefixPath("/ejb", new EjbHttpService(new Association() {
+        servicesHandler.addPrefixPath("/ejb", new HttpRemoteEjbService(new Association() {
             @Override
             public <T> CancelHandle receiveInvocationRequest(@NotNull InvocationRequest invocationRequest) {
                 TestCancelHandle handle = new TestCancelHandle();

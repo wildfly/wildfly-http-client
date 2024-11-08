@@ -44,18 +44,18 @@ import java.util.function.Function;
  * @author Flavia Rainone
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-public class EjbHttpService {
+public class HttpRemoteEjbService {
     private final HttpServiceConfig httpServiceConfig;
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags = new ConcurrentHashMap<>();
     private final ServerHandlers serverHandlers;
 
-    public EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                          Function<String, Boolean> classResolverFilter) {
+    public HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+                                Function<String, Boolean> classResolverFilter) {
         this(association, executorService, localTransactionContext, classResolverFilter, HttpServiceConfig.getInstance());
     }
 
-    private EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                          Function<String, Boolean> classResolverFilter, HttpServiceConfig httpServiceConfig) {
+    private HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+                                 Function<String, Boolean> classResolverFilter, HttpServiceConfig httpServiceConfig) {
         this.httpServiceConfig = httpServiceConfig;
         this.serverHandlers = ServerHandlers.newInstance(association, executorService, localTransactionContext, classResolverFilter, httpServiceConfig);
     }
