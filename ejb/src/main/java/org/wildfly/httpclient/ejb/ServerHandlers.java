@@ -37,6 +37,7 @@ import io.undertow.server.handlers.Cookie;
 import io.undertow.server.handlers.CookieImpl;
 import io.undertow.server.session.SecureRandomSessionIdGenerator;
 import io.undertow.server.session.SessionIdGenerator;
+import io.undertow.util.AttachmentKey;
 import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
 import jakarta.ejb.EJBHome;
@@ -136,7 +137,7 @@ final class ServerHandlers {
         }
     }
 
-    static final class HttpInvocationHandler extends RemoteHTTPHandler {
+    static final class HttpInvocationHandler extends AbstractEjbHandler {
         private final Association association;
         private final ExecutorService executorService;
         private final LocalTransactionContext localTransactionContext;
@@ -471,7 +472,7 @@ final class ServerHandlers {
         }
     }
 
-    private static final class HttpCancelHandler extends RemoteHTTPHandler {
+    private static final class HttpCancelHandler extends AbstractEjbHandler {
 
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
 
@@ -530,7 +531,7 @@ final class ServerHandlers {
 
     }
 
-    private static final class HttpSessionOpenHandler extends RemoteHTTPHandler {
+    private static final class HttpSessionOpenHandler extends AbstractEjbHandler {
         private final Association association;
         private final ExecutorService executorService;
         private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
@@ -710,7 +711,7 @@ final class ServerHandlers {
         }
     }
 
-    private static final class HttpDiscoveryHandler extends RemoteHTTPHandler {
+    private static final class HttpDiscoveryHandler extends AbstractEjbHandler {
         private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
         private final HttpServiceConfig httpServiceConfig;
 
@@ -751,6 +752,36 @@ final class ServerHandlers {
             }
             exchange.getResponseSender().send(ByteBuffer.wrap(data));
         }
+    }
 
+    private abstract static class AbstractEjbHandler implements HttpHandler {
+        private final ExecutorService executorService;
+
+        private static final AttachmentKey<ExecutorService> EXECUTOR = AttachmentKey.create(ExecutorService.class);
+
+        public AbstractEjbHandler(ExecutorService executorService) {
+            this.executorService = executorService;
+        }
+
+        @Override
+        public final void handleRequest(HttpServerExchange exchange) throws Exception {
+            if (exchange.isInIoThread()) {
+                if (executorService == null) {
+                    exchange.dispatch(this);
+                } else {
+                    exchange.putAttachment(EXECUTOR, executorService);
+                    exchange.dispatch(executorService, this);
+                }
+                return;
+            } else if (executorService != null && exchange.getAttachment(EXECUTOR) == null) {
+                exchange.putAttachment(EXECUTOR, executorService);
+                exchange.dispatch(executorService, this);
+                return;
+            }
+            exchange.startBlocking();
+            handleInternal(exchange);
+        }
+
+        protected abstract void handleInternal(HttpServerExchange exchange) throws Exception;
     }
 }
