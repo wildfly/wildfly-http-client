@@ -48,7 +48,7 @@
         <maven.compiler.source>11</maven.compiler.source>
         <!-- Versions -->
         <version.io.undertow>2.3.18.Final</version.io.undertow>
-        <version.org.jboss.logging-tools>3.0.2.Final</version.org.jboss.logging-tools>
+        <version.org.jboss.logging-tools>3.0.3.Final</version.org.jboss.logging-tools>
         <version.org.junit>4.13.2</version.org.junit>
         <version.org.assertj>3.26.3</version.org.assertj>
         <version.org.jboss.logmanager>3.0.6.Final</version.org.jboss.logmanager>
