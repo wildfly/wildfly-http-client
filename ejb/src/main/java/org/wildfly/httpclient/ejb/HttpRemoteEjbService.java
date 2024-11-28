@@ -42,34 +42,22 @@ import java.util.function.Function;
  *
  * @author Stuart Douglas
  * @author Flavia Rainone
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-public class EjbHttpService {
-
-    private final Association association;
-    private final ExecutorService executorService;
-    private final LocalTransactionContext localTransactionContext;
-    private final Function<String, Boolean> classResolverFilter;
+public class HttpRemoteEjbService {
     private final HttpServiceConfig httpServiceConfig;
-
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags = new ConcurrentHashMap<>();
+    private final ServerHandlers serverHandlers;
 
-    @Deprecated
-    public EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
-        this(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, null);
+    public HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+                                Function<String, Boolean> classResolverFilter) {
+        this(association, executorService, localTransactionContext, classResolverFilter, HttpServiceConfig.getInstance());
     }
 
-    public EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                          Function<String, Boolean> classResolverFilter) {
-        this(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, classResolverFilter);
-    }
-
-    public EjbHttpService(HttpServiceConfig httpServiceConfig, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                          Function<String, Boolean> classResolverFilter) {
+    private HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+                                 Function<String, Boolean> classResolverFilter, HttpServiceConfig httpServiceConfig) {
         this.httpServiceConfig = httpServiceConfig;
-        this.association = association;
-        this.executorService = executorService;
-        this.localTransactionContext = localTransactionContext;
-        this.classResolverFilter = classResolverFilter;
+        this.serverHandlers = ServerHandlers.newInstance(association, executorService, localTransactionContext, classResolverFilter, httpServiceConfig);
     }
 
     public HttpHandler createHttpHandler() {
@@ -85,17 +73,6 @@ public class EjbHttpService {
     }
 
     private void registerHandler(final PathHandler pathHandler, final RequestType requestType) {
-        pathHandler.addPrefixPath(requestType.getPath(), new AllowedMethodsHandler(newInvocationHandler(requestType), requestType.getMethod()));
+        pathHandler.addPrefixPath(requestType.getPath(), new AllowedMethodsHandler(serverHandlers.handlerOf(requestType), requestType.getMethod()));
     }
-
-    private HttpHandler newInvocationHandler(final RequestType requestType) {
-        switch (requestType) {
-            case INVOKE: return new HttpInvocationHandler(association, executorService, localTransactionContext, cancellationFlags, classResolverFilter, httpServiceConfig);
-            case CANCEL : return new HttpCancelHandler(association, executorService, localTransactionContext, cancellationFlags);
-            case CREATE_SESSION: return new HttpSessionOpenHandler(association, executorService, localTransactionContext, httpServiceConfig);
-            case DISCOVER: return new HttpDiscoveryHandler(executorService, association, httpServiceConfig);
-            default: throw new IllegalStateException();
-        }
-    }
-
 }
