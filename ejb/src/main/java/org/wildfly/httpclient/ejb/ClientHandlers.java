@@ -17,6 +17,15 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.ejb.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
+import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
+import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
+import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
+import static org.xnio.IoUtils.safeClose;
+
 import io.undertow.client.ClientResponse;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBModuleIdentifier;
@@ -40,15 +49,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-
-import static org.wildfly.httpclient.ejb.ByteOutputs.byteOutputOf;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
-import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
-import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
-import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
-import static org.xnio.IoUtils.safeClose;
 
 /**
  * Utility class providing factory methods for creating client-side handlers of Remote EJB over HTTP protocol.
