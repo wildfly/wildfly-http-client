@@ -17,7 +17,7 @@
  */
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.ejb.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.Constants.EJB_RESPONSE_NEW_SESSION;
 import static org.wildfly.httpclient.ejb.Constants.EJB_SESSION_ID;
@@ -62,7 +62,6 @@ import org.jboss.ejb.server.SessionOpenRequest;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.SimpleClassResolver;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.ContentType;
@@ -421,7 +420,7 @@ final class ServerHandlers {
     //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
     //                                    }
                     OutputStream outputStream = exchange.getOutputStream();
-                    final ByteOutput byteOutput = Marshalling.createByteOutput(outputStream);
+                    final ByteOutput byteOutput = byteOutputOf(outputStream);
                     try (byteOutput) {
                         marshaller.start(byteOutput);
                         serializeObject(marshaller, result);

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.wildfly.httpclient.naming;
+package org.wildfly.httpclient.common;
 
 import org.jboss.marshalling.ByteOutput;
 
@@ -27,13 +27,13 @@ import java.io.OutputStream;
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class ByteOutputs {
+public final class ByteOutputs {
 
     private ByteOutputs() {
         // forbidden instantiation
     }
 
-    static ByteOutput byteOutputOf(final OutputStream delegate) {
+    public static ByteOutput byteOutputOf(final OutputStream delegate) {
         if (delegate == null) throw new IllegalArgumentException();
         return new ByteOutputStream(delegate);
     }

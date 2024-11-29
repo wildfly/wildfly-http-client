@@ -17,7 +17,7 @@
  */
 package org.wildfly.httpclient.naming;
 
-import static org.wildfly.httpclient.naming.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
 import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 import static org.wildfly.httpclient.naming.ClassLoaderUtils.setContextClassLoader;

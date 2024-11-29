@@ -17,7 +17,7 @@
  */
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.ejb.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
 import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
@@ -35,7 +35,6 @@ import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.xnio.IoUtils;
@@ -108,7 +107,7 @@ final class ClientHandlers {
 
         @Override
         public void marshall(final OutputStream httpBodyRequestStream) throws Exception {
-            try (ByteOutput out = Marshalling.createByteOutput(httpBodyRequestStream)) {
+            try (ByteOutput out = byteOutputOf(httpBodyRequestStream)) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
                 serializeObjectArray(marshaller, parameters);

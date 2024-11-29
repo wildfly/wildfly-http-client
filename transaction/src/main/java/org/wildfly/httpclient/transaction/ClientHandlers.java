@@ -17,7 +17,7 @@
  */
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXid;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXidArray;
 import static org.wildfly.httpclient.transaction.Serializer.serializeXid;

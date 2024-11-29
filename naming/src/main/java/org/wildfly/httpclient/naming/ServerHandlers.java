@@ -18,6 +18,7 @@
 package org.wildfly.httpclient.naming;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
@@ -34,7 +35,6 @@ import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.ContextClassResolver;
 import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
@@ -134,7 +134,7 @@ final class ServerHandlers {
                     exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
                     HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-                    ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream()));
+                    ByteOutput out = new NoFlushByteOutput(byteOutputOf(exchange.getOutputStream()));
                     try (out) {
                         marshaller.start(out);
                         serializeObject(marshaller, result);

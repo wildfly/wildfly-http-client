@@ -17,8 +17,8 @@
  */
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
-import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;

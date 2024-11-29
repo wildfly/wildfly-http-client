@@ -18,13 +18,13 @@
 
 package org.wildfly.httpclient.common;
 
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 
 import java.io.OutputStream;
 
@@ -42,14 +42,15 @@ public class HttpServerHelper {
             exchange.setStatusCode(status);
             putResponseHeader(exchange, Headers.CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
             final Marshaller marshaller = serviceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
-            OutputStream outputStream = exchange.getOutputStream();
-            final ByteOutput byteOutput = Marshalling.createByteOutput(outputStream);
-            // start the marshaller
-            marshaller.start(byteOutput);
-            marshaller.writeObject(e);
-            marshaller.write(0);
-            marshaller.finish();
-            marshaller.flush();
+            final OutputStream outputStream = exchange.getOutputStream();
+            try (ByteOutput byteOutput = byteOutputOf(outputStream)) {
+                // start the marshaller
+                marshaller.start(byteOutput);
+                marshaller.writeObject(e);
+                marshaller.write(0);
+                marshaller.finish();
+                marshaller.flush();
+            }
             exchange.endExchange();
         } catch (Exception ex) {
             ex.addSuppressed(e);
