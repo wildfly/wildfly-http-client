@@ -29,7 +29,6 @@ import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.xnio.IoUtils;
 
 import javax.transaction.xa.Xid;
@@ -77,7 +76,7 @@ final class ClientHandlers {
 
         @Override
         public void marshall(final OutputStream httpBodyRequestStream) throws Exception {
-            try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(httpBodyRequestStream))) {
+            try (ByteOutput out = byteOutputOf(httpBodyRequestStream)) {
                 marshaller.start(out);
                 serializeXid(marshaller, xid);
                 marshaller.finish();

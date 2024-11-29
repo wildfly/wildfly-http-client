@@ -41,7 +41,6 @@ import org.wildfly.common.function.ExceptionBiFunction;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
@@ -192,7 +191,7 @@ final class ServerHandlers {
                 final Xid xid = xidResolver.apply(transaction);
 
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
+                final ByteOutput byteOutput = byteOutputOf(out);
                 try (byteOutput) {
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
                     marshaller.start(byteOutput);
@@ -237,7 +236,7 @@ final class ServerHandlers {
                 final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
 
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
+                final ByteOutput byteOutput = byteOutputOf(out);
                 try (byteOutput) {
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
                     marshaller.start(byteOutput);

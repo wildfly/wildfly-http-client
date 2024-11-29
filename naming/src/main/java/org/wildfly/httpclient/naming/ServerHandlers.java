@@ -40,7 +40,6 @@ import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 
 import javax.naming.Binding;
 import javax.naming.Context;
@@ -134,7 +133,7 @@ final class ServerHandlers {
                     exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
                     HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-                    ByteOutput out = new NoFlushByteOutput(byteOutputOf(exchange.getOutputStream()));
+                    ByteOutput out = byteOutputOf(exchange.getOutputStream());
                     try (out) {
                         marshaller.start(out);
                         serializeObject(marshaller, result);
