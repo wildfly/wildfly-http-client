@@ -18,6 +18,7 @@
 package org.wildfly.httpclient.ejb;
 
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.Constants.EJB_RESPONSE_NEW_SESSION;
 import static org.wildfly.httpclient.ejb.Constants.EJB_SESSION_ID;
@@ -67,7 +68,6 @@ import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.common.annotation.NotNull;
 import org.wildfly.security.auth.server.SecurityIdentity;
@@ -267,7 +267,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.noSuchMethod());
+                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.noSuchMethod());
                     }
 
                     @Override
@@ -275,7 +275,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.sessionNotActive());
+                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.sessionNotActive());
                     }
 
                     @Override
@@ -283,7 +283,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
+                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
                     }
 
                     @Override
@@ -316,7 +316,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
+                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
                     }
 
                     @Override
@@ -324,7 +324,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
+                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
                     }
 
                     @Override
@@ -340,7 +340,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
+                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
                     }
 
                     @Override
@@ -426,7 +426,7 @@ final class ServerHandlers {
                     }
                     exchange.endExchange();
                 } catch (Exception e) {
-                    HttpServerHelper.sendException(exchange, httpServiceConfig, 500, e);
+                    sendException(exchange, httpServiceConfig, 500, e);
                 }
             }
         }
@@ -569,7 +569,7 @@ final class ServerHandlers {
                         unmarshaller.finish();
                     }
                 } catch (Exception e) {
-                    HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                    sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
                     return;
                 }
                 final Transaction transaction;
@@ -633,17 +633,17 @@ final class ServerHandlers {
 
                     @Override
                     public void writeException(@NotNull Exception exception) {
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
+                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
                     }
 
                     @Override
                     public void writeNoSuchEJB() {
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
+                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
                     }
 
                     @Override
                     public void writeWrongViewType() {
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
+                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
                     }
 
                     @Override
@@ -653,7 +653,7 @@ final class ServerHandlers {
 
                     @Override
                     public void writeNotStateful() {
-                        HttpServerHelper.sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
+                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
                     }
 
                     @Override

@@ -19,6 +19,7 @@ package org.wildfly.httpclient.naming;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
@@ -38,7 +39,6 @@ import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 
 import javax.naming.Binding;
@@ -141,7 +141,7 @@ final class ServerHandlers {
                     }
                 }
             } catch (Throwable e) {
-                HttpServerHelper.sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }
         }
 
