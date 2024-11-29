@@ -689,11 +689,6 @@ final class ServerHandlers {
         private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
         private final HttpServiceConfig httpServiceConfig;
 
-        @Deprecated
-        public HttpDiscoveryHandler(ExecutorService executorService, Association association) {
-            this (executorService, association, HttpServiceConfig.DEFAULT);
-        }
-
         public HttpDiscoveryHandler(ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
             super(executorService);
             association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {

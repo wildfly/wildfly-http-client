@@ -59,8 +59,4 @@ public class HttpServerHelper {
         }
     }
 
-    @Deprecated
-    public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
-        sendException(exchange, HttpServiceConfig.getInstance(), status, e);
-    }
 }
