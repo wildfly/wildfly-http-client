@@ -75,8 +75,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream httpBodyRequestStream) throws Exception {
-            try (ByteOutput out = byteOutputOf(httpBodyRequestStream)) {
+        public void marshall(final OutputStream os) throws Exception {
+            try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeXid(marshaller, xid);
                 marshaller.finish();

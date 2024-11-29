@@ -190,15 +190,14 @@ final class ServerHandlers {
                 final LocalTransaction transaction = ctx.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
 
-                final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final ByteOutput byteOutput = byteOutputOf(out);
-                try (byteOutput) {
-                    Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
-                    marshaller.start(byteOutput);
+                final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+                try (ByteOutput out = byteOutputOf(baos)) {
+                    marshaller.start(out);
                     serializeXid(marshaller, xid);
                     marshaller.finish();
                 }
-                exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
+                exchange.getResponseSender().send(ByteBuffer.wrap(baos.toByteArray()));
             } catch (Exception e) {
                 sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
             }

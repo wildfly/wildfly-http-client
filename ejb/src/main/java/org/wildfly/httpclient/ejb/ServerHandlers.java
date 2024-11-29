@@ -80,7 +80,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InvalidClassException;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Base64;
@@ -419,10 +418,8 @@ final class ServerHandlers {
     //                                    if (output.getSessionAffinity() != null) {
     //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
     //                                    }
-                    OutputStream outputStream = exchange.getOutputStream();
-                    final ByteOutput byteOutput = byteOutputOf(outputStream);
-                    try (byteOutput) {
-                        marshaller.start(byteOutput);
+                    try (final ByteOutput out = byteOutputOf(exchange.getOutputStream())) {
+                        marshaller.start(out);
                         serializeObject(marshaller, result);
                         serializeMap(marshaller, contextData);
                         marshaller.finish();
