@@ -26,7 +26,6 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
 import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
-import static org.wildfly.httpclient.common.Utils.newMarshaller;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
@@ -110,7 +109,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         final CompletableFuture<T> result = new CompletableFuture<>();
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
-        final Marshaller marshaller = newMarshaller(marshallerFactory, result);
+        final Marshaller marshaller = marshallerFactory.createMarshaller(result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                     xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, resultFunction), result::completeExceptionally, null, null);

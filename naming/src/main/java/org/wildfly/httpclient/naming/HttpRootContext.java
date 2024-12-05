@@ -37,8 +37,6 @@ import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
 import static org.wildfly.httpclient.naming.RequestType.REBIND;
 import static org.wildfly.httpclient.naming.RequestType.RENAME;
 import static org.wildfly.httpclient.naming.RequestType.UNBIND;
-import static org.wildfly.httpclient.common.Utils.newMarshaller;
-import static org.wildfly.httpclient.common.Utils.newUnmarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
@@ -272,7 +270,7 @@ public class HttpRootContext extends AbstractContext {
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(clientRequest);
-        final Unmarshaller unmarshaller = newUnmarshaller(objectResolver, marshallerFactory, result);
+        final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(objectResolver, result);
         if (unmarshaller != null) {
             targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, null,
                     optionalObjectHttpResultHandler(unmarshaller, result, httpNamingProvider, getContextClassLoader()),
@@ -323,7 +321,7 @@ public class HttpRootContext extends AbstractContext {
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(clientRequest);
-        final Marshaller marshaller = newMarshaller(objectResolver, marshallerFactory, result);
+        final Marshaller marshaller = marshallerFactory.createMarshaller(objectResolver, result);
         if (marshaller != null) {
             targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration,
                     object != null ? objectHttpMarshaller(marshaller, object) : null, emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
