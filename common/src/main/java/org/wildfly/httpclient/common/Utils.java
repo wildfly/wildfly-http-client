@@ -16,24 +16,44 @@
  * limitations under the License.
  */
 
-package org.wildfly.httpclient.ejb;
+package org.wildfly.httpclient.common;
 
 import org.jboss.marshalling.Marshaller;
+import org.jboss.marshalling.ObjectResolver;
 import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.HttpMarshallerFactory;
 
 import java.util.concurrent.CompletableFuture;
 
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class Utils {
+public final class Utils {
 
     private Utils() {
         // forbidden instantiation
     }
 
-    static <T> Marshaller newMarshaller(final HttpMarshallerFactory factory, final CompletableFuture<T> failureHandler) {
+    public static <T> Marshaller newMarshaller(final ObjectResolver objectResolver, final HttpMarshallerFactory factory, final CompletableFuture<T> failureHandler) {
+        Marshaller marshaller = null;
+        try {
+            marshaller = objectResolver != null ? factory.createMarshaller(objectResolver) : factory.createMarshaller();
+        } catch (Exception e) {
+            failureHandler.completeExceptionally(e);
+        }
+        return marshaller;
+    }
+
+    public static <T> Unmarshaller newUnmarshaller(final ObjectResolver objectResolver, final HttpMarshallerFactory factory, final CompletableFuture<T> failureHandler) {
+        Unmarshaller unmarshaller = null;
+        try {
+            unmarshaller = objectResolver != null ? factory.createUnmarshaller(objectResolver) : factory.createUnmarshaller();
+        } catch (Exception e) {
+            failureHandler.completeExceptionally(e);
+        }
+        return unmarshaller;
+    }
+
+    public static <T> Marshaller newMarshaller(final HttpMarshallerFactory factory, final CompletableFuture<T> failureHandler) {
         Marshaller marshaller = null;
         try {
             marshaller = factory.createMarshaller();
@@ -43,7 +63,7 @@ final class Utils {
         return marshaller;
     }
 
-    static <T> Unmarshaller newUnmarshaller(final HttpMarshallerFactory factory, final CompletableFuture<T> failureHandler) {
+    public static <T> Unmarshaller newUnmarshaller(final HttpMarshallerFactory factory, final CompletableFuture<T> failureHandler) {
         Unmarshaller unmarshaller = null;
         try {
             unmarshaller = factory.createUnmarshaller();

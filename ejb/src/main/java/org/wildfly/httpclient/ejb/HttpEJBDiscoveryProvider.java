@@ -22,7 +22,7 @@ import static org.jboss.ejb.client.EJBClientContext.getCurrent;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.Constants.HTTP_SCHEME;
 import static org.wildfly.httpclient.ejb.ClientHandlers.discoveryHttpResultHandler;
-import static org.wildfly.httpclient.ejb.Utils.newUnmarshaller;
+import static org.wildfly.httpclient.common.Utils.newUnmarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.ejb.client.EJBClientConnection;

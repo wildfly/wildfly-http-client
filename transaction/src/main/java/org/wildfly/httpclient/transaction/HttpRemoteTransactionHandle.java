@@ -20,7 +20,7 @@ package org.wildfly.httpclient.transaction;
 
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
-import static org.wildfly.httpclient.transaction.Utils.newMarshaller;
+import static org.wildfly.httpclient.common.Utils.newMarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;

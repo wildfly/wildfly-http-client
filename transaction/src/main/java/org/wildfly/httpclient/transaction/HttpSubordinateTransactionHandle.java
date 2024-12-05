@@ -26,7 +26,7 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
 import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
-import static org.wildfly.httpclient.transaction.Utils.newMarshaller;
+import static org.wildfly.httpclient.common.Utils.newMarshaller;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;

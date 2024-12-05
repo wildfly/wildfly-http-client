@@ -37,8 +37,8 @@ import static org.wildfly.httpclient.naming.RequestType.LOOKUP_LINK;
 import static org.wildfly.httpclient.naming.RequestType.REBIND;
 import static org.wildfly.httpclient.naming.RequestType.RENAME;
 import static org.wildfly.httpclient.naming.RequestType.UNBIND;
-import static org.wildfly.httpclient.naming.Utils.newMarshaller;
-import static org.wildfly.httpclient.naming.Utils.newUnmarshaller;
+import static org.wildfly.httpclient.common.Utils.newMarshaller;
+import static org.wildfly.httpclient.common.Utils.newUnmarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;

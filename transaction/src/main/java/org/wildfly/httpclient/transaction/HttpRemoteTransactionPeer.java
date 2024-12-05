@@ -22,7 +22,7 @@ import static java.security.AccessController.doPrivileged;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidArrayHttpResultHandler;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpResultHandler;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
-import static org.wildfly.httpclient.transaction.Utils.newUnmarshaller;
+import static org.wildfly.httpclient.common.Utils.newUnmarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Unmarshaller;
