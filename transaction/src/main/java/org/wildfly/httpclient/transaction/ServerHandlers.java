@@ -19,7 +19,6 @@ package org.wildfly.httpclient.transaction;
 
 import static java.lang.Boolean.parseBoolean;
 import static io.undertow.util.Headers.CONTENT_TYPE;
-import static io.undertow.util.StatusCodes.BAD_REQUEST;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
@@ -36,6 +35,7 @@ import static org.wildfly.httpclient.transaction.Serializer.serializeXidArray;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HttpString;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
@@ -118,14 +118,8 @@ final class ServerHandlers {
         }
 
         @Override
-        protected boolean isValidRequest(final HttpServerExchange exchange) {
-            final ContentType contentType = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
-            if (contentType == null || contentType.getVersion() != 1 || !contentType.getType().equals(XID.getType())) {
-                exchange.setStatusCode(BAD_REQUEST);
-                HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s has incorrect or missing content type", exchange);
-                return false;
-            }
-            return true;
+        protected ContentType getRequiredContentType() {
+            return XID;
         }
 
         @Override
@@ -156,14 +150,13 @@ final class ServerHandlers {
         }
 
         @Override
-        protected boolean isValidRequest(final HttpServerExchange exchange) {
-            final String timeoutString = getRequestHeader(exchange, TIMEOUT);
-            if (timeoutString == null) {
-                exchange.setStatusCode(BAD_REQUEST);
-                HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TIMEOUT);
-                return false;
-            }
-            return true;
+        protected ContentType getRequiredContentType() {
+            return null;
+        }
+
+        @Override
+        protected HttpString[] getRequiredRequestHeaders() {
+            return new HttpString[] { TIMEOUT };
         }
 
         @Override
@@ -191,26 +184,19 @@ final class ServerHandlers {
         }
 
         @Override
-        protected boolean isValidRequest(final HttpServerExchange exchange) {
-            String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
-            if (flagsStringString == null) {
-                exchange.setStatusCode(BAD_REQUEST);
-                HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_FLAGS);
-                return false;
-            }
-            String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
-            if (parentName == null) {
-                exchange.setStatusCode(BAD_REQUEST);
-                HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_PARENT_NAME);
-                return false;
-            }
-            return true;
+        protected ContentType getRequiredContentType() {
+            return null;
+        }
+
+        @Override
+        protected HttpString[] getRequiredRequestHeaders() {
+            return new HttpString[] { RECOVERY_PARENT_NAME, RECOVERY_FLAGS };
         }
 
         @Override
         protected void processRequest(final HttpServerExchange exchange) throws Exception {
-            final String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
-            final int flags = Integer.parseInt(flagsStringString);
+            final String flagsString = getRequestHeader(exchange, RECOVERY_FLAGS);
+            final int flags = Integer.parseInt(flagsString);
             final String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
             final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
 
