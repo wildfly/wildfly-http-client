@@ -22,6 +22,7 @@ import static io.undertow.util.Headers.CONTENT_TYPE;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 
+import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
@@ -29,15 +30,17 @@ import org.jboss.marshalling.Marshaller;
 import java.io.OutputStream;
 
 /**
- * @author Stuart Douglas
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-public class HttpServerHelper {
+public abstract class AbstractServerHttpHandler implements HttpHandler {
 
-    private HttpServerHelper() {
+    protected final HttpServiceConfig config;
 
+    protected AbstractServerHttpHandler(final HttpServiceConfig config) {
+        this.config = config;
     }
 
-    public static void sendException(HttpServerExchange exchange, HttpServiceConfig serviceConfig, int status, Throwable e) {
+    protected final void sendException(HttpServerExchange exchange, HttpServiceConfig serviceConfig, int status, Throwable e) {
         try {
             exchange.setStatusCode(status);
             putResponseHeader(exchange, CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");

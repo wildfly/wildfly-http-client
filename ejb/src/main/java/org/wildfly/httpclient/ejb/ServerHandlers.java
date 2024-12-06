@@ -26,7 +26,6 @@ import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
-import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.Constants.EJB_RESPONSE_NEW_SESSION;
 import static org.wildfly.httpclient.ejb.Constants.EJB_SESSION_ID;
@@ -70,6 +69,7 @@ import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.SimpleClassResolver;
 import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.httpclient.common.AbstractServerHttpHandler;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
@@ -146,12 +146,10 @@ final class ServerHandlers {
         private final LocalTransactionContext localTransactionContext;
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
         private final Function<String, Boolean> classResolverFilter;
-        private final HttpServiceConfig config;
 
         HttpInvocationHandler(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                               Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter) {
-            super(executorService);
-            this.config = config;
+            super(config, executorService);
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
@@ -470,7 +468,7 @@ final class ServerHandlers {
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
 
         HttpCancelHandler(HttpServiceConfig config, ExecutorService executorService, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
-            super(executorService);
+            super(config, executorService);
             this.cancellationFlags = cancellationFlags;
         }
 
@@ -521,11 +519,9 @@ final class ServerHandlers {
         private final ExecutorService executorService;
         private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
         private final LocalTransactionContext localTransactionContext;
-        private final HttpServiceConfig config;
 
         HttpSessionOpenHandler(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
-            super(executorService);
-            this.config = config;
+            super(config, executorService);
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
@@ -691,11 +687,9 @@ final class ServerHandlers {
 
     private static final class HttpDiscoveryHandler extends AbstractEjbHandler {
         private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
-        private final HttpServiceConfig config;
 
         public HttpDiscoveryHandler(HttpServiceConfig config, ExecutorService executorService, Association association) {
-            super(executorService);
-            this.config = config;
+            super(config, executorService);
             association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {
                 @Override
                 public void moduleAvailable(List<EJBModuleIdentifier> modules) {
@@ -727,12 +721,13 @@ final class ServerHandlers {
         }
     }
 
-    private abstract static class AbstractEjbHandler implements HttpHandler {
+    private abstract static class AbstractEjbHandler extends AbstractServerHttpHandler {
         private final ExecutorService executorService;
 
         private static final AttachmentKey<ExecutorService> EXECUTOR = AttachmentKey.create(ExecutorService.class);
 
-        public AbstractEjbHandler(ExecutorService executorService) {
+        public AbstractEjbHandler(final HttpServiceConfig config, final ExecutorService executorService) {
+            super(config);
             this.executorService = executorService;
         }
 
