@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.naming;
 
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
 import static org.wildfly.httpclient.naming.Serializer.serializeObject;
@@ -27,7 +28,6 @@ import io.undertow.client.ClientResponse;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -150,7 +150,7 @@ final class ClientHandlers {
 
         @Override
         public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(is)) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Object object = deserializeObject(unmarshaller);
                 unmarshaller.finish();

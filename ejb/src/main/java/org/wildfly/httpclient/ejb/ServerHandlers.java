@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
@@ -61,7 +62,6 @@ import org.jboss.ejb.server.InvocationRequest;
 import org.jboss.ejb.server.ModuleAvailabilityListener;
 import org.jboss.ejb.server.SessionOpenRequest;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.SimpleClassResolver;
 import org.jboss.marshalling.Unmarshaller;
@@ -217,8 +217,8 @@ final class ServerHandlers {
                         final HttpMarshallerFactory unmarshallingFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
                         final Unmarshaller unmarshaller = unmarshallingFactory.createUnmarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
 
-                        try (InputStream inputStream = exchange.getInputStream()) {
-                            unmarshaller.start(new InputStreamByteInput(inputStream));
+                        try (InputStream is = exchange.getInputStream()) {
+                            unmarshaller.start(byteInputOf(is));
                             final TransactionInfo txnInfo = deserializeTransaction(unmarshaller);
                             final Object[] methodParams = new Object[parameterTypeNames.length];
                             deserializeObjectArray(unmarshaller, methodParams);
@@ -563,8 +563,8 @@ final class ServerHandlers {
                     final HttpMarshallerFactory httpUnmarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
                     final Unmarshaller unmarshaller = httpUnmarshallerFactory.createUnmarshaller(HttpProtocolV1ObjectTable.INSTANCE);
 
-                    try (InputStream inputStream = exchange.getInputStream()) {
-                        unmarshaller.start(new InputStreamByteInput(inputStream));
+                    try (InputStream is = exchange.getInputStream()) {
+                        unmarshaller.start(byteInputOf(is));
                         txnInfo = deserializeTransaction(unmarshaller);
                         unmarshaller.finish();
                     }

@@ -27,6 +27,7 @@ import static io.undertow.util.Headers.HOST;
 import static io.undertow.util.Headers.IDENTITY;
 import static io.undertow.util.Headers.SET_COOKIE;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.addRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.containsRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
@@ -44,7 +45,6 @@ import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Methods;
 import io.undertow.util.StatusCodes;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
@@ -280,7 +280,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                     throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
                                                 }
                                             }
-                                            unmarshaller.start(new InputStreamByteInput(in));
+                                            unmarshaller.start(byteInputOf(in));
                                             Throwable exception = (Throwable) unmarshaller.readObject();
                                             Map<String, Object> attachments = readAttachments(unmarshaller);
                                             int read = in.read();

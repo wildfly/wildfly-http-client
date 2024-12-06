@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
@@ -34,7 +35,6 @@ import io.undertow.util.Headers;
 import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.common.function.ExceptionBiFunction;
@@ -47,6 +47,7 @@ import org.wildfly.transaction.client.LocalTransactionContext;
 
 import javax.transaction.xa.Xid;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.function.Function;
@@ -145,8 +146,9 @@ final class ServerHandlers {
             try {
                 final HttpMarshallerFactory httpMarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
                 final Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
+                final InputStream is = exchange.getInputStream();
                 Xid simpleXid;
-                try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
+                try (ByteInput in = byteInputOf(is)) {
                     unmarshaller.start(in);
                     simpleXid = deserializeXid(unmarshaller);
                     unmarshaller.finish();

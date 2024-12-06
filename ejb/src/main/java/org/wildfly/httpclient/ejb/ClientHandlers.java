@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
@@ -33,7 +34,6 @@ import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -166,7 +166,7 @@ final class ClientHandlers {
 
         @Override
         public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(is)) {
+            try (ByteInput in = byteInputOf(is)) {
                 Set<EJBModuleIdentifier> modules;
                 unmarshaller.start(in);
                 modules = deserializeSet(unmarshaller);
@@ -245,7 +245,7 @@ final class ClientHandlers {
 
         @Override
         public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(is)) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 final Object returned = deserializeObject(unmarshaller);
                 final Map<String, Object> attachments = deserializeMap(unmarshaller);

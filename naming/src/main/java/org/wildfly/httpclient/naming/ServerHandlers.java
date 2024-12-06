@@ -18,6 +18,7 @@
 package org.wildfly.httpclient.naming;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
@@ -34,7 +35,6 @@ import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.ContextClassResolver;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.ContentType;
@@ -47,6 +47,7 @@ import javax.naming.NameClassPair;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InvalidClassException;
 import java.net.URLDecoder;
 import java.util.Collections;
@@ -286,7 +287,8 @@ final class ServerHandlers {
                 return null;
             }
             final HttpMarshallerFactory marshallerFactory = config.getHttpUnmarshallerFactory(exchange);
-            try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
+            final InputStream is = exchange.getInputStream();
+            try (ByteInput in = byteInputOf(is)) {
                 Unmarshaller unmarshaller = classFilter != null ?
                         marshallerFactory.createUnmarshaller(new FilterClassResolver(classFilter)):
                         marshallerFactory.createUnmarshaller();

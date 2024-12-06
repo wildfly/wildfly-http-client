@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXid;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXidArray;
@@ -25,7 +26,6 @@ import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
 import io.undertow.client.ClientResponse;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -114,7 +114,7 @@ final class ClientHandlers {
 
         @Override
         public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(is)) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid xid = deserializeXid(unmarshaller);
                 unmarshaller.finish();
@@ -138,7 +138,7 @@ final class ClientHandlers {
 
         @Override
         public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(is)) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid[] ret = deserializeXidArray(unmarshaller);
                 unmarshaller.finish();
