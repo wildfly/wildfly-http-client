@@ -20,7 +20,6 @@ package org.wildfly.httpclient.transaction;
 import static java.lang.Boolean.parseBoolean;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static io.undertow.util.StatusCodes.BAD_REQUEST;
-import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
@@ -130,26 +129,22 @@ final class ServerHandlers {
         }
 
         @Override
-        protected void processRequest(final HttpServerExchange exchange) {
-            try {
-                final HttpMarshallerFactory httpMarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
-                final Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
-                final InputStream is = exchange.getInputStream();
-                Xid simpleXid;
-                try (ByteInput in = byteInputOf(is)) {
-                    unmarshaller.start(in);
-                    simpleXid = deserializeXid(unmarshaller);
-                    unmarshaller.finish();
-                }
-
-                final ImportResult<LocalTransaction> transaction = ctx.findOrImportTransaction(simpleXid, 0);
-                transaction.getTransaction().performFunction((ExceptionBiFunction<ImportResult<LocalTransaction>, HttpServerExchange, Void, Exception>) (o, exchange2) -> {
-                    handleImpl(exchange2, o);
-                    return null;
-                }, transaction, exchange);
-            } catch (Exception e) {
-                sendException(exchange, INTERNAL_SERVER_ERROR, e);
+        protected void processRequest(final HttpServerExchange exchange) throws Exception {
+            final HttpMarshallerFactory httpMarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
+            final Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
+            final InputStream is = exchange.getInputStream();
+            Xid simpleXid;
+            try (ByteInput in = byteInputOf(is)) {
+                unmarshaller.start(in);
+                simpleXid = deserializeXid(unmarshaller);
+                unmarshaller.finish();
             }
+
+            final ImportResult<LocalTransaction> transaction = ctx.findOrImportTransaction(simpleXid, 0);
+            transaction.getTransaction().performFunction((ExceptionBiFunction<ImportResult<LocalTransaction>, HttpServerExchange, Void, Exception>) (o, exchange2) -> {
+                handleImpl(exchange2, o);
+                return null;
+            }, transaction, exchange);
         }
 
         protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> localTransactionImportResult) throws Exception {}
@@ -172,25 +167,21 @@ final class ServerHandlers {
         }
 
         @Override
-        protected void processRequest(final HttpServerExchange exchange) {
-            try {
-                final String timeoutString = getRequestHeader(exchange, TIMEOUT);
-                final Integer timeout = Integer.parseInt(timeoutString);
-                putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION);
-                final LocalTransaction transaction = ctx.beginTransaction(timeout);
-                final Xid xid = xidResolver.apply(transaction);
+        protected void processRequest(final HttpServerExchange exchange) throws Exception {
+            final String timeoutString = getRequestHeader(exchange, TIMEOUT);
+            final Integer timeout = Integer.parseInt(timeoutString);
+            putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION);
+            final LocalTransaction transaction = ctx.beginTransaction(timeout);
+            final Xid xid = xidResolver.apply(transaction);
 
-                final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
-                try (ByteOutput out = byteOutputOf(baos)) {
-                    marshaller.start(out);
-                    serializeXid(marshaller, xid);
-                    marshaller.finish();
-                }
-                exchange.getResponseSender().send(ByteBuffer.wrap(baos.toByteArray()));
-            } catch (Exception e) {
-                sendException(exchange, INTERNAL_SERVER_ERROR, e);
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+            try (ByteOutput out = byteOutputOf(baos)) {
+                marshaller.start(out);
+                serializeXid(marshaller, xid);
+                marshaller.finish();
             }
+            exchange.getResponseSender().send(ByteBuffer.wrap(baos.toByteArray()));
         }
     }
 
@@ -217,25 +208,21 @@ final class ServerHandlers {
         }
 
         @Override
-        protected void processRequest(final HttpServerExchange exchange) {
-            try {
-                final String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
-                final int flags = Integer.parseInt(flagsStringString);
-                final String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
-                final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
+        protected void processRequest(final HttpServerExchange exchange) throws Exception {
+            final String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
+            final int flags = Integer.parseInt(flagsStringString);
+            final String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
+            final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
 
-                final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final ByteOutput byteOutput = byteOutputOf(out);
-                try (byteOutput) {
-                    Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
-                    marshaller.start(byteOutput);
-                    serializeXidArray(marshaller, recoveryList);
-                    marshaller.finish();
-                }
-                exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
-            } catch (Exception e) {
-                sendException(exchange, INTERNAL_SERVER_ERROR, e);
+            final ByteArrayOutputStream out = new ByteArrayOutputStream();
+            final ByteOutput byteOutput = byteOutputOf(out);
+            try (byteOutput) {
+                Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+                marshaller.start(byteOutput);
+                serializeXidArray(marshaller, recoveryList);
+                marshaller.finish();
             }
+            exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
         }
     }
 
