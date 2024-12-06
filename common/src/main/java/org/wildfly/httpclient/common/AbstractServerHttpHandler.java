@@ -40,6 +40,20 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
         this.config = config;
     }
 
+    protected boolean isValidRequest(final HttpServerExchange exchange) {
+        return true;
+    }
+
+    protected void processRequest(final HttpServerExchange exchange) throws Exception {
+    }
+
+    @Override
+    public final void handleRequest(final HttpServerExchange exchange) throws Exception {
+        if (isValidRequest(exchange)) {
+            processRequest(exchange);
+        }
+    }
+
     protected final void sendException(final HttpServerExchange exchange, final int status, final Throwable e) {
         try {
             exchange.setStatusCode(status);
