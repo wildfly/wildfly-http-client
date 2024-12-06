@@ -122,7 +122,7 @@ final class ServerHandlers {
         }
 
         @Override
-        public final void handleRequest(HttpServerExchange exchange) throws Exception {
+        public final void processRequest(HttpServerExchange exchange) throws Exception {
             PathTemplateMatch params = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY);
             String name = URLDecoder.decode(params.getParameters().get(NAME_PATH_PARAMETER), UTF_8);
             try {
@@ -216,13 +216,19 @@ final class ServerHandlers {
         }
 
         @Override
-        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
+        protected boolean isValidRequest(final HttpServerExchange exchange) {
             Deque<String> newName = exchange.getQueryParameters().get(NEW_QUERY_PARAMETER);
             if (newName == null || newName.isEmpty()) {
                 exchange.setStatusCode(BAD_REQUEST);
                 exchange.endExchange();
-                return null;
+                return false;
             }
+            return true;
+        }
+
+        @Override
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
+            Deque<String> newName = exchange.getQueryParameters().get(NEW_QUERY_PARAMETER);
             String nn = URLDecoder.decode(newName.getFirst(), UTF_8);
             ctx.rename(name, nn);
             return null;
@@ -283,13 +289,18 @@ final class ServerHandlers {
         }
 
         @Override
-        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
+        protected boolean isValidRequest(final HttpServerExchange exchange) {
             ContentType contentType = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
             if (contentType == null || !contentType.getType().equals(VALUE.getType()) || contentType.getVersion() != 1) {
                 exchange.setStatusCode(BAD_REQUEST);
                 exchange.endExchange();
-                return null;
+                return false;
             }
+            return true;
+        }
+
+        @Override
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             final HttpMarshallerFactory marshallerFactory = config.getHttpUnmarshallerFactory(exchange);
             final InputStream is = exchange.getInputStream();
             try (ByteInput in = byteInputOf(is)) {

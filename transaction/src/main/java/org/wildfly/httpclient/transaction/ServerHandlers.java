@@ -104,34 +104,18 @@ final class ServerHandlers {
 
     }
 
-    private abstract static class ValidatingTransactionHandler extends AbstractServerHttpHandler {
+    private abstract static class AbstractTransactionHandler extends AbstractServerHttpHandler {
         protected final LocalTransactionContext ctx;
         protected final Function<LocalTransaction, Xid> xidResolver;
 
-        private ValidatingTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+        private AbstractTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
             this(config, ctx, null);
         }
 
-        private ValidatingTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
+        private AbstractTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
             super(config);
             this.ctx = ctx;
             this.xidResolver = xidResolver;
-        }
-
-        protected abstract boolean isValidRequest(HttpServerExchange exchange);
-        protected abstract void processRequest(HttpServerExchange exchange);
-
-        @Override
-        public final void handleRequest(final HttpServerExchange exchange) throws Exception {
-            if (isValidRequest(exchange)) {
-                processRequest(exchange);
-            }
-        }
-    }
-
-    private abstract static class AbstractTransactionHandler extends ValidatingTransactionHandler {
-        private AbstractTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
         }
 
         @Override
@@ -168,10 +152,10 @@ final class ServerHandlers {
             }
         }
 
-        protected abstract void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> localTransactionImportResult) throws Exception;
+        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> localTransactionImportResult) throws Exception {}
     }
 
-    private static final class BeginHandler extends ValidatingTransactionHandler {
+    private static final class BeginHandler extends AbstractTransactionHandler {
         private BeginHandler(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
             super(config, ctx, xidResolver);
         }
@@ -210,7 +194,7 @@ final class ServerHandlers {
         }
     }
 
-    private static final class XARecoveryHandler extends ValidatingTransactionHandler {
+    private static final class XARecoveryHandler extends AbstractTransactionHandler {
         private XARecoveryHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
             super(config, ctx);
         }
