@@ -248,7 +248,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                         ok = false;
                                         isException = false;
                                     } else {
-                                        ok = expectedResponse.getType().equals(type.getType()) && expectedResponse.getVersion() >= type.getVersion();
+                                        ok = expectedResponse.equals(type);
                                         isException = false;
                                     }
                                 }

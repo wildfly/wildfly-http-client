@@ -63,7 +63,7 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
         final ContentType expectedCT = getRequiredContentType();
         if (expectedCT == null) return true;
         final ContentType currentCT = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
-        if (currentCT == null || currentCT.getVersion() != 1 || !expectedCT.getType().equals(currentCT.getType())) {
+        if (!expectedCT.equals(currentCT)) {
             exchange.setStatusCode(BAD_REQUEST);
             exchange.endExchange();
             HttpClientMessages.MESSAGES.debugf("Exchange %s is missing %s content type header", exchange, expectedCT);
