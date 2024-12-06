@@ -60,12 +60,12 @@ final class ClientHandlers {
         // forbidden instantiation
     }
 
-    static HttpTargetContext.HttpMarshaller invokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] parameters, final Map<String, Object> contextData) {
-        return new InvokeHttpMarshaller(marshaller, txnInfo, parameters, contextData);
+    static HttpTargetContext.HttpMarshaller invokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn, final Object[] objects, final Map<String, Object> map) {
+        return new InvokeHttpMarshaller(marshaller, txn, objects, map);
     }
 
-    static HttpTargetContext.HttpMarshaller createSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo) {
-        return new CreateSessionHttpMarshaller(marshaller, txnInfo);
+    static HttpTargetContext.HttpMarshaller createSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn) {
+        return new CreateSessionHttpMarshaller(marshaller, txn);
     }
 
     static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
@@ -76,8 +76,8 @@ final class ClientHandlers {
         return new DiscoveryHttpResultHandler(unmarshaller, result);
     }
 
-    static HttpTargetContext.HttpResultHandler invokeHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverContext, final EJBClientInvocationContext clientInvocationContext) {
-        return new EjbClassLoaderAwareHttpResultHandler(unmarshaller, receiverContext, clientInvocationContext);
+    static HttpTargetContext.HttpResultHandler invokeHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
+        return new EjbClassLoaderAwareHttpResultHandler(unmarshaller, receiverCtx, clientCtx);
     }
 
     static Function<ClientResponse, Boolean> cancelInvocationResponseFunction() {
@@ -94,24 +94,24 @@ final class ClientHandlers {
 
     private static final class InvokeHttpMarshaller implements HttpTargetContext.HttpMarshaller {
         private final Marshaller marshaller;
-        private final TransactionInfo txnInfo;
-        private final Object[] parameters;
-        private final Map<String, Object> contextData;
+        private final TransactionInfo txn;
+        private final Object[] objects;
+        private final Map<String, Object> map;
 
-        private InvokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] parameters, final Map<String, Object> contextData) {
+        private InvokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn, final Object[] objects, final Map<String, Object> map) {
             this.marshaller = marshaller;
-            this.txnInfo = txnInfo;
-            this.parameters = parameters;
-            this.contextData = contextData;
+            this.txn = txn;
+            this.objects = objects;
+            this.map = map;
         }
 
         @Override
         public void marshall(final OutputStream os) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
-                serializeTransaction(marshaller, txnInfo);
-                serializeObjectArray(marshaller, parameters);
-                serializeMap(marshaller, contextData);
+                serializeTransaction(marshaller, txn);
+                serializeObjectArray(marshaller, objects);
+                serializeMap(marshaller, map);
                 marshaller.finish();
             }
         }
@@ -119,18 +119,18 @@ final class ClientHandlers {
 
     private static final class CreateSessionHttpMarshaller implements HttpTargetContext.HttpMarshaller {
         private final Marshaller marshaller;
-        private final TransactionInfo txnInfo;
+        private final TransactionInfo txn;
 
-        private CreateSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo) {
+        private CreateSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn) {
             this.marshaller = marshaller;
-            this.txnInfo = txnInfo;
+            this.txn = txn;
         }
 
         @Override
         public void marshall(final OutputStream os) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
-                serializeTransaction(marshaller, txnInfo);
+                serializeTransaction(marshaller, txn);
                 marshaller.finish();
             }
         }
@@ -146,7 +146,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
             try {
                 result.complete(function != null ? function.apply(httpResponse) : null);
             } finally {
@@ -156,8 +156,8 @@ final class ClientHandlers {
     }
 
     private static final class DiscoveryHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Set<EJBModuleIdentifier>> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Set<EJBModuleIdentifier>> result;
 
         private DiscoveryHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Set<EJBModuleIdentifier>> result) {
             this.unmarshaller = unmarshaller;
@@ -165,8 +165,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+            try (ByteInput in = new InputStreamByteInput(is)) {
                 Set<EJBModuleIdentifier> modules;
                 unmarshaller.start(in);
                 modules = deserializeSet(unmarshaller);
@@ -188,36 +188,36 @@ final class ClientHandlers {
             WELL_KNOWN_KEYS.add("jboss.source.address");
         }
 
-        private final EJBReceiverInvocationContext receiverContext;
-        private final EJBClientInvocationContext clientInvocationContext;
         private final Unmarshaller unmarshaller;
+        private final EJBReceiverInvocationContext receiverCtx;
+        private final EJBClientInvocationContext clientCtx;
 
-        private EjbClassLoaderAwareHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverContext, final EJBClientInvocationContext clientInvocationContext) {
+        private EjbClassLoaderAwareHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
             this.unmarshaller = unmarshaller;
-            this.receiverContext = receiverContext;
-            this.clientInvocationContext = clientInvocationContext;
+            this.receiverCtx = receiverCtx;
+            this.clientCtx = clientCtx;
         }
 
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            receiverContext.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+            receiverCtx.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                 @Override
                 public Object getResult() throws Exception {
                     final CompletableFuture<InvocationInfo> result = new CompletableFuture<>();
-                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(httpBodyResponseStream, httpResponse, doneCallback);
+                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(is, httpResponse, doneCallback);
 
                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
-                    Set<String> returnedContextDataKeys = (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
+                    Set<String> returnedContextDataKeys = (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
                     if(returnedContextDataKeys != null) {
-                        clientInvocationContext.getContextData().keySet().removeIf(k -> (!k.equals(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY)));
+                        clientCtx.getContextData().keySet().removeIf(k -> (!k.equals(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY)));
                     }
-                    Set<String> returnedKeys =  (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
+                    Set<String> returnedKeys =  (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
 
                     // If there are any attachments, add them to the client invocation's context data
                     if (result.get().getAttachments() != null) {
                         for (Map.Entry<String, Object> entry : result.get().getAttachments().entrySet()) {
                             if (entry.getValue() != null &&
                                     ((returnedKeys != null && returnedKeys.contains(entry.getKey())) || WELL_KNOWN_KEYS.contains(entry.getKey()))) {
-                                clientInvocationContext.getContextData().put(entry.getKey(), entry.getValue());
+                                clientCtx.getContextData().put(entry.getKey(), entry.getValue());
                             }
                         }
                     }
@@ -227,7 +227,7 @@ final class ClientHandlers {
                 @Override
                 public void discardResult() {
                     IoUtils.safeClose(doneCallback);
-                    IoUtils.safeClose(httpBodyResponseStream);
+                    IoUtils.safeClose(is);
                 }
             });
 
@@ -235,8 +235,8 @@ final class ClientHandlers {
     }
 
     private static final class InvokeHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<InvocationInfo> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<InvocationInfo> result;
 
         private InvokeHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<InvocationInfo> result) {
             this.unmarshaller = unmarshaller;
@@ -244,8 +244,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+            try (ByteInput in = new InputStreamByteInput(is)) {
                 unmarshaller.start(in);
                 final Object returned = deserializeObject(unmarshaller);
                 final Map<String, Object> attachments = deserializeMap(unmarshaller);

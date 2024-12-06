@@ -94,7 +94,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
             try {
                 result.complete(function != null ? function.apply(httpResponse) : null);
             } finally {
@@ -104,8 +104,8 @@ final class ClientHandlers {
     }
 
     private static final class XidHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Xid> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Xid> result;
 
         private XidHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
             this.unmarshaller = unmarshaller;
@@ -113,8 +113,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+            try (ByteInput in = new InputStreamByteInput(is)) {
                 unmarshaller.start(in);
                 Xid xid = deserializeXid(unmarshaller);
                 unmarshaller.finish();
@@ -128,8 +128,8 @@ final class ClientHandlers {
     }
 
     private static final class XidArrayHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Xid[]> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Xid[]> result;
 
         private XidArrayHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
             this.unmarshaller = unmarshaller;
@@ -137,8 +137,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+            try (ByteInput in = new InputStreamByteInput(is)) {
                 unmarshaller.start(in);
                 Xid[] ret = deserializeXidArray(unmarshaller);
                 unmarshaller.finish();

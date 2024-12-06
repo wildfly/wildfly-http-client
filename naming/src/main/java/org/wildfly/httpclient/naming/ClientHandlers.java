@@ -95,7 +95,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
             try {
                 result.complete(function != null ? function.apply(httpResponse) : null);
             } finally {
@@ -105,8 +105,8 @@ final class ClientHandlers {
     }
 
     private static final class OptionalObjectHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Object> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Object> result;
         private final NamingProvider namingProvider;
         private final ClassLoader classLoader;
 
@@ -118,15 +118,15 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
             try {
                 namingProvider.performExceptionAction((a, b) -> {
                     ClassLoader old = setContextClassLoader(classLoader);
                     try {
                         if (httpResponse.getResponseCode() == StatusCodes.NO_CONTENT) {
-                            emptyHttpResultHandler(result, null).handleResult(httpBodyResponseStream, httpResponse, doneCallback);
+                            emptyHttpResultHandler(result, null).handleResult(is, httpResponse, doneCallback);
                         } else {
-                            objectHttpResultHandler(unmarshaller, result).handleResult(httpBodyResponseStream, httpResponse, doneCallback);
+                            objectHttpResultHandler(unmarshaller, result).handleResult(is, httpResponse, doneCallback);
                         }
                     } finally {
                         setContextClassLoader(old);
@@ -140,8 +140,8 @@ final class ClientHandlers {
     }
 
     private static final class ObjectHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Object> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Object> result;
 
         private ObjectHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Object> result) {
             this.unmarshaller = unmarshaller;
@@ -149,8 +149,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+            try (ByteInput in = new InputStreamByteInput(is)) {
                 unmarshaller.start(in);
                 Object object = deserializeObject(unmarshaller);
                 unmarshaller.finish();
