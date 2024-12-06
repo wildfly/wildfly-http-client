@@ -141,18 +141,18 @@ final class ServerHandlers {
         private final LocalTransactionContext localTransactionContext;
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
         private final Function<String, Boolean> classResolverFilter;
-        private final HttpServiceConfig httpServiceConfig;
+        private final HttpServiceConfig config;
 
         HttpInvocationHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                               Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter,
-                              HttpServiceConfig httpServiceConfig) {
+                              HttpServiceConfig config) {
             super(executorService);
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
             this.cancellationFlags = cancellationFlags;
             this.classResolverFilter = classResolverFilter;
-            this.httpServiceConfig = httpServiceConfig;
+            this.config = config;
         }
 
         @Override
@@ -214,7 +214,7 @@ final class ServerHandlers {
                     @Override
                     public Resolved getRequestContent(final ClassLoader classLoader) throws IOException, ClassNotFoundException {
                         final Class<?> view = Class.forName(viewName, false, classLoader);
-                        final HttpMarshallerFactory unmarshallingFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
+                        final HttpMarshallerFactory unmarshallingFactory = config.getHttpUnmarshallerFactory(exchange);
                         final Unmarshaller unmarshaller = unmarshallingFactory.createUnmarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
 
                         try (InputStream is = exchange.getInputStream()) {
@@ -236,7 +236,7 @@ final class ServerHandlers {
                                 locator = new StatelessEJBLocator<>(view, app, module, bean, distinct, Affinity.LOCAL);
                             }
 
-                            final HttpMarshallerFactory marshallerFactory = httpServiceConfig.getHttpMarshallerFactory(exchange);
+                            final HttpMarshallerFactory marshallerFactory = config.getHttpMarshallerFactory(exchange);
                             final Marshaller marshaller = marshallerFactory.createMarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
                             final Transaction transaction;
                             if ((txnInfo.getType() == TransactionInfo.NULL_TRANSACTION) || localTransactionContext == null) { //the TX context may be null in unit tests
@@ -267,7 +267,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.noSuchMethod());
+                        sendException(exchange, config, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.noSuchMethod());
                     }
 
                     @Override
@@ -275,7 +275,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.sessionNotActive());
+                        sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.sessionNotActive());
                     }
 
                     @Override
@@ -283,7 +283,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
+                        sendException(exchange, config, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
                     }
 
                     @Override
@@ -316,7 +316,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
+                        sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, exception);
                     }
 
                     @Override
@@ -324,7 +324,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
+                        sendException(exchange, config, StatusCodes.NOT_FOUND, new NoSuchEJBException());
                     }
 
                     @Override
@@ -340,7 +340,7 @@ final class ServerHandlers {
                         if(identifier != null) {
                             cancellationFlags.remove(identifier);
                         }
-                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
+                        sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
                     }
 
                     @Override
@@ -426,7 +426,7 @@ final class ServerHandlers {
                     }
                     exchange.endExchange();
                 } catch (Exception e) {
-                    sendException(exchange, httpServiceConfig, 500, e);
+                    sendException(exchange, config, 500, e);
                 }
             }
         }
@@ -517,14 +517,14 @@ final class ServerHandlers {
         private final ExecutorService executorService;
         private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
         private final LocalTransactionContext localTransactionContext;
-        private final HttpServiceConfig httpServiceConfig;
+        private final HttpServiceConfig config;
 
-        HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig httpServiceConfig) {
+        HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig config) {
             super(executorService);
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
-            this.httpServiceConfig = httpServiceConfig;
+            this.config = config;
         }
 
         @Override
@@ -560,7 +560,7 @@ final class ServerHandlers {
             exchange.dispatch(executorService, () -> {
                 final TransactionInfo txnInfo;
                 try {
-                    final HttpMarshallerFactory httpUnmarshallerFactory = httpServiceConfig.getHttpUnmarshallerFactory(exchange);
+                    final HttpMarshallerFactory httpUnmarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
                     final Unmarshaller unmarshaller = httpUnmarshallerFactory.createUnmarshaller(HttpProtocolV1ObjectTable.INSTANCE);
 
                     try (InputStream is = exchange.getInputStream()) {
@@ -569,7 +569,7 @@ final class ServerHandlers {
                         unmarshaller.finish();
                     }
                 } catch (Exception e) {
-                    sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                    sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
                     return;
                 }
                 final Transaction transaction;
@@ -633,17 +633,17 @@ final class ServerHandlers {
 
                     @Override
                     public void writeException(@NotNull Exception exception) {
-                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, exception);
+                        sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, exception);
                     }
 
                     @Override
                     public void writeNoSuchEJB() {
-                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, new NoSuchEJBException());
+                        sendException(exchange, config, StatusCodes.NOT_FOUND, new NoSuchEJBException());
                     }
 
                     @Override
                     public void writeWrongViewType() {
-                        sendException(exchange, httpServiceConfig, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
+                        sendException(exchange, config, StatusCodes.NOT_FOUND, EjbHttpClientMessages.MESSAGES.wrongViewType());
                     }
 
                     @Override
@@ -653,7 +653,7 @@ final class ServerHandlers {
 
                     @Override
                     public void writeNotStateful() {
-                        sendException(exchange, httpServiceConfig, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
+                        sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, EjbHttpClientMessages.MESSAGES.notStateful());
                     }
 
                     @Override
@@ -687,9 +687,9 @@ final class ServerHandlers {
 
     private static final class HttpDiscoveryHandler extends AbstractEjbHandler {
         private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
-        private final HttpServiceConfig httpServiceConfig;
+        private final HttpServiceConfig config;
 
-        public HttpDiscoveryHandler(ExecutorService executorService, Association association, HttpServiceConfig httpServiceConfig) {
+        public HttpDiscoveryHandler(ExecutorService executorService, Association association, HttpServiceConfig config) {
             super(executorService);
             association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {
                 @Override
@@ -702,7 +702,7 @@ final class ServerHandlers {
                     availableModules.removeAll(modules);
                 }
             });
-            this.httpServiceConfig = httpServiceConfig;
+            this.config = config;
         }
 
         @Override
@@ -710,7 +710,7 @@ final class ServerHandlers {
             exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, EJB_DISCOVERY_RESPONSE.toString());
             byte[] data;
             final ByteArrayOutputStream out = new ByteArrayOutputStream();
-            Marshaller marshaller = httpServiceConfig.getHttpMarshallerFactory(exchange)
+            Marshaller marshaller = config.getHttpMarshallerFactory(exchange)
                     .createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
             ByteOutput byteOutput = byteOutputOf(out);
             try (byteOutput) {

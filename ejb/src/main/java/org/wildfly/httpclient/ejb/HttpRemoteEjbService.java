@@ -45,7 +45,7 @@ import java.util.function.Function;
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public class HttpRemoteEjbService {
-    private final HttpServiceConfig httpServiceConfig;
+    private final HttpServiceConfig config;
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags = new ConcurrentHashMap<>();
     private final ServerHandlers serverHandlers;
 
@@ -55,9 +55,9 @@ public class HttpRemoteEjbService {
     }
 
     private HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                                 Function<String, Boolean> classResolverFilter, HttpServiceConfig httpServiceConfig) {
-        this.httpServiceConfig = httpServiceConfig;
-        this.serverHandlers = ServerHandlers.newInstance(association, executorService, localTransactionContext, classResolverFilter, httpServiceConfig);
+                                 Function<String, Boolean> classResolverFilter, HttpServiceConfig config) {
+        this.config = config;
+        this.serverHandlers = ServerHandlers.newInstance(association, executorService, localTransactionContext, classResolverFilter, config);
     }
 
     public HttpHandler createHttpHandler() {
@@ -69,7 +69,7 @@ public class HttpRemoteEjbService {
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
         requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
-        return httpServiceConfig.wrap(requestEncodingHandler);
+        return config.wrap(requestEncodingHandler);
     }
 
     private void registerHandler(final PathHandler pathHandler, final RequestType requestType) {
