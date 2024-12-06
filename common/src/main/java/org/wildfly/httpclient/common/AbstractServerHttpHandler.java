@@ -40,11 +40,11 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
         this.config = config;
     }
 
-    protected final void sendException(HttpServerExchange exchange, HttpServiceConfig serviceConfig, int status, Throwable e) {
+    protected final void sendException(final HttpServerExchange exchange, final int status, final Throwable e) {
         try {
             exchange.setStatusCode(status);
             putResponseHeader(exchange, CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
-            final Marshaller marshaller = serviceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
+            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
             final OutputStream outputStream = exchange.getOutputStream();
             try (ByteOutput byteOutput = byteOutputOf(outputStream)) {
                 // start the marshaller
