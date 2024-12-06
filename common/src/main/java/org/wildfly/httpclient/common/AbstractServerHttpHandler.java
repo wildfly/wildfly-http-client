@@ -19,6 +19,7 @@
 package org.wildfly.httpclient.common;
 
 import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 
@@ -48,9 +49,13 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
     }
 
     @Override
-    public final void handleRequest(final HttpServerExchange exchange) throws Exception {
-        if (isValidRequest(exchange)) {
-            processRequest(exchange);
+    public final void handleRequest(final HttpServerExchange exchange) {
+        try {
+            if (isValidRequest(exchange)) {
+                processRequest(exchange);
+            }
+        } catch (Throwable e) {
+            sendException(exchange, INTERNAL_SERVER_ERROR, e);
         }
     }
 

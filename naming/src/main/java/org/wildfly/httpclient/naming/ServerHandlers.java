@@ -19,7 +19,6 @@ package org.wildfly.httpclient.naming;
 
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static io.undertow.util.StatusCodes.BAD_REQUEST;
-import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
 import static io.undertow.util.StatusCodes.NO_CONTENT;
 import static io.undertow.util.StatusCodes.OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -125,28 +124,25 @@ final class ServerHandlers {
         public final void processRequest(HttpServerExchange exchange) throws Exception {
             PathTemplateMatch params = exchange.getAttachment(PathTemplateMatch.ATTACHMENT_KEY);
             String name = URLDecoder.decode(params.getParameters().get(NAME_PATH_PARAMETER), UTF_8);
-            try {
-                Object result = doOperation(exchange, name);
-                if (exchange.isComplete()) {
-                    return;
+
+            Object result = doOperation(exchange, name);
+            if (exchange.isComplete()) {
+                return;
+            }
+            if (result == null) {
+                exchange.setStatusCode(OK);
+            } else if (result instanceof Context) {
+                exchange.setStatusCode(NO_CONTENT);
+            } else {
+                putResponseHeader(exchange, CONTENT_TYPE, VALUE);
+                HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
+                Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
+                ByteOutput out = byteOutputOf(exchange.getOutputStream());
+                try (out) {
+                    marshaller.start(out);
+                    serializeObject(marshaller, result);
+                    marshaller.finish();
                 }
-                if (result == null) {
-                    exchange.setStatusCode(OK);
-                } else if (result instanceof Context) {
-                    exchange.setStatusCode(NO_CONTENT);
-                } else {
-                    putResponseHeader(exchange, CONTENT_TYPE, VALUE);
-                    HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
-                    Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-                    ByteOutput out = byteOutputOf(exchange.getOutputStream());
-                    try (out) {
-                        marshaller.start(out);
-                        serializeObject(marshaller, result);
-                        marshaller.finish();
-                    }
-                }
-            } catch (Throwable e) {
-                sendException(exchange, INTERNAL_SERVER_ERROR, e);
             }
         }
 
