@@ -28,12 +28,9 @@ import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 import io.undertow.server.handlers.encoding.RequestEncodingHandler;
 import io.undertow.util.Headers;
 import org.jboss.ejb.server.Association;
-import org.jboss.ejb.server.CancelHandle;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.transaction.client.LocalTransactionContext;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
@@ -46,7 +43,6 @@ import java.util.function.Function;
  */
 public class HttpRemoteEjbService {
     private final HttpServiceConfig config;
-    private final Map<InvocationIdentifier, CancelHandle> cancellationFlags = new ConcurrentHashMap<>();
     private final ServerHandlers serverHandlers;
 
     public HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
