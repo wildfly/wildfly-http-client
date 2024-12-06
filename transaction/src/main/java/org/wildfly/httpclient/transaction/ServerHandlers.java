@@ -164,7 +164,7 @@ final class ServerHandlers {
                     return null;
                 }, transaction, exchange);
             } catch (Exception e) {
-                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -205,7 +205,7 @@ final class ServerHandlers {
                 }
                 exchange.getResponseSender().send(ByteBuffer.wrap(baos.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, INTERNAL_SERVER_ERROR, e);
             }
         }
     }
@@ -250,7 +250,7 @@ final class ServerHandlers {
                 }
                 exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, INTERNAL_SERVER_ERROR, e);
             }
         }
     }
