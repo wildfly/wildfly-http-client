@@ -158,15 +158,8 @@ final class ServerHandlers {
         }
 
         @Override
-        protected boolean isValidRequest(final HttpServerExchange exchange) {
-            String ct = getRequestHeader(exchange, CONTENT_TYPE);
-            ContentType contentType = ContentType.parse(ct);
-            if (contentType == null || contentType.getVersion() != 1 || !INVOCATION.getType().equals(contentType.getType())) {
-                exchange.setStatusCode(BAD_REQUEST);
-                EjbHttpClientMessages.MESSAGES.debugf("Bad content type %s", ct);
-                return false;
-            }
-            return true;
+        protected ContentType getRequiredContentType() {
+            return INVOCATION;
         }
 
         @Override
@@ -477,18 +470,6 @@ final class ServerHandlers {
         }
 
         @Override
-        protected boolean isValidRequest(HttpServerExchange exchange) {
-            String ct = getRequestHeader(exchange, CONTENT_TYPE);
-            ContentType contentType = ContentType.parse(ct);
-            if (contentType != null) {
-                exchange.setStatusCode(BAD_REQUEST);
-                EjbHttpClientMessages.MESSAGES.debugf("Bad content type %s", ct);
-                return false;
-            }
-            return true;
-        }
-
-        @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
             String relativePath = exchange.getRelativePath();
             if (relativePath.startsWith("/")) {
@@ -536,15 +517,8 @@ final class ServerHandlers {
         }
 
         @Override
-        protected boolean isValidRequest(HttpServerExchange exchange) {
-            String ct = getRequestHeader(exchange, CONTENT_TYPE);
-            ContentType contentType = ContentType.parse(ct);
-            if (contentType == null || contentType.getVersion() != 1 || !SESSION_OPEN.getType().equals(contentType.getType())) {
-                exchange.setStatusCode(BAD_REQUEST);
-                EjbHttpClientMessages.MESSAGES.debugf("Bad content type %s", ct);
-                return false;
-            }
-            return true;
+        protected ContentType getRequiredContentType() {
+            return SESSION_OPEN;
         }
 
         @Override

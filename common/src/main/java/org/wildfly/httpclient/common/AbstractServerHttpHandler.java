@@ -19,16 +19,20 @@
 package org.wildfly.httpclient.common;
 
 import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.StatusCodes.BAD_REQUEST;
 import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HttpString;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 
 import java.io.OutputStream;
+import java.util.Deque;
 
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
@@ -41,22 +45,75 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
         this.config = config;
     }
 
-    protected boolean isValidRequest(final HttpServerExchange exchange) {
-        return true;
-    }
-
-    protected void processRequest(final HttpServerExchange exchange) throws Exception {
-    }
+    protected abstract void processRequest(final HttpServerExchange exchange) throws Exception;
 
     @Override
     public final void handleRequest(final HttpServerExchange exchange) {
         try {
-            if (isValidRequest(exchange)) {
-                processRequest(exchange);
-            }
+            if (!containsRequiredContentType(exchange)) return;
+            if (!containsRequiredRequestHeaders(exchange)) return;
+            if (!containsRequiredQueryParameters(exchange)) return;
+            processRequest(exchange);
         } catch (Throwable e) {
             sendException(exchange, INTERNAL_SERVER_ERROR, e);
         }
+    }
+
+    private boolean containsRequiredContentType(final HttpServerExchange exchange) {
+        final ContentType expectedCT = getRequiredContentType();
+        if (expectedCT == null) return true;
+        final ContentType currentCT = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
+        if (currentCT == null || currentCT.getVersion() != 1 || !expectedCT.getType().equals(currentCT.getType())) {
+            exchange.setStatusCode(BAD_REQUEST);
+            exchange.endExchange();
+            HttpClientMessages.MESSAGES.debugf("Exchange %s is missing %s content type header", exchange, expectedCT);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean containsRequiredRequestHeaders(final HttpServerExchange exchange) {
+        final HttpString[] requestHeaders = getRequiredRequestHeaders();
+        if (requestHeaders == null || requestHeaders.length == 0) return true;
+        String value = null;
+        for (int i = 0; i < requestHeaders.length; i++) {
+            value = getRequestHeader(exchange, requestHeaders[i]);
+            if (value == null) {
+                exchange.setStatusCode(BAD_REQUEST);
+                exchange.endExchange();
+                HttpClientMessages.MESSAGES.debugf("Exchange %s is missing %s request header", exchange, requestHeaders[i]);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean containsRequiredQueryParameters(final HttpServerExchange exchange) {
+        final String[] queryParameters = getRequiredQueryParameters();
+        if (queryParameters == null || queryParameters.length == 0) return true;
+        Deque<String> values = null;
+        for (int i = 0; i < queryParameters.length; i++) {
+            values = exchange.getQueryParameters().get(queryParameters[i]);
+            if (values == null || values.isEmpty()) {
+                exchange.setStatusCode(BAD_REQUEST);
+                exchange.endExchange();
+                HttpClientMessages.MESSAGES.debugf("Exchange %s is missing %s query parameter", exchange, queryParameters[i]);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    protected ContentType getRequiredContentType() {
+        return null;
+    }
+
+    protected HttpString[] getRequiredRequestHeaders() {
+        return null;
+    }
+
+    protected String[] getRequiredQueryParameters() {
+        return null;
     }
 
     protected final void sendException(final HttpServerExchange exchange, final int status, final Throwable e) {
