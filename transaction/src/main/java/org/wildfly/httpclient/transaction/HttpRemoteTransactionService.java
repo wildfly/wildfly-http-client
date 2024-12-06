@@ -38,12 +38,12 @@ public class HttpRemoteTransactionService {
     private final ServerHandlers serverHandlers;
 
     public HttpRemoteTransactionService(final LocalTransactionContext transactionContext, final Function<LocalTransaction, Xid> xidResolver) {
-        this(transactionContext, xidResolver, HttpServiceConfig.getInstance());
+        this(HttpServiceConfig.getInstance(), transactionContext, xidResolver);
     }
 
-    private  HttpRemoteTransactionService(final LocalTransactionContext transactionContext, final Function<LocalTransaction, Xid> xidResolver, final HttpServiceConfig config) {
+    private  HttpRemoteTransactionService(final HttpServiceConfig config, final LocalTransactionContext transactionContext, final Function<LocalTransaction, Xid> xidResolver) {
         this.config = config;
-        this.serverHandlers = ServerHandlers.newInstance(transactionContext, xidResolver, config);
+        this.serverHandlers = ServerHandlers.newInstance(config, transactionContext, xidResolver);
     }
 
     public HttpHandler createHandler() {

@@ -99,37 +99,37 @@ import java.util.function.Function;
  */
 final class ServerHandlers {
 
+    private final HttpServiceConfig config;
     private final Association association;
     private final ExecutorService executorService;
     private final LocalTransactionContext ctx;
     private final Function<String, Boolean> classFilter;
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags = new ConcurrentHashMap<>();
-    private final HttpServiceConfig config;
 
-    private ServerHandlers(final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
-                           final Function<String, Boolean> classFilter, final HttpServiceConfig config) {
+    private ServerHandlers(final HttpServiceConfig config, final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
+                           final Function<String, Boolean> classFilter) {
+        this.config = config;
         this.association = association;
         this.executorService = executorService;
         this.ctx = ctx;
         this.classFilter = classFilter;
-        this.config = config;
     }
 
-    static ServerHandlers newInstance(final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
-                                      final Function<String, Boolean> classFilter, final HttpServiceConfig config) {
-        return new ServerHandlers(association, executorService, ctx, classFilter, config);
+    static ServerHandlers newInstance(final HttpServiceConfig config, final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
+                                      final Function<String, Boolean> classFilter) {
+        return new ServerHandlers(config, association, executorService, ctx, classFilter);
     }
 
     HttpHandler handlerOf(final RequestType requestType) {
         switch (requestType) {
             case INVOKE:
-                return new HttpInvocationHandler(association, executorService, ctx, cancellationFlags, classFilter, config);
+                return new HttpInvocationHandler(config, association, executorService, ctx, cancellationFlags, classFilter);
             case CANCEL :
-                return new HttpCancelHandler(executorService, cancellationFlags);
+                return new HttpCancelHandler(config, executorService, cancellationFlags);
             case CREATE_SESSION:
-                return new HttpSessionOpenHandler(association, executorService, ctx, config);
+                return new HttpSessionOpenHandler(config, association, executorService, ctx);
             case DISCOVER:
-                return new HttpDiscoveryHandler(executorService, association, config);
+                return new HttpDiscoveryHandler(config, executorService, association);
             default:
                 throw new IllegalStateException();
         }
@@ -143,20 +143,19 @@ final class ServerHandlers {
         private final Function<String, Boolean> classResolverFilter;
         private final HttpServiceConfig config;
 
-        HttpInvocationHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                              Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter,
-                              HttpServiceConfig config) {
+        HttpInvocationHandler(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+                              Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter) {
             super(executorService);
+            this.config = config;
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
             this.cancellationFlags = cancellationFlags;
             this.classResolverFilter = classResolverFilter;
-            this.config = config;
         }
 
         @Override
-        protected void handleInternal(HttpServerExchange exchange) throws Exception {
+        protected void handleInternal(final HttpServerExchange exchange) throws Exception {
             String ct = exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE);
             ContentType contentType = ContentType.parse(ct);
             if (contentType == null || contentType.getVersion() != 1 || !INVOCATION.getType().equals(contentType.getType())) {
@@ -465,7 +464,7 @@ final class ServerHandlers {
 
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
 
-        HttpCancelHandler(ExecutorService executorService, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
+        HttpCancelHandler(HttpServiceConfig config, ExecutorService executorService, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
             super(executorService);
             this.cancellationFlags = cancellationFlags;
         }
@@ -519,12 +518,12 @@ final class ServerHandlers {
         private final LocalTransactionContext localTransactionContext;
         private final HttpServiceConfig config;
 
-        HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext, HttpServiceConfig config) {
+        HttpSessionOpenHandler(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
             super(executorService);
+            this.config = config;
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
-            this.config = config;
         }
 
         @Override
@@ -689,8 +688,9 @@ final class ServerHandlers {
         private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
         private final HttpServiceConfig config;
 
-        public HttpDiscoveryHandler(ExecutorService executorService, Association association, HttpServiceConfig config) {
+        public HttpDiscoveryHandler(HttpServiceConfig config, ExecutorService executorService, Association association) {
             super(executorService);
+            this.config = config;
             association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {
                 @Override
                 public void moduleAvailable(List<EJBModuleIdentifier> modules) {
@@ -702,7 +702,6 @@ final class ServerHandlers {
                     availableModules.removeAll(modules);
                 }
             });
-            this.config = config;
         }
 
         @Override

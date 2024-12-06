@@ -40,12 +40,12 @@ public class HttpRemoteNamingService {
     private final ServerHandlers serverHandlers;
 
     public HttpRemoteNamingService(final Context localContext, final Function<String, Boolean> classResolverFilter) {
-        this (localContext, classResolverFilter, HttpServiceConfig.getInstance());
+        this (HttpServiceConfig.getInstance(), localContext, classResolverFilter);
     }
 
-    private HttpRemoteNamingService(final Context localContext, final Function<String, Boolean> classResolverFilter, final HttpServiceConfig config) {
+    private HttpRemoteNamingService(final HttpServiceConfig config, final Context localContext, final Function<String, Boolean> classResolverFilter) {
         this.config = config;
-        this.serverHandlers = ServerHandlers.newInstance(localContext, classResolverFilter, config);
+        this.serverHandlers = ServerHandlers.newInstance(config, localContext, classResolverFilter);
     }
 
     public HttpHandler createHandler() {
