@@ -27,6 +27,7 @@ import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.Constants.OPC_QUERY_PARAMETER;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
@@ -328,7 +329,7 @@ final class ServerHandlers {
 
         @Override
         protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
-            Deque<String> opc = exchange.getQueryParameters().get("opc");
+            Deque<String> opc = exchange.getQueryParameters().get(OPC_QUERY_PARAMETER);
             boolean onePhase = false;
             if (opc != null && !opc.isEmpty()) {
                 onePhase = parseBoolean(opc.poll());

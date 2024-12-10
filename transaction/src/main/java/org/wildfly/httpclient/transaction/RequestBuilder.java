@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static java.lang.Boolean.TRUE;
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static java.net.URLEncoder.encode;
@@ -26,6 +27,7 @@ import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.Constants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.Constants.OPC_QUERY_PARAMETER;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
@@ -110,7 +112,7 @@ final class RequestBuilder {
         appendPath(sb, VERSION_PATH + version, false);
         appendPath(sb, requestType.getPath(), false);
         if (requestType == XA_COMMIT) {
-            sb.append(onePhase != null && onePhase ? "?opc=true" : "");
+            sb.append(onePhase != null && onePhase ? "?" + OPC_QUERY_PARAMETER + "=" + TRUE : "");
         } else if (requestType == XA_RECOVER) {
             appendPath(sb, parentName, false);
         }
