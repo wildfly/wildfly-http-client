@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static io.undertow.util.Headers.GZIP;
+
 import io.undertow.conduits.GzipStreamSourceConduit;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.AllowedMethodsHandler;
@@ -26,7 +28,6 @@ import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 import io.undertow.server.handlers.encoding.RequestEncodingHandler;
-import io.undertow.util.Headers;
 import org.jboss.ejb.server.Association;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.transaction.client.LocalTransactionContext;
@@ -62,9 +63,9 @@ public class HttpRemoteEjbService {
             registerHandler(pathHandler, requestType);
         }
 
-        EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
+        EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
-        requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
+        requestEncodingHandler.addEncoding(GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
         return config.wrap(requestEncodingHandler);
     }
 
