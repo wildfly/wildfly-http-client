@@ -147,9 +147,9 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
-                result.complete(function != null ? function.apply(httpResponse) : null);
+                result.complete(function != null ? function.apply(response) : null);
             } finally {
                 IoUtils.safeClose(doneCallback);
             }
@@ -166,7 +166,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try (ByteInput in = byteInputOf(is)) {
                 Set<EJBModuleIdentifier> modules;
                 unmarshaller.start(in);
@@ -199,12 +199,12 @@ final class ClientHandlers {
             this.clientCtx = clientCtx;
         }
 
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             receiverCtx.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                 @Override
                 public Object getResult() throws Exception {
                     final CompletableFuture<InvocationInfo> result = new CompletableFuture<>();
-                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(is, httpResponse, doneCallback);
+                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(is, response, doneCallback);
 
                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
                     Set<String> returnedContextDataKeys = (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
@@ -245,7 +245,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 final Object returned = deserializeObject(unmarshaller);
@@ -262,15 +262,15 @@ final class ClientHandlers {
 
     private static final class CancelInvocationResponseFunction implements Function<ClientResponse, Boolean> {
         @Override
-        public Boolean apply(final ClientResponse clientResponse) {
+        public Boolean apply(final ClientResponse response) {
             return true;
         }
     }
 
     private static final class CreateSessionResponseFunction implements Function<ClientResponse, SessionID> {
         @Override
-        public SessionID apply(final ClientResponse clientResponse) {
-            final String sessionId = getResponseHeader(clientResponse, Constants.EJB_SESSION_ID);
+        public SessionID apply(final ClientResponse response) {
+            final String sessionId = getResponseHeader(response, Constants.EJB_SESSION_ID);
             if (sessionId != null) {
                 return SessionID.createSessionID(Base64.getUrlDecoder().decode(sessionId));
             }

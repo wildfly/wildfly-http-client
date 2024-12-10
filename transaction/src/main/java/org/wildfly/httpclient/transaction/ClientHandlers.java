@@ -94,9 +94,9 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
-                result.complete(function != null ? function.apply(httpResponse) : null);
+                result.complete(function != null ? function.apply(response) : null);
             } finally {
                 IoUtils.safeClose(doneCallback);
             }
@@ -113,7 +113,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid xid = deserializeXid(unmarshaller);
@@ -137,7 +137,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid[] ret = deserializeXidArray(unmarshaller);

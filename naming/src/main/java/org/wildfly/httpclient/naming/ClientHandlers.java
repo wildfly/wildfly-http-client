@@ -95,9 +95,9 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
-                result.complete(function != null ? function.apply(httpResponse) : null);
+                result.complete(function != null ? function.apply(response) : null);
             } finally {
                 safeClose(doneCallback);
             }
@@ -118,15 +118,15 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
                 namingProvider.performExceptionAction((a, b) -> {
                     ClassLoader old = setContextClassLoader(classLoader);
                     try {
-                        if (httpResponse.getResponseCode() == NO_CONTENT) {
-                            emptyHttpResultHandler(result, null).handleResult(is, httpResponse, doneCallback);
+                        if (response.getResponseCode() == NO_CONTENT) {
+                            emptyHttpResultHandler(result, null).handleResult(is, response, doneCallback);
                         } else {
-                            objectHttpResultHandler(unmarshaller, result).handleResult(is, httpResponse, doneCallback);
+                            objectHttpResultHandler(unmarshaller, result).handleResult(is, response, doneCallback);
                         }
                     } finally {
                         setContextClassLoader(old);
@@ -149,7 +149,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Object object = deserializeObject(unmarshaller);
