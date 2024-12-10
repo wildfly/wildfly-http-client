@@ -128,7 +128,7 @@ final class RequestBuilder {
             headers.put(RECOVERY_PARENT_NAME, parentName);
             headers.put(RECOVERY_FLAGS, Integer.toString(flags));
         } else {
-            headers.add(ACCEPT, EXCEPTION.toString());
+            headers.put(ACCEPT, EXCEPTION.toString());
             headers.put(CONTENT_TYPE, XID.toString());
         }
     }

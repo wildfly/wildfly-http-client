@@ -141,7 +141,7 @@ final class RequestBuilder {
         final HeaderMap headers = request.getRequestHeaders();
         switch (requestType) {
             case INVOKE: {
-                headers.add(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+                headers.put(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
                 headers.put(CONTENT_TYPE, INVOCATION.toString());
                 if (invocationId != null) {
                     headers.put(INVOCATION_ID, invocationId);
@@ -155,11 +155,11 @@ final class RequestBuilder {
                 headers.put(TRANSFER_ENCODING, CHUNKED.toString());
             } break;
             case CREATE_SESSION: {
-                headers.add(ACCEPT, EJB_EXCEPTION.toString());
+                headers.put(ACCEPT, EJB_EXCEPTION.toString());
                 headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
             } break;
             case DISCOVER: {
-                headers.add(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
+                headers.put(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
             } break;
             case CANCEL: {
                 // no headers to be added
