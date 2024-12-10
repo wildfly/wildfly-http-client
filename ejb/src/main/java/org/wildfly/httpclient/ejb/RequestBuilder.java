@@ -116,11 +116,11 @@ final class RequestBuilder {
     }
 
     ClientRequest createRequest(final String prefix) {
-        final ClientRequest clientRequest = new ClientRequest();
-        setRequestMethod(clientRequest);
-        setRequestPath(clientRequest, prefix);
-        setRequestHeaders(clientRequest);
-        return clientRequest;
+        final ClientRequest request = new ClientRequest();
+        setRequestMethod(request);
+        setRequestPath(request, prefix);
+        setRequestHeaders(request);
+        return request;
     }
 
     private void setRequestMethod(final ClientRequest request) {

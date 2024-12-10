@@ -252,7 +252,7 @@ public class HttpRootContext extends AbstractContext {
         }, environment, context, name, object);
     }
 
-    private Object performOperation(Name name, URI providerUri, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
+    private Object performOperation(Name name, URI providerUri, HttpTargetContext targetContext, ClientRequest request) throws NamingException {
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
         AuthenticationContextConfigurationClient client = CLIENT;
@@ -269,10 +269,10 @@ public class HttpRootContext extends AbstractContext {
 
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(clientRequest);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(objectResolver, result);
         if (unmarshaller != null) {
-            targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration, null,
+            targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
                     optionalObjectHttpResultHandler(unmarshaller, result, httpNamingProvider, getContextClassLoader()),
                     result::completeExceptionally, VALUE, null, true);
         }
@@ -303,7 +303,7 @@ public class HttpRootContext extends AbstractContext {
         return environment.getProviderUris().size() > 1;
     }
 
-    private void performOperation(URI providerUri, Object object, HttpTargetContext targetContext, ClientRequest clientRequest) throws NamingException {
+    private void performOperation(URI providerUri, Object object, HttpTargetContext targetContext, ClientRequest request) throws NamingException {
         final ProviderEnvironment providerEnvironment = httpNamingProvider.getProviderEnvironment();
         final AuthenticationContext context = providerEnvironment.getAuthenticationContextSupplier().get();
         AuthenticationContextConfigurationClient client = CLIENT;
@@ -320,10 +320,10 @@ public class HttpRootContext extends AbstractContext {
 
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(clientRequest);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
         final Marshaller marshaller = marshallerFactory.createMarshaller(objectResolver, result);
         if (marshaller != null) {
-            targetContext.sendRequest(clientRequest, sslContext, authenticationConfiguration,
+            targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                     object != null ? objectHttpMarshaller(marshaller, object) : null, emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
         }
         try {

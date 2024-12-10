@@ -144,9 +144,9 @@ public class HttpTargetContext extends AbstractAttachable {
 
 
     private void acquireSessionAffinity(CountDownLatch latch, AuthenticationConfiguration authenticationConfiguration) {
-        ClientRequest clientRequest = new ClientRequest();
-        clientRequest.setMethod(Methods.GET);
-        clientRequest.setPath(uri.getPath() + "/common/v1/affinity");
+        ClientRequest request = new ClientRequest();
+        request.setMethod(Methods.GET);
+        request.setPath(uri.getPath() + "/common/v1/affinity");
         AuthenticationContext context = AuthenticationContext.captureCurrent();
         SSLContext sslContext;
         try {
@@ -156,7 +156,7 @@ public class HttpTargetContext extends AbstractAttachable {
             HttpClientMessages.MESSAGES.failedToAcquireSession(e);
             return;
         }
-        sendRequest(clientRequest, sslContext, authenticationConfiguration, null, null, (e) -> {
+        sendRequest(request, sslContext, authenticationConfiguration, null, null, (e) -> {
             latch.countDown();
             HttpClientMessages.MESSAGES.failedToAcquireSession(e);
         }, null, latch::countDown);
@@ -439,8 +439,8 @@ public class HttpTargetContext extends AbstractAttachable {
         return attachments;
     }
 
-    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest clientRequest) {
-        return this.httpMarshallerFactoryProvider.getMarshallerFactory(clientRequest);
+    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest request) {
+        return this.httpMarshallerFactoryProvider.getMarshallerFactory(request);
     }
 
     public HttpConnectionPool getConnectionPool() {
