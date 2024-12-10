@@ -266,7 +266,7 @@ class PoolAuthenticationContext {
                 sb.append(", response=\"");
                 sb.append(HexConverter.convertToHexString(digest.digest()));
                 sb.append("\"");
-                putRequestHeader(request, AUTHORIZATION, sb.toString());
+                putRequestHeader(request, AUTHORIZATION, sb);
                 return true;
             } catch (NoSuchAlgorithmException e) {
                 throw new RuntimeException(e);

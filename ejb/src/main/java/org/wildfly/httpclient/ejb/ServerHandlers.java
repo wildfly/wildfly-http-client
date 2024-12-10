@@ -418,7 +418,7 @@ final class ServerHandlers {
                     cancellationFlags.remove(identifier);
                 }
                 try {
-                    putResponseHeader(exchange, CONTENT_TYPE, Constants.EJB_RESPONSE.toString());
+                    putResponseHeader(exchange, CONTENT_TYPE, Constants.EJB_RESPONSE);
     //                                    if (output.getSessionAffinity() != null) {
     //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
     //                                    }
@@ -673,7 +673,7 @@ final class ServerHandlers {
                             exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
                         }
 
-                        putResponseHeader(exchange, CONTENT_TYPE, EJB_RESPONSE_NEW_SESSION.toString());
+                        putResponseHeader(exchange, CONTENT_TYPE, EJB_RESPONSE_NEW_SESSION);
                         putResponseHeader(exchange, EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
 
                         exchange.setStatusCode(NO_CONTENT);
@@ -711,7 +711,7 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
-            putResponseHeader(exchange, CONTENT_TYPE, EJB_DISCOVERY_RESPONSE.toString());
+            putResponseHeader(exchange, CONTENT_TYPE, EJB_DISCOVERY_RESPONSE);
             byte[] data;
             final ByteArrayOutputStream out = new ByteArrayOutputStream();
             Marshaller marshaller = config.getHttpMarshallerFactory(exchange)

@@ -194,7 +194,7 @@ public class HttpTargetContext extends AbstractAttachable {
                 : authenticationConfiguration;
 
             if (containsRequestHeader(request, CONTENT_TYPE)) {
-                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED.toString());
+                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED);
             }
             final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
             connection.sendRequest(request, new ClientCallback<ClientExchange>() {

@@ -141,21 +141,21 @@ final class RequestBuilder {
         switch (requestType) {
             case INVOKE: {
                 putRequestHeader(request, ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
-                putRequestHeader(request, CONTENT_TYPE, INVOCATION.toString());
+                putRequestHeader(request, CONTENT_TYPE, INVOCATION);
                 if (invocationId != null) {
                     putRequestHeader(request, INVOCATION_ID, invocationId);
                 }
                 if (compressRequest) {
-                    putRequestHeader(request, CONTENT_ENCODING, GZIP.toString());
+                    putRequestHeader(request, CONTENT_ENCODING, GZIP);
                 }
                 if (compressResponse) {
-                    putRequestHeader(request, ACCEPT_ENCODING, GZIP.toString());
+                    putRequestHeader(request, ACCEPT_ENCODING, GZIP);
                 }
-                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED.toString());
+                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED);
             } break;
             case CREATE_SESSION: {
-                putRequestHeader(request, ACCEPT, EJB_EXCEPTION.toString());
-                putRequestHeader(request, CONTENT_TYPE, SESSION_OPEN.toString());
+                putRequestHeader(request, ACCEPT, EJB_EXCEPTION);
+                putRequestHeader(request, CONTENT_TYPE, SESSION_OPEN);
             } break;
             case DISCOVER: {
                 putRequestHeader(request, ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);

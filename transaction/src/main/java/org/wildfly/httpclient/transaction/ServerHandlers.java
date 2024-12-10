@@ -191,7 +191,7 @@ final class ServerHandlers {
             try {
                 final String timeoutString = getRequestHeader(exchange, TIMEOUT);
                 final Integer timeout = Integer.parseInt(timeoutString);
-                putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION.toString());
+                putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION);
                 final LocalTransaction transaction = ctx.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
 

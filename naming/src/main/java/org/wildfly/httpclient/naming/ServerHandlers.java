@@ -136,7 +136,7 @@ final class ServerHandlers {
                 } else if (result instanceof Context) {
                     exchange.setStatusCode(NO_CONTENT);
                 } else {
-                    putResponseHeader(exchange, CONTENT_TYPE, VALUE.toString());
+                    putResponseHeader(exchange, CONTENT_TYPE, VALUE);
                     HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
                     ByteOutput out = byteOutputOf(exchange.getOutputStream());

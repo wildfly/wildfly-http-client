@@ -108,7 +108,7 @@ final class RequestBuilder {
     private void setRequestHeaders(final ClientRequest request) {
         putRequestHeader(request, ACCEPT, VALUE + "," + EXCEPTION);
         if (object != null) {
-            putRequestHeader(request, CONTENT_TYPE, VALUE.toString());
+            putRequestHeader(request, CONTENT_TYPE, VALUE);
         }
     }
 

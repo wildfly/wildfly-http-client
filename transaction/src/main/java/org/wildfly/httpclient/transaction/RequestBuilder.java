@@ -125,10 +125,10 @@ final class RequestBuilder {
         } else if (requestType == XA_RECOVER) {
             putRequestHeader(request, ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
             putRequestHeader(request, RECOVERY_PARENT_NAME, parentName);
-            putRequestHeader(request, RECOVERY_FLAGS, Integer.toString(flags));
+            putRequestHeader(request, RECOVERY_FLAGS, flags);
         } else {
-            putRequestHeader(request, ACCEPT, EXCEPTION.toString());
-            putRequestHeader(request, CONTENT_TYPE, XID.toString());
+            putRequestHeader(request, ACCEPT, EXCEPTION);
+            putRequestHeader(request, CONTENT_TYPE, XID);
         }
     }
 
