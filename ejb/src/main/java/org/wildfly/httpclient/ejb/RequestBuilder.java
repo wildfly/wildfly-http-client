@@ -26,6 +26,7 @@ import static io.undertow.util.Headers.CHUNKED;
 import static io.undertow.util.Headers.GZIP;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
 
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.ejb.Constants.EJB_CONTEXT;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
@@ -39,7 +40,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.net.URLEncoder.encode;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.util.HeaderMap;
 import org.jboss.ejb.client.EJBLocator;
 import org.wildfly.httpclient.common.Protocol;
 
@@ -138,28 +138,27 @@ final class RequestBuilder {
     }
 
     private void setRequestHeaders(final ClientRequest request) {
-        final HeaderMap headers = request.getRequestHeaders();
         switch (requestType) {
             case INVOKE: {
-                headers.put(ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
-                headers.put(CONTENT_TYPE, INVOCATION.toString());
+                putRequestHeader(request, ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
+                putRequestHeader(request, CONTENT_TYPE, INVOCATION.toString());
                 if (invocationId != null) {
-                    headers.put(INVOCATION_ID, invocationId);
+                    putRequestHeader(request, INVOCATION_ID, invocationId);
                 }
                 if (compressRequest) {
-                    headers.put(CONTENT_ENCODING, GZIP.toString());
+                    putRequestHeader(request, CONTENT_ENCODING, GZIP.toString());
                 }
                 if (compressResponse) {
-                    headers.put(ACCEPT_ENCODING, GZIP.toString());
+                    putRequestHeader(request, ACCEPT_ENCODING, GZIP.toString());
                 }
-                headers.put(TRANSFER_ENCODING, CHUNKED.toString());
+                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED.toString());
             } break;
             case CREATE_SESSION: {
-                headers.put(ACCEPT, EJB_EXCEPTION.toString());
-                headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
+                putRequestHeader(request, ACCEPT, EJB_EXCEPTION.toString());
+                putRequestHeader(request, CONTENT_TYPE, SESSION_OPEN.toString());
             } break;
             case DISCOVER: {
-                headers.put(ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
+                putRequestHeader(request, ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
             } break;
             case CANCEL: {
                 // no headers to be added

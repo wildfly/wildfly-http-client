@@ -22,6 +22,7 @@ import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.Constants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
@@ -36,7 +37,6 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.util.HeaderMap;
 import org.wildfly.httpclient.common.Protocol;
 
 /**
@@ -119,17 +119,16 @@ final class RequestBuilder {
 
 
     private void setRequestHeaders(final ClientRequest request) {
-        final HeaderMap headers = request.getRequestHeaders();
         if (requestType == UT_BEGIN) {
-            headers.put(ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
-            headers.put(TIMEOUT, timeout);
+            putRequestHeader(request, ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
+            putRequestHeader(request, TIMEOUT, timeout);
         } else if (requestType == XA_RECOVER) {
-            headers.put(ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
-            headers.put(RECOVERY_PARENT_NAME, parentName);
-            headers.put(RECOVERY_FLAGS, Integer.toString(flags));
+            putRequestHeader(request, ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
+            putRequestHeader(request, RECOVERY_PARENT_NAME, parentName);
+            putRequestHeader(request, RECOVERY_FLAGS, Integer.toString(flags));
         } else {
-            headers.put(ACCEPT, EXCEPTION.toString());
-            headers.put(CONTENT_TYPE, XID.toString());
+            putRequestHeader(request, ACCEPT, EXCEPTION.toString());
+            putRequestHeader(request, CONTENT_TYPE, XID.toString());
         }
     }
 

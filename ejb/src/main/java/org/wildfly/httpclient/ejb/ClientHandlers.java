@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
@@ -269,7 +270,7 @@ final class ClientHandlers {
     private static final class CreateSessionResponseFunction implements Function<ClientResponse, SessionID> {
         @Override
         public SessionID apply(final ClientResponse clientResponse) {
-            final String sessionId = clientResponse.getResponseHeaders().getFirst(Constants.EJB_SESSION_ID);
+            final String sessionId = getResponseHeader(clientResponse, Constants.EJB_SESSION_ID);
             if (sessionId != null) {
                 return SessionID.createSessionID(Base64.getUrlDecoder().decode(sessionId));
             }

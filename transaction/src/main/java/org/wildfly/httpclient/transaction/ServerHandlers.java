@@ -22,6 +22,8 @@ import static io.undertow.util.StatusCodes.BAD_REQUEST;
 import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
@@ -133,7 +135,7 @@ final class ServerHandlers {
 
         @Override
         protected boolean isValidRequest(final HttpServerExchange exchange) {
-            final ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(CONTENT_TYPE));
+            final ContentType contentType = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
             if (contentType == null || contentType.getVersion() != 1 || !contentType.getType().equals(XID.getType())) {
                 exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s has incorrect or missing content type", exchange);
@@ -175,7 +177,7 @@ final class ServerHandlers {
 
         @Override
         protected boolean isValidRequest(final HttpServerExchange exchange) {
-            final String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
+            final String timeoutString = getRequestHeader(exchange, TIMEOUT);
             if (timeoutString == null) {
                 exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TIMEOUT);
@@ -187,9 +189,9 @@ final class ServerHandlers {
         @Override
         protected void processRequest(final HttpServerExchange exchange) {
             try {
-                final String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
+                final String timeoutString = getRequestHeader(exchange, TIMEOUT);
                 final Integer timeout = Integer.parseInt(timeoutString);
-                exchange.getResponseHeaders().put(CONTENT_TYPE, NEW_TRANSACTION.toString());
+                putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION.toString());
                 final LocalTransaction transaction = ctx.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
 
@@ -214,13 +216,13 @@ final class ServerHandlers {
 
         @Override
         protected boolean isValidRequest(final HttpServerExchange exchange) {
-            String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
+            String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
             if (flagsStringString == null) {
                 exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_FLAGS);
                 return false;
             }
-            String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
+            String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
             if (parentName == null) {
                 exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_PARENT_NAME);
@@ -232,9 +234,9 @@ final class ServerHandlers {
         @Override
         protected void processRequest(final HttpServerExchange exchange) {
             try {
-                final String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
+                final String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
                 final int flags = Integer.parseInt(flagsStringString);
-                final String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
+                final String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
                 final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
 
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();

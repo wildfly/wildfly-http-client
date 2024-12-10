@@ -24,6 +24,8 @@ import static io.undertow.util.StatusCodes.NO_CONTENT;
 import static io.undertow.util.StatusCodes.NOT_FOUND;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.Constants.EJB_RESPONSE_NEW_SESSION;
@@ -159,7 +161,7 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(final HttpServerExchange exchange) throws Exception {
-            String ct = exchange.getRequestHeaders().getFirst(CONTENT_TYPE);
+            String ct = getRequestHeader(exchange, CONTENT_TYPE);
             ContentType contentType = ContentType.parse(ct);
             if (contentType == null || contentType.getVersion() != 1 || !INVOCATION.getType().equals(contentType.getType())) {
                 exchange.setStatusCode(BAD_REQUEST);
@@ -192,7 +194,7 @@ final class ServerHandlers {
             final String sessionAffinity = cookie != null ? cookie.getValue() : null;
             final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
 
-            final String cancellationId = exchange.getRequestHeaders().getFirst(Constants.INVOCATION_ID);
+            final String cancellationId = getRequestHeader(exchange, Constants.INVOCATION_ID);
             final InvocationIdentifier identifier;
             if(cancellationId != null && sessionAffinity != null) {
                 identifier = new InvocationIdentifier(cancellationId, sessionAffinity);
@@ -416,7 +418,7 @@ final class ServerHandlers {
                     cancellationFlags.remove(identifier);
                 }
                 try {
-                    exchange.getResponseHeaders().put(CONTENT_TYPE, Constants.EJB_RESPONSE.toString());
+                    putResponseHeader(exchange, CONTENT_TYPE, Constants.EJB_RESPONSE.toString());
     //                                    if (output.getSessionAffinity() != null) {
     //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
     //                                    }
@@ -474,7 +476,7 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
-            String ct = exchange.getRequestHeaders().getFirst(CONTENT_TYPE);
+            String ct = getRequestHeader(exchange, CONTENT_TYPE);
             ContentType contentType = ContentType.parse(ct);
             if (contentType != null) {
                 exchange.setStatusCode(BAD_REQUEST);
@@ -531,7 +533,7 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
-            String ct = exchange.getRequestHeaders().getFirst(CONTENT_TYPE);
+            String ct = getRequestHeader(exchange, CONTENT_TYPE);
             ContentType contentType = ContentType.parse(ct);
             if (contentType == null || contentType.getVersion() != 1 || !SESSION_OPEN.getType().equals(contentType.getType())) {
                 exchange.setStatusCode(BAD_REQUEST);
@@ -671,8 +673,8 @@ final class ServerHandlers {
                             exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
                         }
 
-                        exchange.getResponseHeaders().put(CONTENT_TYPE, EJB_RESPONSE_NEW_SESSION.toString());
-                        exchange.getResponseHeaders().put(EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
+                        putResponseHeader(exchange, CONTENT_TYPE, EJB_RESPONSE_NEW_SESSION.toString());
+                        putResponseHeader(exchange, EJB_SESSION_ID, Base64.getUrlEncoder().encodeToString(sessionId.getEncodedForm()));
 
                         exchange.setStatusCode(NO_CONTENT);
                         exchange.endExchange();
@@ -709,7 +711,7 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
-            exchange.getResponseHeaders().put(CONTENT_TYPE, EJB_DISCOVERY_RESPONSE.toString());
+            putResponseHeader(exchange, CONTENT_TYPE, EJB_DISCOVERY_RESPONSE.toString());
             byte[] data;
             final ByteArrayOutputStream out = new ByteArrayOutputStream();
             Marshaller marshaller = config.getHttpMarshallerFactory(exchange)

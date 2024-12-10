@@ -25,6 +25,8 @@ import static io.undertow.util.StatusCodes.OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
@@ -134,7 +136,7 @@ final class ServerHandlers {
                 } else if (result instanceof Context) {
                     exchange.setStatusCode(NO_CONTENT);
                 } else {
-                    exchange.getResponseHeaders().put(CONTENT_TYPE, VALUE.toString());
+                    putResponseHeader(exchange, CONTENT_TYPE, VALUE.toString());
                     HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
                     ByteOutput out = byteOutputOf(exchange.getOutputStream());
@@ -283,7 +285,7 @@ final class ServerHandlers {
 
         @Override
         protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
-            ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(CONTENT_TYPE));
+            ContentType contentType = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
             if (contentType == null || !contentType.getType().equals(VALUE.getType()) || contentType.getVersion() != 1) {
                 exchange.setStatusCode(BAD_REQUEST);
                 exchange.endExchange();

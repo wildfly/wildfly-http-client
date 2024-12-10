@@ -19,6 +19,7 @@
 package org.wildfly.httpclient.ejb;
 
 import static io.undertow.util.Headers.SET_COOKIE;
+import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
@@ -46,7 +47,7 @@ public class AsyncInvocationTestCase {
 
     @Before
     public void before() {
-        EJBTestServer.registerServicesHandler("common/v1/affinity", httpServerExchange -> httpServerExchange.getResponseHeaders().put(SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
+        EJBTestServer.registerServicesHandler("common/v1/affinity", exchange -> putResponseHeader(exchange, SET_COOKIE, "JSESSIONID=" + EJBTestServer.INITIAL_SESSION_AFFINITY));
     }
 
     @Test

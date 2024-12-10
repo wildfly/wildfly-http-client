@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
 import static org.wildfly.httpclient.transaction.Constants.READ_ONLY;
@@ -89,7 +90,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     @Override
     public int prepare() throws XAException {
         boolean readOnly = processOperation(XA_PREPARE, (result) -> {
-            String header = result.getResponseHeaders().getFirst(READ_ONLY);
+            String header = getResponseHeader(result, READ_ONLY);
             return header != null && Boolean.parseBoolean(header);
         }, null);
         return readOnly ? XAResource.XA_RDONLY : XAResource.XA_OK;

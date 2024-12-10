@@ -22,13 +22,13 @@ import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.naming.Constants.EXCEPTION;
 import static org.wildfly.httpclient.naming.Constants.NAMING_CONTEXT;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.util.HeaderMap;
 import org.wildfly.httpclient.common.Protocol;
 
 import javax.naming.Name;
@@ -106,10 +106,9 @@ final class RequestBuilder {
     }
 
     private void setRequestHeaders(final ClientRequest request) {
-        final HeaderMap headers = request.getRequestHeaders();
-        headers.put(ACCEPT, VALUE + "," + EXCEPTION);
+        putRequestHeader(request, ACCEPT, VALUE + "," + EXCEPTION);
         if (object != null) {
-            headers.put(CONTENT_TYPE, VALUE.toString());
+            putRequestHeader(request, CONTENT_TYPE, VALUE.toString());
         }
     }
 
