@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static java.lang.Boolean.TRUE;
+import static java.lang.Boolean.parseBoolean;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
@@ -69,7 +71,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void commit(boolean onePhase) throws XAException {
-        processOperation(XA_COMMIT, null, onePhase ? Boolean.TRUE : null);
+        processOperation(XA_COMMIT, null, onePhase ? TRUE : null);
     }
 
     @Override
@@ -91,7 +93,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     public int prepare() throws XAException {
         boolean readOnly = processOperation(XA_PREPARE, (result) -> {
             String header = getResponseHeader(result, READ_ONLY);
-            return header != null && Boolean.parseBoolean(header);
+            return parseBoolean(header);
         }, null);
         return readOnly ? XAResource.XA_RDONLY : XAResource.XA_OK;
     }

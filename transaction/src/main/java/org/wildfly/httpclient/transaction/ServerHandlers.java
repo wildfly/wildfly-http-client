@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.transaction;
 
+import static java.lang.Boolean.parseBoolean;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static io.undertow.util.StatusCodes.BAD_REQUEST;
 import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
@@ -330,7 +331,7 @@ final class ServerHandlers {
             Deque<String> opc = exchange.getQueryParameters().get("opc");
             boolean onePhase = false;
             if (opc != null && !opc.isEmpty()) {
-                onePhase = Boolean.parseBoolean(opc.poll());
+                onePhase = parseBoolean(opc.poll());
             }
             transaction.getControl().commit(onePhase);
         }
