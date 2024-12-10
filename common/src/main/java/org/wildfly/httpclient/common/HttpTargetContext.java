@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.common;
 
+import static io.undertow.util.StatusCodes.NO_CONTENT;
 import static io.undertow.util.Headers.CHUNKED;
 import static io.undertow.util.Headers.COOKIE;
 import static io.undertow.util.Headers.CONTENT_ENCODING;
@@ -44,7 +45,6 @@ import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Methods;
-import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
@@ -237,7 +237,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                 final boolean ok;
                                 final boolean isException;
                                 if (type == null) {
-                                    ok = expectedResponse == null || (allowNoContent && response.getResponseCode() == StatusCodes.NO_CONTENT);
+                                    ok = expectedResponse == null || (allowNoContent && response.getResponseCode() == NO_CONTENT);
                                     isException = false;
                                 } else {
                                     if (type.getType().equals(EXCEPTION_TYPE)) {
@@ -310,7 +310,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 }
                                                 connection.done(false);
                                             };
-                                            if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
+                                            if (response.getResponseCode() == NO_CONTENT) {
                                                 IoUtils.safeClose(in);
                                                 httpResultHandler.handleResult(null, response, doneCallback);
                                             } else {

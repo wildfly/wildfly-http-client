@@ -18,6 +18,8 @@
 package org.wildfly.httpclient.transaction;
 
 import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.StatusCodes.BAD_REQUEST;
+import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
@@ -32,7 +34,6 @@ import static org.wildfly.httpclient.transaction.Serializer.serializeXidArray;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
-import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
@@ -134,7 +135,7 @@ final class ServerHandlers {
         protected boolean isValidRequest(final HttpServerExchange exchange) {
             final ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(CONTENT_TYPE));
             if (contentType == null || contentType.getVersion() != 1 || !contentType.getType().equals(XID.getType())) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s has incorrect or missing content type", exchange);
                 return false;
             }
@@ -160,7 +161,7 @@ final class ServerHandlers {
                     return null;
                 }, transaction, exchange);
             } catch (Exception e) {
-                sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -176,7 +177,7 @@ final class ServerHandlers {
         protected boolean isValidRequest(final HttpServerExchange exchange) {
             final String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
             if (timeoutString == null) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TIMEOUT);
                 return false;
             }
@@ -201,7 +202,7 @@ final class ServerHandlers {
                 }
                 exchange.getResponseSender().send(ByteBuffer.wrap(baos.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
             }
         }
     }
@@ -215,13 +216,13 @@ final class ServerHandlers {
         protected boolean isValidRequest(final HttpServerExchange exchange) {
             String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
             if (flagsStringString == null) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_FLAGS);
                 return false;
             }
             String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
             if (parentName == null) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_PARENT_NAME);
                 return false;
             }
@@ -246,7 +247,7 @@ final class ServerHandlers {
                 }
                 exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
             }
         }
     }

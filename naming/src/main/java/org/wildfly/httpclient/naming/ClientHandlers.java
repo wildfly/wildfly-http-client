@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.naming;
 
+import static io.undertow.util.StatusCodes.NO_CONTENT;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
@@ -25,7 +26,6 @@ import static org.wildfly.httpclient.naming.ClassLoaderUtils.setContextClassLoad
 import static org.xnio.IoUtils.safeClose;
 
 import io.undertow.client.ClientResponse;
-import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
@@ -123,7 +123,7 @@ final class ClientHandlers {
                 namingProvider.performExceptionAction((a, b) -> {
                     ClassLoader old = setContextClassLoader(classLoader);
                     try {
-                        if (httpResponse.getResponseCode() == StatusCodes.NO_CONTENT) {
+                        if (httpResponse.getResponseCode() == NO_CONTENT) {
                             emptyHttpResultHandler(result, null).handleResult(is, httpResponse, doneCallback);
                         } else {
                             objectHttpResultHandler(unmarshaller, result).handleResult(is, httpResponse, doneCallback);
