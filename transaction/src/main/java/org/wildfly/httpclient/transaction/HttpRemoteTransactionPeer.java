@@ -22,7 +22,6 @@ import static java.security.AccessController.doPrivileged;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidArrayHttpResultHandler;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpResultHandler;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
-import static org.wildfly.httpclient.transaction.Utils.newUnmarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Unmarshaller;
@@ -91,7 +90,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         final CompletableFuture<Xid[]> result = new CompletableFuture<>();
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
-        final Unmarshaller unmarshaller = newUnmarshaller(marshallerFactory, result);
+        final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
                     xidArrayHttpResultHandler(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
@@ -126,7 +125,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
         final CompletableFuture<Xid> result = new CompletableFuture<>();
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
-        final Unmarshaller unmarshaller = newUnmarshaller(marshallerFactory, result);
+        final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
                     xidHttpResultHandler(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
