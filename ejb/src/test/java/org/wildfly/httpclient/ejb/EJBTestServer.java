@@ -19,7 +19,6 @@
 package org.wildfly.httpclient.ejb;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -68,13 +67,13 @@ public class EJBTestServer extends HTTPTestServer {
 
     @Override
     protected void registerPaths(PathHandler servicesHandler) {
-        servicesHandler.addPrefixPath("/ejb", new EjbHttpService(new Association() {
+        servicesHandler.addPrefixPath("/ejb", new HttpRemoteEjbService(new Association() {
             @Override
             public <T> CancelHandle receiveInvocationRequest(@NotNull InvocationRequest invocationRequest) {
                 TestCancelHandle handle = new TestCancelHandle();
                 try {
                     InvocationRequest.Resolved request = invocationRequest.getRequestContent(getClass().getClassLoader());
-                    HttpInvocationHandler.ResolvedInvocation resolvedInvocation = (HttpInvocationHandler.ResolvedInvocation) request;
+                    ServerHandlers.HttpInvocationHandler.ResolvedInvocation resolvedInvocation = (ServerHandlers.HttpInvocationHandler.ResolvedInvocation) request;
                     TestEjbOutput out = new TestEjbOutput();
                     getWorker().execute(() -> {
                         try {

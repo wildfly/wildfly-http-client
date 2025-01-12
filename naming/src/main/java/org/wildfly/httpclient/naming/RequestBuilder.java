@@ -23,9 +23,9 @@ import static io.undertow.util.Headers.CONTENT_TYPE;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
-import static org.wildfly.httpclient.naming.NamingConstants.EXCEPTION;
-import static org.wildfly.httpclient.naming.NamingConstants.NAMING_CONTEXT;
-import static org.wildfly.httpclient.naming.NamingConstants.VALUE;
+import static org.wildfly.httpclient.naming.Constants.EXCEPTION;
+import static org.wildfly.httpclient.naming.Constants.NAMING_CONTEXT;
+import static org.wildfly.httpclient.naming.Constants.VALUE;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.util.HeaderMap;

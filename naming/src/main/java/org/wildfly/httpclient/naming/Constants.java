@@ -23,7 +23,7 @@ import org.wildfly.httpclient.common.ContentType;
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class NamingConstants {
+final class Constants {
 
     // request headers
     static final ContentType VALUE = new ContentType("application/x-wf-jndi-jbmar-value", 1);
@@ -31,18 +31,6 @@ final class NamingConstants {
 
     // context path
     static final String NAMING_CONTEXT = "/naming";
-
-    // paths
-    static final String BIND_PATH = "/bind";
-    static final String CREATE_SUBCONTEXT_PATH = "/create-subcontext";
-    static final String DESTROY_SUBCONTEXT_PATH = "/dest-subctx";
-    static final String LIST_PATH = "/list";
-    static final String LIST_BINDINGS_PATH = "/list-bindings";
-    static final String LOOKUP_PATH = "/lookup";
-    static final String LOOKUP_LINK_PATH = "/lookuplink";
-    static final String REBIND_PATH = "/rebind";
-    static final String RENAME_PATH = "/rename";
-    static final String UNBIND_PATH = "/unbind";
 
     // params
     static final String NAME_PATH_PARAMETER = "name";
@@ -57,7 +45,7 @@ final class NamingConstants {
     static final int HTTP_PORT = 80;
     static final int HTTPS_PORT = 443;
 
-    private NamingConstants() {
+    private Constants() {
         // forbidden instantiation
     }
 

@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.common;
 
+import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
+
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import org.jboss.marshalling.ByteOutput;
@@ -38,7 +40,7 @@ public class HttpServerHelper {
     public static void sendException(HttpServerExchange exchange, HttpServiceConfig serviceConfig, int status, Throwable e) {
         try {
             exchange.setStatusCode(status);
-            exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
+            putResponseHeader(exchange, Headers.CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
             final Marshaller marshaller = serviceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
             OutputStream outputStream = exchange.getOutputStream();
             final ByteOutput byteOutput = Marshalling.createByteOutput(outputStream);

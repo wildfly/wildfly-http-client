@@ -26,12 +26,14 @@ import static io.undertow.util.Headers.CHUNKED;
 import static io.undertow.util.Headers.GZIP;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
 
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_DISCOVERY_RESPONSE;
-import static org.wildfly.httpclient.ejb.EjbConstants.EJB_EXCEPTION;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ACCEPT;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION_ID;
-import static org.wildfly.httpclient.ejb.EjbConstants.INVOCATION;
-import static org.wildfly.httpclient.ejb.EjbConstants.SESSION_OPEN;
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
+import static org.wildfly.httpclient.ejb.Constants.EJB_CONTEXT;
+import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
+import static org.wildfly.httpclient.ejb.Constants.EJB_EXCEPTION;
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION_ACCEPT;
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION_ID;
+import static org.wildfly.httpclient.ejb.Constants.INVOCATION;
+import static org.wildfly.httpclient.ejb.Constants.SESSION_OPEN;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.net.URLEncoder.encode;
@@ -128,7 +130,7 @@ final class RequestBuilder {
     private void setRequestPath(final ClientRequest request, final String prefix) {
         switch (requestType) {
             case INVOKE: request.setPath(getStartEjbInvocationRequestPath(prefix)); break;
-            case OPEN: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
+            case CREATE_SESSION: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
             case DISCOVER: request.setPath(getDiscoverEjbRequestPath(prefix)); break;
             case CANCEL: request.setPath(getCancelEjbInvocationRequestPath(prefix)); break;
             default: throw new IllegalStateException();
@@ -152,7 +154,7 @@ final class RequestBuilder {
                 }
                 headers.put(TRANSFER_ENCODING, CHUNKED.toString());
             } break;
-            case OPEN: {
+            case CREATE_SESSION: {
                 headers.add(ACCEPT, EJB_EXCEPTION.toString());
                 headers.put(CONTENT_TYPE, SESSION_OPEN.toString());
             } break;
@@ -212,13 +214,16 @@ final class RequestBuilder {
         if (prefix != null) {
             sb.append(prefix);
         }
-        appendPath(sb, "ejb", false);
-        appendPath(sb, "v" + version, false);
+        appendPath(sb, EJB_CONTEXT, false);
+        appendPath(sb, VERSION_PATH + version, false);
         appendPath(sb, requestType.getPath(), false);
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
-        sb.append("/").append(path == null || path.isEmpty() ? "-" : encode ? encode(path, UTF_8) : path);
+        if (path == null || !path.startsWith("/")) {
+            sb.append("/");
+        }
+        sb.append(path == null || path.isEmpty() ? "-" : encode ? encode(path, UTF_8) : path);
     }
 
 }
