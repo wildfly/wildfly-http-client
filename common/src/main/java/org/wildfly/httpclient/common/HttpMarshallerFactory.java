@@ -30,6 +30,7 @@ import org.jboss.marshalling.river.RiverMarshallerFactory;
 import org.wildfly.common.annotation.NotNull;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Creates {@link Marshaller} objects for reading and writing requests and responses objects as bytes.
@@ -122,6 +123,72 @@ public final class HttpMarshallerFactory {
         marshallingConfiguration.setClassResolver(resolver);
         marshallingConfiguration.setObjectTable(table);
         return RIVER_MARSHALLER_FACTORY.createMarshaller(marshallingConfiguration);
+    }
+
+    /**
+     * Creates a {@code Marshaller} configured with an optional object resolver.
+     *
+     * @param resolver responsible for substituting objects when marshalling. This parameter can be <code>null</code>.
+     * @param failureHandler to store exception if an I/O error occurs during marshaller creation
+     * @return the marshaller or <code>null</code> if exception have been stored in failureHandler
+     */
+    public <T> Marshaller createMarshaller(final ObjectResolver resolver, @NotNull final CompletableFuture<T> failureHandler) {
+        Marshaller marshaller = null;
+        try {
+            marshaller = resolver != null ? createMarshaller(resolver) : createMarshaller();
+        } catch (Exception e) {
+            failureHandler.completeExceptionally(e);
+        }
+        return marshaller;
+    }
+
+    /**
+     * Creates a {@code Unmarshaller} configured with an optional object resolver.
+     *
+     * @param resolver responsible for substituting objects when unmarshalling. This parameter can be <code>null</code>.
+     * @param failureHandler to store exception if an I/O error occurs during marshaller creation
+     * @return the unmarshaller or <code>null</code> if exception have been stored in failureHandler
+     */
+    public <T> Unmarshaller createUnmarshaller(final ObjectResolver resolver, @NotNull final CompletableFuture<T> failureHandler) {
+        Unmarshaller unmarshaller = null;
+        try {
+            unmarshaller = resolver != null ? createUnmarshaller(resolver) : createUnmarshaller();
+        } catch (Exception e) {
+            failureHandler.completeExceptionally(e);
+        }
+        return unmarshaller;
+    }
+
+    /**
+     * Creates a simple {@code Marshaller}.
+     *
+     * @param failureHandler to store exception if an I/O error occurs during marshaller creation
+     * @return the marshaller or <code>null</code> if exception have been stored in failureHandler
+     */
+    public <T> Marshaller createMarshaller(@NotNull final CompletableFuture<T> failureHandler) {
+        Marshaller marshaller = null;
+        try {
+            marshaller = createMarshaller();
+        } catch (Exception e) {
+            failureHandler.completeExceptionally(e);
+        }
+        return marshaller;
+    }
+
+    /**
+     * Creates a simple {@code Unmarshaller}.
+     *
+     * @param failureHandler to store exception if an I/O error occurs during unmarshaller creation
+     * @return the unmarshaller or <code>null</code> if exception have been stored in failureHandler
+     */
+    public <T> Unmarshaller createUnmarshaller(@NotNull final CompletableFuture<T> failureHandler) {
+        Unmarshaller unmarshaller = null;
+        try {
+            unmarshaller = createUnmarshaller();
+        } catch (Exception e) {
+            failureHandler.completeExceptionally(e);
+        }
+        return unmarshaller;
     }
 
     /**

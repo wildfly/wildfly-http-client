@@ -17,7 +17,8 @@
  */
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXid;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXidArray;
 import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
@@ -25,11 +26,9 @@ import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
 import io.undertow.client.ClientResponse;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.xnio.IoUtils;
 
 import javax.transaction.xa.Xid;
@@ -76,8 +75,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream httpBodyRequestStream) throws Exception {
-            try (ByteOutput out = new NoFlushByteOutput(byteOutputOf(httpBodyRequestStream))) {
+        public void marshall(final OutputStream os) throws Exception {
+            try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeXid(marshaller, xid);
                 marshaller.finish();
@@ -95,9 +94,9 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
-                result.complete(function != null ? function.apply(httpResponse) : null);
+                result.complete(function != null ? function.apply(response) : null);
             } finally {
                 IoUtils.safeClose(doneCallback);
             }
@@ -105,8 +104,8 @@ final class ClientHandlers {
     }
 
     private static final class XidHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Xid> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Xid> result;
 
         private XidHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
             this.unmarshaller = unmarshaller;
@@ -114,8 +113,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid xid = deserializeXid(unmarshaller);
                 unmarshaller.finish();
@@ -129,8 +128,8 @@ final class ClientHandlers {
     }
 
     private static final class XidArrayHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Xid[]> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Xid[]> result;
 
         private XidArrayHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
             this.unmarshaller = unmarshaller;
@@ -138,8 +137,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid[] ret = deserializeXidArray(unmarshaller);
                 unmarshaller.finish();

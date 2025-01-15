@@ -18,13 +18,13 @@
 
 package org.wildfly.httpclient.common;
 
+import static io.undertow.util.Headers.CONTENT_TYPE;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 
 import io.undertow.server.HttpServerExchange;
-import io.undertow.util.Headers;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 
 import java.io.OutputStream;
 
@@ -40,16 +40,17 @@ public class HttpServerHelper {
     public static void sendException(HttpServerExchange exchange, HttpServiceConfig serviceConfig, int status, Throwable e) {
         try {
             exchange.setStatusCode(status);
-            putResponseHeader(exchange, Headers.CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
+            putResponseHeader(exchange, CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
             final Marshaller marshaller = serviceConfig.getHttpMarshallerFactory(exchange).createMarshaller();
-            OutputStream outputStream = exchange.getOutputStream();
-            final ByteOutput byteOutput = Marshalling.createByteOutput(outputStream);
-            // start the marshaller
-            marshaller.start(byteOutput);
-            marshaller.writeObject(e);
-            marshaller.write(0);
-            marshaller.finish();
-            marshaller.flush();
+            final OutputStream outputStream = exchange.getOutputStream();
+            try (ByteOutput byteOutput = byteOutputOf(outputStream)) {
+                // start the marshaller
+                marshaller.start(byteOutput);
+                marshaller.writeObject(e);
+                marshaller.write(0);
+                marshaller.finish();
+                marshaller.flush();
+            }
             exchange.endExchange();
         } catch (Exception ex) {
             ex.addSuppressed(e);
@@ -58,8 +59,4 @@ public class HttpServerHelper {
         }
     }
 
-    @Deprecated
-    public static void sendException(HttpServerExchange exchange, int status, Throwable e) {
-        sendException(exchange, HttpServiceConfig.getInstance(), status, e);
-    }
 }
