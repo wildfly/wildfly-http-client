@@ -36,37 +36,37 @@ final class Serializer {
         // forbidden instantiation
     }
 
-    static void serializeXid(final ObjectOutput out, final Xid xid) throws IOException {
-        out.writeInt(xid.getFormatId());
-        out.writeInt(xid.getGlobalTransactionId().length);
-        out.write(xid.getGlobalTransactionId());
-        out.writeInt(xid.getBranchQualifier().length);
-        out.write(xid.getBranchQualifier());
+    static void serializeXid(final ObjectOutput output, final Xid xid) throws IOException {
+        output.writeInt(xid.getFormatId());
+        output.writeInt(xid.getGlobalTransactionId().length);
+        output.write(xid.getGlobalTransactionId());
+        output.writeInt(xid.getBranchQualifier().length);
+        output.write(xid.getBranchQualifier());
     }
 
-    static Xid deserializeXid(final ObjectInput in) throws IOException {
-        int formatId = in.readInt();
-        int length = in.readInt();
+    static Xid deserializeXid(final ObjectInput input) throws IOException {
+        int formatId = input.readInt();
+        int length = input.readInt();
         byte[] globalId = new byte[length];
-        in.readFully(globalId);
-        length = in.readInt();
+        input.readFully(globalId);
+        length = input.readInt();
         byte[] branchId = new byte[length];
-        in.readFully(branchId);
+        input.readFully(branchId);
         return new SimpleXid(formatId, globalId, branchId);
     }
 
-    static void serializeXidArray(final ObjectOutput out, final Xid[] xids) throws IOException {
-        out.writeInt(xids.length);
+    static void serializeXidArray(final ObjectOutput output, final Xid[] xids) throws IOException {
+        output.writeInt(xids.length);
         for (Xid xid : xids) {
-            serializeXid(out, xid);
+            serializeXid(output, xid);
         }
     }
 
-    static Xid[] deserializeXidArray(final ObjectInput in) throws IOException {
-        int length = in.readInt();
+    static Xid[] deserializeXidArray(final ObjectInput input) throws IOException {
+        int length = input.readInt();
         Xid[] ret = new Xid[length];
         for (int i = 0; i < length; ++i) {
-            ret[i] = deserializeXid(in);
+            ret[i] = deserializeXid(input);
         }
         return ret;
     }
