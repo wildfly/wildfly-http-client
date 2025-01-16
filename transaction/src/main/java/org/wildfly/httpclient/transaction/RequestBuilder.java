@@ -123,11 +123,11 @@ final class RequestBuilder {
     private void setRequestHeaders(final ClientRequest request) {
         if (requestType == UT_BEGIN) {
             putRequestHeader(request, ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
-            putRequestHeader(request, TIMEOUT, timeout);
+            putRequestHeader(request, TIMEOUT, String.valueOf(timeout));
         } else if (requestType == XA_RECOVER) {
             putRequestHeader(request, ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
             putRequestHeader(request, RECOVERY_PARENT_NAME, parentName);
-            putRequestHeader(request, RECOVERY_FLAGS, flags);
+            putRequestHeader(request, RECOVERY_FLAGS, String.valueOf(flags));
         } else {
             putRequestHeader(request, ACCEPT, EXCEPTION);
             putRequestHeader(request, CONTENT_TYPE, XID);
