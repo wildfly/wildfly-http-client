@@ -36,50 +36,47 @@ public final class HeadersHelper {
     }
 
     public static boolean containsRequestHeader(final ClientRequest request, final HttpString headerName) {
-        if (request == null || headerName == null) return false;
+        if (request == null || headerName == null) throw new IllegalArgumentException();
         return request.getRequestHeaders().contains(headerName);
     }
 
     public static String getRequestHeader(final ClientRequest request, final HttpString headerName) {
-        if (request == null || headerName == null) return null;
+        if (request == null || headerName == null) throw new IllegalArgumentException();
         return request.getRequestHeaders().getFirst(headerName);
     }
 
     public static String getResponseHeader(final ClientResponse response, final HttpString headerName) {
-        if (response == null || headerName == null) return null;
+        if (response == null || headerName == null) throw new IllegalArgumentException();
         return response.getResponseHeaders().getFirst(headerName);
     }
 
     public static HeaderValues getResponseHeaders(final ClientResponse response, final HttpString headerName) {
-        if (response == null || headerName == null) return null;
+        if (response == null || headerName == null) throw new IllegalArgumentException();
         return response.getResponseHeaders().get(headerName);
     }
 
     public static void putRequestHeader(final ClientRequest request, final HttpString headerName, final long headerValue) {
-        if (request == null || headerName == null) return;
+        if (request == null || headerName == null) throw new IllegalArgumentException();
         request.getRequestHeaders().put(headerName, headerValue);
     }
 
     public static void putRequestHeader(final ClientRequest request, final HttpString headerName, final Object headerValue) {
-        if (request == null || headerName == null) return;
-        if (headerValue == null) throw new IllegalArgumentException();
+        if (request == null || headerName == null || headerValue == null) throw new IllegalArgumentException();
         request.getRequestHeaders().put(headerName, headerValue.toString());
     }
 
     public static void addResponseHeader(final HttpServerExchange exchange, final HttpString headerName, final Object headerValue) {
-        if (exchange == null || headerName == null) return;
-        if (headerValue == null) throw new IllegalArgumentException();
+        if (exchange == null || headerName == null || headerValue == null) throw new IllegalArgumentException();
         exchange.getResponseHeaders().add(headerName, headerValue.toString());
     }
 
     public static String getRequestHeader(final HttpServerExchange exchange, final HttpString headerName) {
-        if (exchange == null || headerName == null) return null;
+        if (exchange == null || headerName == null) throw new IllegalArgumentException();
         return exchange.getRequestHeaders().getFirst(headerName);
     }
 
     public static void putResponseHeader(final HttpServerExchange exchange, final HttpString headerName, final Object headerValue) {
-        if (exchange == null || headerName == null) return;
-        if (headerValue == null) throw new IllegalArgumentException();
+        if (exchange == null || headerName == null || headerValue == null) throw new IllegalArgumentException();
         exchange.getResponseHeaders().put(headerName, headerValue.toString());
     }
 
