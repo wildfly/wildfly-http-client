@@ -17,7 +17,17 @@
  */
 package org.wildfly.httpclient.naming;
 
+import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.StatusCodes.BAD_REQUEST;
+import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
+import static io.undertow.util.StatusCodes.NO_CONTENT;
+import static io.undertow.util.StatusCodes.OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
+import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
 import static org.wildfly.httpclient.naming.Constants.NAME_PATH_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
@@ -26,21 +36,15 @@ import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
-import io.undertow.util.Headers;
 import io.undertow.util.PathTemplateMatch;
-import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.ContextClassResolver;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpServerHelper;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 
 import javax.naming.Binding;
 import javax.naming.Context;
@@ -48,6 +52,7 @@ import javax.naming.NameClassPair;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InvalidClassException;
 import java.net.URLDecoder;
 import java.util.Collections;
@@ -65,38 +70,38 @@ final class ServerHandlers {
     private final Function<String, Boolean> classFilter;
     private final HttpServiceConfig config;
 
-    private ServerHandlers(final Context ctx, final Function<String, Boolean> classFilter, final HttpServiceConfig config) {
+    private ServerHandlers(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
+        this.config = config;
         this.ctx = ctx;
         this.classFilter = classFilter;
-        this.config = config;
     }
 
-    static ServerHandlers newInstance(final Context ctx, final Function<String, Boolean> classFilter, final HttpServiceConfig config) {
-        return new ServerHandlers(ctx, classFilter, config);
+    static ServerHandlers newInstance(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
+        return new ServerHandlers(config, ctx, classFilter);
     }
 
     HttpHandler handlerOf(final RequestType requestType) {
         switch (requestType) {
             case BIND:
-                return new BindHandler(ctx, config, classFilter);
+                return new BindHandler(config, ctx, classFilter);
             case CREATE_SUBCONTEXT:
-                return new CreateSubContextHandler(ctx, config);
+                return new CreateSubContextHandler(config, ctx);
             case DESTROY_SUBCONTEXT:
-                return new DestroySubContextHandler(ctx, config);
+                return new DestroySubContextHandler(config, ctx);
             case LIST:
-                return new ListHandler(ctx, config);
+                return new ListHandler(config, ctx);
             case LIST_BINDINGS:
-                return new ListBindingsHandler(ctx, config);
+                return new ListBindingsHandler(config, ctx);
             case LOOKUP:
-                return new LookupHandler(ctx, config);
+                return new LookupHandler(config, ctx);
             case LOOKUP_LINK:
-                return new LookupLinkHandler(ctx, config);
+                return new LookupLinkHandler(config, ctx);
             case REBIND:
-                return new RebindHandler(ctx, config, classFilter);
+                return new RebindHandler(config, ctx, classFilter);
             case RENAME:
-                return new RenameHandler(ctx, config);
+                return new RenameHandler(config, ctx);
             case UNBIND:
-                return new UnbindHandler(ctx, config);
+                return new UnbindHandler(config, ctx);
             default:
                 throw new IllegalStateException();
         }
@@ -107,11 +112,11 @@ final class ServerHandlers {
         protected final HttpServiceConfig config;
         protected final Function<String, Boolean> classFilter;
 
-        private AbstractNamingHandler(final Context ctx, final HttpServiceConfig config) {
-            this(ctx, null, config);
+        private AbstractNamingHandler(final HttpServiceConfig config, final Context ctx) {
+            this(config, ctx, null);
         }
 
-        private AbstractNamingHandler(final Context ctx, final Function<String, Boolean> classFilter, final HttpServiceConfig config) {
+        private AbstractNamingHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
             this.ctx = ctx;
             this.classFilter = classFilter;
             this.config = config;
@@ -127,14 +132,14 @@ final class ServerHandlers {
                     return;
                 }
                 if (result == null) {
-                    exchange.setStatusCode(StatusCodes.OK);
+                    exchange.setStatusCode(OK);
                 } else if (result instanceof Context) {
-                    exchange.setStatusCode(StatusCodes.NO_CONTENT);
+                    exchange.setStatusCode(NO_CONTENT);
                 } else {
-                    exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, VALUE.toString());
+                    putResponseHeader(exchange, CONTENT_TYPE, VALUE);
                     HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-                    ByteOutput out = new NoFlushByteOutput(Marshalling.createByteOutput(exchange.getOutputStream()));
+                    ByteOutput out = byteOutputOf(exchange.getOutputStream());
                     try (out) {
                         marshaller.start(out);
                         serializeObject(marshaller, result);
@@ -142,7 +147,7 @@ final class ServerHandlers {
                     }
                 }
             } catch (Throwable e) {
-                HttpServerHelper.sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -150,72 +155,72 @@ final class ServerHandlers {
     }
 
     private static final class LookupHandler extends AbstractNamingHandler {
-        private LookupHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private LookupHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             return ctx.lookup(name);
         }
     }
 
     private static final class LookupLinkHandler extends AbstractNamingHandler {
-        private LookupLinkHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private LookupLinkHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             return ctx.lookupLink(name);
         }
     }
 
     private static final class CreateSubContextHandler extends AbstractNamingHandler {
-        private CreateSubContextHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private CreateSubContextHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             return ctx.createSubcontext(name);
         }
     }
 
     private static final class UnbindHandler extends AbstractNamingHandler {
-        private UnbindHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private UnbindHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             ctx.unbind(name);
             return null;
         }
     }
 
     private static final class ListBindingsHandler extends AbstractNamingHandler {
-        private ListBindingsHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private ListBindingsHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             final NamingEnumeration<Binding> namingEnumeration = ctx.listBindings(name);
             return Collections.list(namingEnumeration);
         }
     }
 
     private static final class RenameHandler extends AbstractNamingHandler {
-        private RenameHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private RenameHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             Deque<String> newName = exchange.getQueryParameters().get(NEW_QUERY_PARAMETER);
             if (newName == null || newName.isEmpty()) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 exchange.endExchange();
                 return null;
             }
@@ -226,68 +231,69 @@ final class ServerHandlers {
     }
 
     private static final class DestroySubContextHandler extends AbstractNamingHandler {
-        private DestroySubContextHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private DestroySubContextHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             ctx.destroySubcontext(name);
             return null;
         }
     }
 
     private static final class ListHandler extends AbstractNamingHandler {
-        private ListHandler(final Context ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private ListHandler(final HttpServiceConfig config, final Context ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
             final NamingEnumeration<NameClassPair> namingEnumeration = ctx.list(name);
             return Collections.list(namingEnumeration);
         }
     }
 
     private class RebindHandler extends AbstractClassFilteringNamingHandler {
-        private RebindHandler(final Context ctx, final HttpServiceConfig config, final Function<String, Boolean> classFilter) {
-            super(ctx, config, classFilter);
+        private RebindHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
+            super(config, ctx, classFilter);
         }
 
 
         @Override
-        protected void doOperation(String name, Object object) throws NamingException {
+        protected void doOperation(final String name, final Object object) throws NamingException {
             ctx.rebind(name, object);
         }
     }
 
     private class BindHandler extends AbstractClassFilteringNamingHandler {
-        private BindHandler(final Context ctx, final HttpServiceConfig config, final Function<String, Boolean> classFilter) {
-            super(ctx, config, classFilter);
+        private BindHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
+            super(config, ctx, classFilter);
         }
 
 
         @Override
-        protected void doOperation(String name, Object object) throws NamingException {
+        protected void doOperation(final String name, final Object object) throws NamingException {
             ctx.bind(name, object);
         }
     }
 
     private abstract static class AbstractClassFilteringNamingHandler extends AbstractNamingHandler {
-        private AbstractClassFilteringNamingHandler(final Context ctx, final HttpServiceConfig config, final Function<String, Boolean> classFilter) {
-            super(ctx, classFilter, config);
+        private AbstractClassFilteringNamingHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
+            super(config, ctx, classFilter);
         }
 
         @Override
-        protected Object doOperation(HttpServerExchange exchange, String name) throws NamingException {
-            ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
+        protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
+            ContentType contentType = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
             if (contentType == null || !contentType.getType().equals(VALUE.getType()) || contentType.getVersion() != 1) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 exchange.endExchange();
                 return null;
             }
             final HttpMarshallerFactory marshallerFactory = config.getHttpUnmarshallerFactory(exchange);
-            try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
+            final InputStream is = exchange.getInputStream();
+            try (ByteInput in = byteInputOf(is)) {
                 Unmarshaller unmarshaller = classFilter != null ?
                         marshallerFactory.createUnmarshaller(new FilterClassResolver(classFilter)):
                         marshallerFactory.createUnmarshaller();

@@ -18,6 +18,9 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static java.lang.Boolean.TRUE;
+import static java.lang.Boolean.parseBoolean;
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
 import static org.wildfly.httpclient.transaction.Constants.READ_ONLY;
@@ -26,7 +29,6 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
 import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
-import static org.wildfly.httpclient.transaction.Utils.newMarshaller;
 
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
@@ -69,7 +71,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void commit(boolean onePhase) throws XAException {
-        processOperation(XA_COMMIT, null, onePhase ? Boolean.TRUE : null);
+        processOperation(XA_COMMIT, null, onePhase ? TRUE : null);
     }
 
     @Override
@@ -90,8 +92,8 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     @Override
     public int prepare() throws XAException {
         boolean readOnly = processOperation(XA_PREPARE, (result) -> {
-            String header = result.getResponseHeaders().getFirst(READ_ONLY);
-            return header != null && Boolean.parseBoolean(header);
+            String header = getResponseHeader(result, READ_ONLY);
+            return parseBoolean(header);
         }, null);
         return readOnly ? XAResource.XA_RDONLY : XAResource.XA_OK;
     }
@@ -110,7 +112,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         final CompletableFuture<T> result = new CompletableFuture<>();
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
-        final Marshaller marshaller = newMarshaller(marshallerFactory, result);
+        final Marshaller marshaller = marshallerFactory.createMarshaller(result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                     xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, resultFunction), result::completeExceptionally, null, null);
