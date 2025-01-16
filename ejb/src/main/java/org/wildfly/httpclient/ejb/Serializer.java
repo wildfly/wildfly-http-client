@@ -130,18 +130,18 @@ final class Serializer {
         return ret;
     }
 
-    static void serializeTransaction(final ObjectOutput output, final TransactionInfo txn) throws IOException {
-        final byte transactionType = txn.getType();
+    static void serializeTransaction(final ObjectOutput output, final TransactionInfo txnInfo) throws IOException {
+        final byte transactionType = txnInfo.getType();
         output.writeByte(transactionType);
         if (transactionType == NULL_TRANSACTION) {
             return;
         }
-        serializeXid(output, txn.getXid());
+        serializeXid(output, txnInfo.getXid());
         if (transactionType == REMOTE_TRANSACTION) {
             return;
         }
         if (transactionType == LOCAL_TRANSACTION) {
-            output.writeInt(txn.getRemainingTime());
+            output.writeInt(txnInfo.getRemainingTime());
         }
     }
 

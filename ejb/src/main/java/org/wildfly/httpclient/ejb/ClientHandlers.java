@@ -62,12 +62,12 @@ final class ClientHandlers {
         // forbidden instantiation
     }
 
-    static HttpTargetContext.HttpMarshaller invokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn, final Object[] objects, final Map<String, Object> map) {
-        return new InvokeHttpMarshaller(marshaller, txn, objects, map);
+    static HttpTargetContext.HttpMarshaller invokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
+        return new InvokeHttpMarshaller(marshaller, txnInfo, objects, map);
     }
 
-    static HttpTargetContext.HttpMarshaller createSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn) {
-        return new CreateSessionHttpMarshaller(marshaller, txn);
+    static HttpTargetContext.HttpMarshaller createSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo) {
+        return new CreateSessionHttpMarshaller(marshaller, txnInfo);
     }
 
     static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
@@ -96,13 +96,13 @@ final class ClientHandlers {
 
     private static final class InvokeHttpMarshaller implements HttpTargetContext.HttpMarshaller {
         private final Marshaller marshaller;
-        private final TransactionInfo txn;
+        private final TransactionInfo txnInfo;
         private final Object[] objects;
         private final Map<String, Object> map;
 
-        private InvokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn, final Object[] objects, final Map<String, Object> map) {
+        private InvokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
             this.marshaller = marshaller;
-            this.txn = txn;
+            this.txnInfo = txnInfo;
             this.objects = objects;
             this.map = map;
         }
@@ -111,7 +111,7 @@ final class ClientHandlers {
         public void marshall(final OutputStream os) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
-                serializeTransaction(marshaller, txn);
+                serializeTransaction(marshaller, txnInfo);
                 serializeObjectArray(marshaller, objects);
                 serializeMap(marshaller, map);
                 marshaller.finish();
@@ -121,18 +121,18 @@ final class ClientHandlers {
 
     private static final class CreateSessionHttpMarshaller implements HttpTargetContext.HttpMarshaller {
         private final Marshaller marshaller;
-        private final TransactionInfo txn;
+        private final TransactionInfo txnInfo;
 
-        private CreateSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txn) {
+        private CreateSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo) {
             this.marshaller = marshaller;
-            this.txn = txn;
+            this.txnInfo = txnInfo;
         }
 
         @Override
         public void marshall(final OutputStream os) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
-                serializeTransaction(marshaller, txn);
+                serializeTransaction(marshaller, txnInfo);
                 marshaller.finish();
             }
         }
