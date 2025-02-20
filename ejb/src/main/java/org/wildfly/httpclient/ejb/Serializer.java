@@ -48,36 +48,36 @@ final class Serializer {
         // forbidden instantiation
     }
 
-    static void serializeObject(final ObjectOutput out, final Object o) throws IOException {
-        out.writeObject(o);
+    static void serializeObject(final ObjectOutput output, final Object object) throws IOException {
+        output.writeObject(object);
     }
 
-    static Object deserializeObject(final ObjectInput in) throws IOException, ClassNotFoundException {
-        return in.readObject();
+    static Object deserializeObject(final ObjectInput input) throws IOException, ClassNotFoundException {
+        return input.readObject();
     }
 
-    static void serializeObjectArray(final ObjectOutput out, final Object[] objects) throws IOException {
+    static void serializeObjectArray(final ObjectOutput output, final Object[] objects) throws IOException {
         if (objects == null) return;
         for (final Object object : objects) {
-            out.writeObject(object);
+            output.writeObject(object);
         }
     }
 
-    static void deserializeObjectArray(final ObjectInput in, final Object[] objects) throws IOException, ClassNotFoundException {
+    static void deserializeObjectArray(final ObjectInput input, final Object[] objects) throws IOException, ClassNotFoundException {
         if (objects == null) return;
         for (int i = 0; i < objects.length; i++) {
-            objects[i] = deserializeObject(in);
+            objects[i] = deserializeObject(input);
         }
     }
 
-    static void serializePackedInteger(final ObjectOutput out, int value) throws IOException {
+    static void serializePackedInteger(final ObjectOutput output, int value) throws IOException {
         if (value < 0)
             throw new IllegalArgumentException();
         if (value > 127) {
-            out.writeByte(value & 0x7F | 0x80);
-            serializePackedInteger(out, value >> 7);
+            output.writeByte(value & 0x7F | 0x80);
+            serializePackedInteger(output, value >> 7);
         } else {
-            out.writeByte(value & 0xFF);
+            output.writeByte(value & 0xFF);
         }
     }
 
@@ -89,17 +89,17 @@ final class Serializer {
         return ret;
     }
 
-    static void serializeMap(final ObjectOutput out, final Map<String, Object> contextData) throws IOException {
-        int size = contextData != null ? contextData.size() : 0;
-        serializePackedInteger(out, size);
-        if (size > 0) for (Map.Entry<String, Object> entry : contextData.entrySet()) {
-            out.writeObject(entry.getKey());
-            out.writeObject(entry.getValue());
+    static void serializeMap(final ObjectOutput output, final Map<String, Object> map) throws IOException {
+        int size = map != null ? map.size() : 0;
+        serializePackedInteger(output, size);
+        if (size > 0) for (Map.Entry<String, Object> entry : map.entrySet()) {
+            output.writeObject(entry.getKey());
+            output.writeObject(entry.getValue());
         }
     }
 
-    static Map<String, Object> deserializeMap(final ObjectInput in) throws IOException, ClassNotFoundException {
-        final int contextDataSize = deserializePackedInteger(in);
+    static Map<String, Object> deserializeMap(final ObjectInput input) throws IOException, ClassNotFoundException {
+        final int contextDataSize = deserializePackedInteger(input);
         if (contextDataSize == 0) {
             return new HashMap<>();
         }
@@ -107,71 +107,71 @@ final class Serializer {
         String key;
         Object value;
         for (int i = 0; i < contextDataSize; i++) {
-            key = (String) in.readObject();
-            value = in.readObject();
+            key = (String) input.readObject();
+            value = input.readObject();
             ret.put(key, value);
         }
         return ret;
     }
 
-    static void serializeSet(final ObjectOutput out, final Set<EJBModuleIdentifier> modules) throws IOException {
-        out.writeInt(modules.size());
-        for (EJBModuleIdentifier ejbModuleIdentifier : modules) {
-            out.writeObject(ejbModuleIdentifier);
+    static void serializeSet(final ObjectOutput output, final Set<EJBModuleIdentifier> set) throws IOException {
+        output.writeInt(set.size());
+        for (EJBModuleIdentifier moduleId : set) {
+            output.writeObject(moduleId);
         }
     }
 
-    static Set<EJBModuleIdentifier> deserializeSet(final ObjectInput in) throws IOException, ClassNotFoundException {
-        int size = in.readInt();
+    static Set<EJBModuleIdentifier> deserializeSet(final ObjectInput input) throws IOException, ClassNotFoundException {
+        int size = input.readInt();
         Set<EJBModuleIdentifier> ret = new HashSet<>(size);
         for (int i = 0; i < size; i++) {
-            ret.add((EJBModuleIdentifier) in.readObject());
+            ret.add((EJBModuleIdentifier) input.readObject());
         }
         return ret;
     }
 
-    static void serializeTransaction(final ObjectOutput out, final TransactionInfo transaction) throws IOException {
-        final byte transactionType = transaction.getType();
-        out.writeByte(transactionType);
+    static void serializeTransaction(final ObjectOutput output, final TransactionInfo txnInfo) throws IOException {
+        final byte transactionType = txnInfo.getType();
+        output.writeByte(transactionType);
         if (transactionType == NULL_TRANSACTION) {
             return;
         }
-        serializeXid(out, transaction.getXid());
+        serializeXid(output, txnInfo.getXid());
         if (transactionType == REMOTE_TRANSACTION) {
             return;
         }
         if (transactionType == LOCAL_TRANSACTION) {
-            out.writeInt(transaction.getRemainingTime());
+            output.writeInt(txnInfo.getRemainingTime());
         }
     }
 
-    static TransactionInfo deserializeTransaction(final ObjectInput in) throws IOException {
-        final int txnType = in.readByte();
+    static TransactionInfo deserializeTransaction(final ObjectInput input) throws IOException {
+        final int txnType = input.readByte();
         if (txnType == NULL_TRANSACTION) {
             return nullTransaction();
         } else if (txnType == REMOTE_TRANSACTION || txnType == LOCAL_TRANSACTION) {
-            final Xid xid = deserializeXid(in);
-            return txnType == REMOTE_TRANSACTION ? remoteTransaction(xid) : localTransaction(xid, in.readInt());
+            final Xid xid = deserializeXid(input);
+            return txnType == REMOTE_TRANSACTION ? remoteTransaction(xid) : localTransaction(xid, input.readInt());
         }
         throw EjbHttpClientMessages.MESSAGES.invalidTransactionType(txnType);
     }
 
-    static void serializeXid(final ObjectOutput out, final Xid xid) throws IOException {
-        out.writeInt(xid.getFormatId());
-        out.writeInt(xid.getGlobalTransactionId().length);
-        out.write(xid.getGlobalTransactionId());
-        out.writeInt(xid.getBranchQualifier().length);
-        out.write(xid.getBranchQualifier());
+    static void serializeXid(final ObjectOutput output, final Xid xid) throws IOException {
+        output.writeInt(xid.getFormatId());
+        output.writeInt(xid.getGlobalTransactionId().length);
+        output.write(xid.getGlobalTransactionId());
+        output.writeInt(xid.getBranchQualifier().length);
+        output.write(xid.getBranchQualifier());
     }
 
-    static Xid deserializeXid(final ObjectInput in) throws IOException {
-        int formatId = in.readInt();
-        int length = in.readInt();
+    static Xid deserializeXid(final ObjectInput input) throws IOException {
+        int formatId = input.readInt();
+        int length = input.readInt();
         byte[] globalId = new byte[length];
-        in.readFully(globalId);
-        length = in.readInt();
+        input.readFully(globalId);
+        length = input.readInt();
         byte[] branchId = new byte[length];
-        in.readFully(branchId);
+        input.readFully(branchId);
         return new SimpleXid(formatId, globalId, branchId);
     }
 

@@ -42,6 +42,9 @@ final class Constants {
     // context path
     static final String TXN_CONTEXT = "/txn";
 
+    // params
+    static final String OPC_QUERY_PARAMETER = "opc";
+
     // protocols
     static final String HTTP_SCHEME = "http";
     static final String HTTPS_SCHEME = "https";

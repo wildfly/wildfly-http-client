@@ -18,13 +18,16 @@
 
 package org.wildfly.httpclient.transaction;
 
+import static java.lang.Boolean.TRUE;
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.Constants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.Constants.OPC_QUERY_PARAMETER;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
@@ -36,7 +39,6 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.util.HeaderMap;
 import org.wildfly.httpclient.common.Protocol;
 
 /**
@@ -90,11 +92,11 @@ final class RequestBuilder {
     // helper methods
 
     ClientRequest createRequest(final String prefix) {
-        final ClientRequest clientRequest = new ClientRequest();
-        setRequestMethod(clientRequest);
-        setRequestPath(clientRequest, prefix);
-        setRequestHeaders(clientRequest);
-        return clientRequest;
+        final ClientRequest request = new ClientRequest();
+        setRequestMethod(request);
+        setRequestPath(request, prefix);
+        setRequestHeaders(request);
+        return request;
     }
 
     private void setRequestMethod(final ClientRequest request) {
@@ -110,7 +112,7 @@ final class RequestBuilder {
         appendPath(sb, VERSION_PATH + version, false);
         appendPath(sb, requestType.getPath(), false);
         if (requestType == XA_COMMIT) {
-            sb.append(onePhase != null && onePhase ? "?opc=true" : "");
+            sb.append(onePhase != null && onePhase ? "?" + OPC_QUERY_PARAMETER + "=" + TRUE : "");
         } else if (requestType == XA_RECOVER) {
             appendPath(sb, parentName, false);
         }
@@ -119,17 +121,16 @@ final class RequestBuilder {
 
 
     private void setRequestHeaders(final ClientRequest request) {
-        final HeaderMap headers = request.getRequestHeaders();
         if (requestType == UT_BEGIN) {
-            headers.put(ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
-            headers.put(TIMEOUT, timeout);
+            putRequestHeader(request, ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
+            putRequestHeader(request, TIMEOUT, String.valueOf(timeout));
         } else if (requestType == XA_RECOVER) {
-            headers.put(ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
-            headers.put(RECOVERY_PARENT_NAME, parentName);
-            headers.put(RECOVERY_FLAGS, Integer.toString(flags));
+            putRequestHeader(request, ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
+            putRequestHeader(request, RECOVERY_PARENT_NAME, parentName);
+            putRequestHeader(request, RECOVERY_FLAGS, String.valueOf(flags));
         } else {
-            headers.add(ACCEPT, EXCEPTION.toString());
-            headers.put(CONTENT_TYPE, XID.toString());
+            putRequestHeader(request, ACCEPT, EXCEPTION);
+            putRequestHeader(request, CONTENT_TYPE, XID);
         }
     }
 
