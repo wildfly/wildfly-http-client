@@ -32,19 +32,19 @@ public class PoolAuthenticationContextTestCase {
 
     @Test
     public void testCreateTargetUriWithParams() throws URISyntaxException {
-        ClientRequest req = new ClientRequest();
-        req.setPath("/te%2Bst/test.html?param1=value1&param2=val%20ue2");
+        ClientRequest request = new ClientRequest();
+        request.setPath("/te%2Bst/test.html?param1=value1&param2=val%20ue2");
 
         Assert.assertEquals("http://localhost:8080/te%2Bst/test.html?param1=value1&param2=val%20ue2",
-                PoolAuthenticationContext.createTargetUri(new URI("http://localhost:8080"), req));
+                PoolAuthenticationContext.createTargetUri(new URI("http://localhost:8080"), request));
         Assert.assertEquals("http://localhost/te%2Bst/test.html?param1=value1&param2=val%20ue2",
-                PoolAuthenticationContext.createTargetUri(new URI("http://localhost"), req));
+                PoolAuthenticationContext.createTargetUri(new URI("http://localhost"), request));
         Assert.assertEquals("http://localhost/te%2Bst/test.html?param1=value1&param2=val%20ue2",
-                PoolAuthenticationContext.createTargetUri(new URI("http://localhost:80"), req));
+                PoolAuthenticationContext.createTargetUri(new URI("http://localhost:80"), request));
         Assert.assertEquals("https://localhost/te%2Bst/test.html?param1=value1&param2=val%20ue2",
-                PoolAuthenticationContext.createTargetUri(new URI("https://localhost"), req));
+                PoolAuthenticationContext.createTargetUri(new URI("https://localhost"), request));
         Assert.assertEquals("https://localhost/te%2Bst/test.html?param1=value1&param2=val%20ue2",
-                PoolAuthenticationContext.createTargetUri(new URI("https://localhost:443"), req));
+                PoolAuthenticationContext.createTargetUri(new URI("https://localhost:443"), request));
     }
 
     @Test

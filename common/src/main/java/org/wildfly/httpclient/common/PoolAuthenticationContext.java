@@ -21,6 +21,7 @@ package org.wildfly.httpclient.common;
 import static io.undertow.util.Headers.AUTHENTICATION_INFO;
 import static io.undertow.util.Headers.AUTHORIZATION;
 import static io.undertow.util.Headers.WWW_AUTHENTICATE;
+import static io.undertow.util.StatusCodes.UNAUTHORIZED;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
@@ -54,7 +55,6 @@ import io.undertow.server.session.SecureRandomSessionIdGenerator;
 import io.undertow.util.FlexBase64;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.HexConverter;
-import io.undertow.util.StatusCodes;
 import io.undertow.util.AttachmentKey;
 import org.wildfly.security.auth.principal.NamePrincipal;
 
@@ -80,7 +80,7 @@ class PoolAuthenticationContext {
     private static final SecureRandomSessionIdGenerator cnonceGenerator = new SecureRandomSessionIdGenerator();
 
     boolean handleResponse(ClientResponse response) {
-        if (response.getResponseCode() != StatusCodes.UNAUTHORIZED) {
+        if (response.getResponseCode() != UNAUTHORIZED) {
             return false;
         }
         String authenticate = getResponseHeader(response, WWW_AUTHENTICATE);
@@ -280,7 +280,7 @@ class PoolAuthenticationContext {
             return false;
         }
         ClientResponse response = exchange.getResponse();
-        if (response.getResponseCode() != StatusCodes.UNAUTHORIZED) {
+        if (response.getResponseCode() != UNAUTHORIZED) {
             DigestImpl digest = exchange.getRequest().getAttachment(DIGEST);
             if(digest != null) {
                 String authInfo = getResponseHeader(response, AUTHENTICATION_INFO);

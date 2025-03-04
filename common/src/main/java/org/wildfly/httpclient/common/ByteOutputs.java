@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.wildfly.httpclient.naming;
+package org.wildfly.httpclient.common;
 
 import org.jboss.marshalling.ByteOutput;
 
@@ -23,19 +23,23 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * Helper class. Provides utility method for transforming OutputStreams to ByteOutputs.
+ * Helper class. Provides various utility methods for example:
+ * <ul>
+ *     <li>transforming OutputStreams to ByteOutputs</li>
+ *     <li>introducing special behaviour to existing byte output instances</li>
+ * </ul>
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class ByteOutputs {
+public final class ByteOutputs {
 
     private ByteOutputs() {
         // forbidden instantiation
     }
 
-    static ByteOutput byteOutputOf(final OutputStream delegate) {
+    public static ByteOutput byteOutputOf(final OutputStream delegate) {
         if (delegate == null) throw new IllegalArgumentException();
-        return new ByteOutputStream(delegate);
+        return new UnflushableByteOutput(new ByteOutputStream(delegate));
     }
 
     private static final class ByteOutputStream implements ByteOutput {
@@ -68,6 +72,40 @@ final class ByteOutputs {
 
         @Override
         public void write(final byte[] b, final int off, final int len) throws IOException {
+            delegate.write(b, off, len);
+        }
+
+    }
+
+    private static final class UnflushableByteOutput implements ByteOutput {
+
+        private final ByteOutput delegate;
+
+        public UnflushableByteOutput(final ByteOutput delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
+
+        @Override
+        public void flush() throws IOException {
+            //ignore
+        }
+        @Override
+        public void write(final int b) throws IOException {
+            delegate.write(b);
+        }
+
+        @Override
+        public void write(final byte[] b) throws IOException {
+            delegate.write(b);
+        }
+
+        @Override
+        public void write(final byte[] b, int off, int len) throws IOException {
             delegate.write(b, off, len);
         }
 

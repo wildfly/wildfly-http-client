@@ -34,16 +34,16 @@ import java.util.function.Function;
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public class HttpRemoteTransactionService {
-    private final HttpServiceConfig httpServiceConfig;
+    private final HttpServiceConfig config;
     private final ServerHandlers serverHandlers;
 
     public HttpRemoteTransactionService(final LocalTransactionContext transactionContext, final Function<LocalTransaction, Xid> xidResolver) {
-        this(transactionContext, xidResolver, HttpServiceConfig.getInstance());
+        this(HttpServiceConfig.getInstance(), transactionContext, xidResolver);
     }
 
-    private  HttpRemoteTransactionService(final LocalTransactionContext transactionContext, final Function<LocalTransaction, Xid> xidResolver, final HttpServiceConfig httpServiceConfig) {
-        this.httpServiceConfig = httpServiceConfig;
-        this.serverHandlers = ServerHandlers.newInstance(transactionContext, xidResolver, httpServiceConfig);
+    private  HttpRemoteTransactionService(final HttpServiceConfig config, final LocalTransactionContext transactionContext, final Function<LocalTransaction, Xid> xidResolver) {
+        this.config = config;
+        this.serverHandlers = ServerHandlers.newInstance(config, transactionContext, xidResolver);
     }
 
     public HttpHandler createHandler() {
@@ -52,7 +52,7 @@ public class HttpRemoteTransactionService {
             registerHandler(routingHandler, requestType);
         }
 
-        return httpServiceConfig.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
+        return config.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
     private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType) {

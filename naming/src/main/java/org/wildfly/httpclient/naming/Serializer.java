@@ -33,12 +33,12 @@ final class Serializer {
         // forbidden instantiation
     }
 
-    static void serializeObject(final ObjectOutput out, final Object o) throws IOException {
-        out.writeObject(o);
+    static void serializeObject(final ObjectOutput output, final Object object) throws IOException {
+        output.writeObject(object);
     }
 
-    static Object deserializeObject(final ObjectInput in) throws IOException, ClassNotFoundException {
-        return in.readObject();
+    static Object deserializeObject(final ObjectInput input) throws IOException, ClassNotFoundException {
+        return input.readObject();
     }
 
 }

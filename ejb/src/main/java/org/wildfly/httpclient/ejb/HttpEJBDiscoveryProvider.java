@@ -22,7 +22,6 @@ import static org.jboss.ejb.client.EJBClientContext.getCurrent;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.Constants.HTTP_SCHEME;
 import static org.wildfly.httpclient.ejb.ClientHandlers.discoveryHttpResultHandler;
-import static org.wildfly.httpclient.ejb.Utils.newUnmarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.ejb.client.EJBClientConnection;
@@ -159,7 +158,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
         final CompletableFuture<Set<EJBModuleIdentifier>> result = new CompletableFuture<>();
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
-        final Unmarshaller unmarshaller = newUnmarshaller(marshallerFactory, result);
+        final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
                     discoveryHttpResultHandler(unmarshaller, result),

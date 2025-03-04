@@ -17,6 +17,18 @@
  */
 package org.wildfly.httpclient.ejb;
 
+import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.ejb.Constants.EJB_SESSION_ID;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
+import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
+import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
+import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
+import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
+import static org.xnio.IoUtils.safeClose;
+
 import io.undertow.client.ClientResponse;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBModuleIdentifier;
@@ -24,9 +36,7 @@ import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Marshalling;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.xnio.IoUtils;
@@ -41,15 +51,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-import static org.wildfly.httpclient.ejb.ByteOutputs.byteOutputOf;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeObject;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeSet;
-import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
-import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
-import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
-import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
-import static org.xnio.IoUtils.safeClose;
-
 /**
  * Utility class providing factory methods for creating client-side handlers of Remote EJB over HTTP protocol.
  *
@@ -61,8 +62,8 @@ final class ClientHandlers {
         // forbidden instantiation
     }
 
-    static HttpTargetContext.HttpMarshaller invokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] parameters, final Map<String, Object> contextData) {
-        return new InvokeHttpMarshaller(marshaller, txnInfo, parameters, contextData);
+    static HttpTargetContext.HttpMarshaller invokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
+        return new InvokeHttpMarshaller(marshaller, txnInfo, objects, map);
     }
 
     static HttpTargetContext.HttpMarshaller createSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo) {
@@ -77,8 +78,8 @@ final class ClientHandlers {
         return new DiscoveryHttpResultHandler(unmarshaller, result);
     }
 
-    static HttpTargetContext.HttpResultHandler invokeHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverContext, final EJBClientInvocationContext clientInvocationContext) {
-        return new EjbClassLoaderAwareHttpResultHandler(unmarshaller, receiverContext, clientInvocationContext);
+    static HttpTargetContext.HttpResultHandler invokeHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
+        return new EjbClassLoaderAwareHttpResultHandler(unmarshaller, receiverCtx, clientCtx);
     }
 
     static Function<ClientResponse, Boolean> cancelInvocationResponseFunction() {
@@ -96,23 +97,23 @@ final class ClientHandlers {
     private static final class InvokeHttpMarshaller implements HttpTargetContext.HttpMarshaller {
         private final Marshaller marshaller;
         private final TransactionInfo txnInfo;
-        private final Object[] parameters;
-        private final Map<String, Object> contextData;
+        private final Object[] objects;
+        private final Map<String, Object> map;
 
-        private InvokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] parameters, final Map<String, Object> contextData) {
+        private InvokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
             this.marshaller = marshaller;
             this.txnInfo = txnInfo;
-            this.parameters = parameters;
-            this.contextData = contextData;
+            this.objects = objects;
+            this.map = map;
         }
 
         @Override
-        public void marshall(final OutputStream httpBodyRequestStream) throws Exception {
-            try (ByteOutput out = Marshalling.createByteOutput(httpBodyRequestStream)) {
+        public void marshall(final OutputStream os) throws Exception {
+            try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
-                serializeObjectArray(marshaller, parameters);
-                serializeMap(marshaller, contextData);
+                serializeObjectArray(marshaller, objects);
+                serializeMap(marshaller, map);
                 marshaller.finish();
             }
         }
@@ -128,8 +129,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream httpBodyRequestStream) throws Exception {
-            try (ByteOutput out = byteOutputOf(httpBodyRequestStream)) {
+        public void marshall(final OutputStream os) throws Exception {
+            try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
                 marshaller.finish();
@@ -147,9 +148,9 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
-                result.complete(function != null ? function.apply(httpResponse) : null);
+                result.complete(function != null ? function.apply(response) : null);
             } finally {
                 IoUtils.safeClose(doneCallback);
             }
@@ -157,8 +158,8 @@ final class ClientHandlers {
     }
 
     private static final class DiscoveryHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Set<EJBModuleIdentifier>> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Set<EJBModuleIdentifier>> result;
 
         private DiscoveryHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Set<EJBModuleIdentifier>> result) {
             this.unmarshaller = unmarshaller;
@@ -166,8 +167,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+            try (ByteInput in = byteInputOf(is)) {
                 Set<EJBModuleIdentifier> modules;
                 unmarshaller.start(in);
                 modules = deserializeSet(unmarshaller);
@@ -189,36 +190,36 @@ final class ClientHandlers {
             WELL_KNOWN_KEYS.add("jboss.source.address");
         }
 
-        private final EJBReceiverInvocationContext receiverContext;
-        private final EJBClientInvocationContext clientInvocationContext;
         private final Unmarshaller unmarshaller;
+        private final EJBReceiverInvocationContext receiverCtx;
+        private final EJBClientInvocationContext clientCtx;
 
-        private EjbClassLoaderAwareHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverContext, final EJBClientInvocationContext clientInvocationContext) {
+        private EjbClassLoaderAwareHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
             this.unmarshaller = unmarshaller;
-            this.receiverContext = receiverContext;
-            this.clientInvocationContext = clientInvocationContext;
+            this.receiverCtx = receiverCtx;
+            this.clientCtx = clientCtx;
         }
 
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            receiverContext.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+            receiverCtx.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                 @Override
                 public Object getResult() throws Exception {
                     final CompletableFuture<InvocationInfo> result = new CompletableFuture<>();
-                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(httpBodyResponseStream, httpResponse, doneCallback);
+                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(is, response, doneCallback);
 
                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
-                    Set<String> returnedContextDataKeys = (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
+                    Set<String> returnedContextDataKeys = (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
                     if(returnedContextDataKeys != null) {
-                        clientInvocationContext.getContextData().keySet().removeIf(k -> (!k.equals(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY)));
+                        clientCtx.getContextData().keySet().removeIf(k -> (!k.equals(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY)));
                     }
-                    Set<String> returnedKeys =  (Set<String>) clientInvocationContext.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
+                    Set<String> returnedKeys =  (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
 
                     // If there are any attachments, add them to the client invocation's context data
                     if (result.get().getAttachments() != null) {
                         for (Map.Entry<String, Object> entry : result.get().getAttachments().entrySet()) {
                             if (entry.getValue() != null &&
                                     ((returnedKeys != null && returnedKeys.contains(entry.getKey())) || WELL_KNOWN_KEYS.contains(entry.getKey()))) {
-                                clientInvocationContext.getContextData().put(entry.getKey(), entry.getValue());
+                                clientCtx.getContextData().put(entry.getKey(), entry.getValue());
                             }
                         }
                     }
@@ -228,7 +229,7 @@ final class ClientHandlers {
                 @Override
                 public void discardResult() {
                     IoUtils.safeClose(doneCallback);
-                    IoUtils.safeClose(httpBodyResponseStream);
+                    IoUtils.safeClose(is);
                 }
             });
 
@@ -236,8 +237,8 @@ final class ClientHandlers {
     }
 
     private static final class InvokeHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<InvocationInfo> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<InvocationInfo> result;
 
         private InvokeHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<InvocationInfo> result) {
             this.unmarshaller = unmarshaller;
@@ -245,8 +246,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 final Object returned = deserializeObject(unmarshaller);
                 final Map<String, Object> attachments = deserializeMap(unmarshaller);
@@ -262,15 +263,15 @@ final class ClientHandlers {
 
     private static final class CancelInvocationResponseFunction implements Function<ClientResponse, Boolean> {
         @Override
-        public Boolean apply(final ClientResponse clientResponse) {
+        public Boolean apply(final ClientResponse response) {
             return true;
         }
     }
 
     private static final class CreateSessionResponseFunction implements Function<ClientResponse, SessionID> {
         @Override
-        public SessionID apply(final ClientResponse clientResponse) {
-            final String sessionId = clientResponse.getResponseHeaders().getFirst(Constants.EJB_SESSION_ID);
+        public SessionID apply(final ClientResponse response) {
+            final String sessionId = getResponseHeader(response, EJB_SESSION_ID);
             if (sessionId != null) {
                 return SessionID.createSessionID(Base64.getUrlDecoder().decode(sessionId));
             }

@@ -18,6 +18,8 @@
 
 package org.wildfly.httpclient.ejb;
 
+import static io.undertow.util.Headers.GZIP;
+
 import io.undertow.conduits.GzipStreamSourceConduit;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.handlers.AllowedMethodsHandler;
@@ -26,14 +28,10 @@ import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 import io.undertow.server.handlers.encoding.RequestEncodingHandler;
-import io.undertow.util.Headers;
 import org.jboss.ejb.server.Association;
-import org.jboss.ejb.server.CancelHandle;
 import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.transaction.client.LocalTransactionContext;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 
@@ -45,19 +43,18 @@ import java.util.function.Function;
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public class HttpRemoteEjbService {
-    private final HttpServiceConfig httpServiceConfig;
-    private final Map<InvocationIdentifier, CancelHandle> cancellationFlags = new ConcurrentHashMap<>();
+    private final HttpServiceConfig config;
     private final ServerHandlers serverHandlers;
 
     public HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                                 Function<String, Boolean> classResolverFilter) {
-        this(association, executorService, localTransactionContext, classResolverFilter, HttpServiceConfig.getInstance());
+        this(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, classResolverFilter);
     }
 
-    private HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                                 Function<String, Boolean> classResolverFilter, HttpServiceConfig httpServiceConfig) {
-        this.httpServiceConfig = httpServiceConfig;
-        this.serverHandlers = ServerHandlers.newInstance(association, executorService, localTransactionContext, classResolverFilter, httpServiceConfig);
+    private HttpRemoteEjbService(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+                                 Function<String, Boolean> classResolverFilter) {
+        this.config = config;
+        this.serverHandlers = ServerHandlers.newInstance(config, association, executorService, localTransactionContext, classResolverFilter);
     }
 
     public HttpHandler createHttpHandler() {
@@ -66,10 +63,10 @@ public class HttpRemoteEjbService {
             registerHandler(pathHandler, requestType);
         }
 
-        EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(Headers.GZIP.toString(), new GzipEncodingProvider(), 1));
+        EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
-        requestEncodingHandler.addEncoding(Headers.GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
-        return httpServiceConfig.wrap(requestEncodingHandler);
+        requestEncodingHandler.addEncoding(GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
+        return config.wrap(requestEncodingHandler);
     }
 
     private void registerHandler(final PathHandler pathHandler, final RequestType requestType) {

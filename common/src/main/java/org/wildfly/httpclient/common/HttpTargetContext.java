@@ -18,6 +18,7 @@
 
 package org.wildfly.httpclient.common;
 
+import static io.undertow.util.StatusCodes.NO_CONTENT;
 import static io.undertow.util.Headers.CHUNKED;
 import static io.undertow.util.Headers.COOKIE;
 import static io.undertow.util.Headers.CONTENT_ENCODING;
@@ -27,6 +28,7 @@ import static io.undertow.util.Headers.HOST;
 import static io.undertow.util.Headers.IDENTITY;
 import static io.undertow.util.Headers.SET_COOKIE;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.addRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.containsRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
@@ -43,8 +45,6 @@ import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
 import io.undertow.util.Methods;
-import io.undertow.util.StatusCodes;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
@@ -144,9 +144,9 @@ public class HttpTargetContext extends AbstractAttachable {
 
 
     private void acquireSessionAffinity(CountDownLatch latch, AuthenticationConfiguration authenticationConfiguration) {
-        ClientRequest clientRequest = new ClientRequest();
-        clientRequest.setMethod(Methods.GET);
-        clientRequest.setPath(uri.getPath() + "/common/v1/affinity");
+        ClientRequest request = new ClientRequest();
+        request.setMethod(Methods.GET);
+        request.setPath(uri.getPath() + "/common/v1/affinity");
         AuthenticationContext context = AuthenticationContext.captureCurrent();
         SSLContext sslContext;
         try {
@@ -156,7 +156,7 @@ public class HttpTargetContext extends AbstractAttachable {
             HttpClientMessages.MESSAGES.failedToAcquireSession(e);
             return;
         }
-        sendRequest(clientRequest, sslContext, authenticationConfiguration, null, null, (e) -> {
+        sendRequest(request, sslContext, authenticationConfiguration, null, null, (e) -> {
             latch.countDown();
             HttpClientMessages.MESSAGES.failedToAcquireSession(e);
         }, null, latch::countDown);
@@ -194,7 +194,7 @@ public class HttpTargetContext extends AbstractAttachable {
                 : authenticationConfiguration;
 
             if (containsRequestHeader(request, CONTENT_TYPE)) {
-                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED.toString());
+                putRequestHeader(request, TRANSFER_ENCODING, CHUNKED);
             }
             final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
             connection.sendRequest(request, new ClientCallback<ClientExchange>() {
@@ -237,7 +237,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                 final boolean ok;
                                 final boolean isException;
                                 if (type == null) {
-                                    ok = expectedResponse == null || (allowNoContent && response.getResponseCode() == StatusCodes.NO_CONTENT);
+                                    ok = expectedResponse == null || (allowNoContent && response.getResponseCode() == NO_CONTENT);
                                     isException = false;
                                 } else {
                                     if (type.getType().equals(EXCEPTION_TYPE)) {
@@ -280,7 +280,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                     throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
                                                 }
                                             }
-                                            unmarshaller.start(new InputStreamByteInput(in));
+                                            unmarshaller.start(byteInputOf(in));
                                             Throwable exception = (Throwable) unmarshaller.readObject();
                                             Map<String, Object> attachments = readAttachments(unmarshaller);
                                             int read = in.read();
@@ -310,7 +310,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 }
                                                 connection.done(false);
                                             };
-                                            if (response.getResponseCode() == StatusCodes.NO_CONTENT) {
+                                            if (response.getResponseCode() == NO_CONTENT) {
                                                 IoUtils.safeClose(in);
                                                 httpResultHandler.handleResult(null, response, doneCallback);
                                             } else {
@@ -439,8 +439,8 @@ public class HttpTargetContext extends AbstractAttachable {
         return attachments;
     }
 
-    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest clientRequest) {
-        return this.httpMarshallerFactoryProvider.getMarshallerFactory(clientRequest);
+    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest request) {
+        return this.httpMarshallerFactoryProvider.getMarshallerFactory(request);
     }
 
     public HttpConnectionPool getConnectionPool() {

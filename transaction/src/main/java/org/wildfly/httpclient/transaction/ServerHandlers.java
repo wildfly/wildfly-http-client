@@ -17,9 +17,17 @@
  */
 package org.wildfly.httpclient.transaction;
 
+import static java.lang.Boolean.parseBoolean;
+import static io.undertow.util.Headers.CONTENT_TYPE;
+import static io.undertow.util.StatusCodes.BAD_REQUEST;
+import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
+import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
+import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
 import static org.wildfly.httpclient.common.HttpServerHelper.sendException;
-import static org.wildfly.httpclient.transaction.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
+import static org.wildfly.httpclient.transaction.Constants.OPC_QUERY_PARAMETER;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
@@ -30,24 +38,21 @@ import static org.wildfly.httpclient.transaction.Serializer.serializeXidArray;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
-import io.undertow.util.Headers;
-import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.common.function.ExceptionBiFunction;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpServiceConfig;
-import org.wildfly.httpclient.common.NoFlushByteOutput;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
 
 import javax.transaction.xa.Xid;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.function.Function;
@@ -63,36 +68,36 @@ final class ServerHandlers {
     private final Function<LocalTransaction, Xid> xidResolver;
     private final HttpServiceConfig config;
 
-    private ServerHandlers(final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver, final HttpServiceConfig config) {
+    private ServerHandlers(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
+        this.config = config;
         this.ctx = ctx;
         this.xidResolver = xidResolver;
-        this.config = config;
     }
 
-    static ServerHandlers newInstance(final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver, final HttpServiceConfig config) {
-        return new ServerHandlers(ctx, xidResolver, config);
+    static ServerHandlers newInstance(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
+        return new ServerHandlers(config, ctx, xidResolver);
     }
 
     HttpHandler handlerOf(final RequestType requestType) {
         switch (requestType) {
             case UT_BEGIN:
-                return new BeginHandler(ctx, config, xidResolver);
+                return new BeginHandler(config, ctx, xidResolver);
             case UT_COMMIT:
-                return new UTCommitHandler(ctx, config);
+                return new UTCommitHandler(config, ctx);
             case UT_ROLLBACK:
-                return new UTRollbackHandler(ctx, config);
+                return new UTRollbackHandler(config, ctx);
             case XA_BEFORE_COMPLETION:
-                return new XABeforeCompletionHandler(ctx, config);
+                return new XABeforeCompletionHandler(config, ctx);
             case XA_COMMIT:
-                return new XACommitHandler(ctx, config);
+                return new XACommitHandler(config, ctx);
             case XA_FORGET:
-                return new XAForgetHandler(ctx, config);
+                return new XAForgetHandler(config, ctx);
             case XA_PREPARE:
-                return new XAPrepHandler(ctx, config);
+                return new XAPrepHandler(config, ctx);
             case XA_RECOVER:
-                return new XARecoveryHandler(ctx, config);
+                return new XARecoveryHandler(config, ctx);
             case XA_ROLLBACK:
-                return new XARollbackHandler(ctx, config);
+                return new XARollbackHandler(config, ctx);
             default:
                 throw new IllegalStateException();
         }
@@ -104,14 +109,14 @@ final class ServerHandlers {
         protected final Function<LocalTransaction, Xid> xidResolver;
         protected final HttpServiceConfig config;
 
-        private ValidatingTransactionHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            this(ctx, null, config);
+        private ValidatingTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            this(config, ctx, null);
         }
 
-        private ValidatingTransactionHandler(final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver, final HttpServiceConfig config) {
+        private ValidatingTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
+            this.config = config;
             this.ctx = ctx;
             this.xidResolver = xidResolver;
-            this.config = config;
         }
 
         protected abstract boolean isValidRequest(HttpServerExchange exchange);
@@ -126,15 +131,15 @@ final class ServerHandlers {
     }
 
     private abstract static class AbstractTransactionHandler extends ValidatingTransactionHandler {
-        private AbstractTransactionHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private AbstractTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
         protected boolean isValidRequest(final HttpServerExchange exchange) {
-            final ContentType contentType = ContentType.parse(exchange.getRequestHeaders().getFirst(Headers.CONTENT_TYPE));
+            final ContentType contentType = ContentType.parse(getRequestHeader(exchange, CONTENT_TYPE));
             if (contentType == null || contentType.getVersion() != 1 || !contentType.getType().equals(XID.getType())) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s has incorrect or missing content type", exchange);
                 return false;
             }
@@ -146,8 +151,9 @@ final class ServerHandlers {
             try {
                 final HttpMarshallerFactory httpMarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
                 final Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
+                final InputStream is = exchange.getInputStream();
                 Xid simpleXid;
-                try (ByteInput in = new InputStreamByteInput(exchange.getInputStream())) {
+                try (ByteInput in = byteInputOf(is)) {
                     unmarshaller.start(in);
                     simpleXid = deserializeXid(unmarshaller);
                     unmarshaller.finish();
@@ -159,7 +165,7 @@ final class ServerHandlers {
                     return null;
                 }, transaction, exchange);
             } catch (Exception e) {
-                sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
             }
         }
 
@@ -167,15 +173,15 @@ final class ServerHandlers {
     }
 
     private static final class BeginHandler extends ValidatingTransactionHandler {
-        private BeginHandler(final LocalTransactionContext ctx, final HttpServiceConfig config, final Function<LocalTransaction, Xid> xidResolver) {
-            super(ctx, xidResolver, config);
+        private BeginHandler(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
+            super(config, ctx, xidResolver);
         }
 
         @Override
         protected boolean isValidRequest(final HttpServerExchange exchange) {
-            final String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
+            final String timeoutString = getRequestHeader(exchange, TIMEOUT);
             if (timeoutString == null) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, TIMEOUT);
                 return false;
             }
@@ -185,43 +191,42 @@ final class ServerHandlers {
         @Override
         protected void processRequest(final HttpServerExchange exchange) {
             try {
-                final String timeoutString = exchange.getRequestHeaders().getFirst(TIMEOUT);
+                final String timeoutString = getRequestHeader(exchange, TIMEOUT);
                 final Integer timeout = Integer.parseInt(timeoutString);
-                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, NEW_TRANSACTION.toString());
+                putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION);
                 final LocalTransaction transaction = ctx.beginTransaction(timeout);
                 final Xid xid = xidResolver.apply(transaction);
 
-                final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
-                try (byteOutput) {
-                    Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
-                    marshaller.start(byteOutput);
+                final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+                try (ByteOutput out = byteOutputOf(baos)) {
+                    marshaller.start(out);
                     serializeXid(marshaller, xid);
                     marshaller.finish();
                 }
-                exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
+                exchange.getResponseSender().send(ByteBuffer.wrap(baos.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
             }
         }
     }
 
     private static final class XARecoveryHandler extends ValidatingTransactionHandler {
-        private XARecoveryHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private XARecoveryHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected boolean isValidRequest(HttpServerExchange exchange) {
-            String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
+        protected boolean isValidRequest(final HttpServerExchange exchange) {
+            String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
             if (flagsStringString == null) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_FLAGS);
                 return false;
             }
-            String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
+            String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
             if (parentName == null) {
-                exchange.setStatusCode(StatusCodes.BAD_REQUEST);
+                exchange.setStatusCode(BAD_REQUEST);
                 HttpRemoteTransactionMessages.MESSAGES.debugf("Exchange %s is missing %s header", exchange, RECOVERY_PARENT_NAME);
                 return false;
             }
@@ -229,15 +234,15 @@ final class ServerHandlers {
         }
 
         @Override
-        protected void processRequest(HttpServerExchange exchange) {
+        protected void processRequest(final HttpServerExchange exchange) {
             try {
-                final String flagsStringString = exchange.getRequestHeaders().getFirst(RECOVERY_FLAGS);
+                final String flagsStringString = getRequestHeader(exchange, RECOVERY_FLAGS);
                 final int flags = Integer.parseInt(flagsStringString);
-                final String parentName = exchange.getRequestHeaders().getFirst(RECOVERY_PARENT_NAME);
+                final String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
                 final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
 
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final ByteOutput byteOutput = new NoFlushByteOutput(byteOutputOf(out));
+                final ByteOutput byteOutput = byteOutputOf(out);
                 try (byteOutput) {
                     Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
                     marshaller.start(byteOutput);
@@ -246,88 +251,88 @@ final class ServerHandlers {
                 }
                 exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
             } catch (Exception e) {
-                sendException(exchange, config, StatusCodes.INTERNAL_SERVER_ERROR, e);
+                sendException(exchange, config, INTERNAL_SERVER_ERROR, e);
             }
         }
     }
 
     private static final class UTRollbackHandler extends AbstractTransactionHandler {
-        private UTRollbackHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private UTRollbackHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
+        protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getTransaction().rollback();
         }
     }
 
     private static final class UTCommitHandler extends AbstractTransactionHandler {
-        private UTCommitHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private UTCommitHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
+        protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getTransaction().commit();
         }
     }
 
     private static final class XABeforeCompletionHandler extends AbstractTransactionHandler {
-        private XABeforeCompletionHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private XABeforeCompletionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
+        protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().beforeCompletion();
         }
     }
 
     private static final class XAForgetHandler extends AbstractTransactionHandler {
-        private XAForgetHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private XAForgetHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
+        protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().forget();
         }
     }
 
     private static final class XAPrepHandler extends AbstractTransactionHandler {
-        private XAPrepHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private XAPrepHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
+        protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().prepare();
         }
     }
 
     private static final class XARollbackHandler extends AbstractTransactionHandler {
-        private XARollbackHandler(final LocalTransactionContext ctx, final HttpServiceConfig  config) {
-            super(ctx, config);
+        private XARollbackHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
+        protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
             transaction.getControl().rollback();
         }
     }
 
     private static final class XACommitHandler extends AbstractTransactionHandler {
-        private XACommitHandler(final LocalTransactionContext ctx, final HttpServiceConfig config) {
-            super(ctx, config);
+        private XACommitHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
+            super(config, ctx);
         }
 
         @Override
-        protected void handleImpl(HttpServerExchange exchange, ImportResult<LocalTransaction> transaction) throws Exception {
-            Deque<String> opc = exchange.getQueryParameters().get("opc");
+        protected void handleImpl(final HttpServerExchange exchange, final ImportResult<LocalTransaction> transaction) throws Exception {
+            Deque<String> opc = exchange.getQueryParameters().get(OPC_QUERY_PARAMETER);
             boolean onePhase = false;
             if (opc != null && !opc.isEmpty()) {
-                onePhase = Boolean.parseBoolean(opc.poll());
+                onePhase = parseBoolean(opc.poll());
             }
             transaction.getControl().commit(onePhase);
         }

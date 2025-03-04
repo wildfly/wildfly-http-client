@@ -17,17 +17,17 @@
  */
 package org.wildfly.httpclient.naming;
 
-import static org.wildfly.httpclient.naming.ByteOutputs.byteOutputOf;
+import static io.undertow.util.StatusCodes.NO_CONTENT;
+import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
+import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
 import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 import static org.wildfly.httpclient.naming.ClassLoaderUtils.setContextClassLoader;
 import static org.xnio.IoUtils.safeClose;
 
 import io.undertow.client.ClientResponse;
-import io.undertow.util.StatusCodes;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
-import org.jboss.marshalling.InputStreamByteInput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
@@ -76,8 +76,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream httpBodyRequestStream) throws Exception {
-            try (ByteOutput out = byteOutputOf(httpBodyRequestStream)) {
+        public void marshall(final OutputStream os) throws Exception {
+            try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeObject(marshaller, object);
                 marshaller.finish();
@@ -95,9 +95,9 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
-                result.complete(function != null ? function.apply(httpResponse) : null);
+                result.complete(function != null ? function.apply(response) : null);
             } finally {
                 safeClose(doneCallback);
             }
@@ -105,8 +105,8 @@ final class ClientHandlers {
     }
 
     private static final class OptionalObjectHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Object> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Object> result;
         private final NamingProvider namingProvider;
         private final ClassLoader classLoader;
 
@@ -118,15 +118,15 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
             try {
                 namingProvider.performExceptionAction((a, b) -> {
                     ClassLoader old = setContextClassLoader(classLoader);
                     try {
-                        if (httpResponse.getResponseCode() == StatusCodes.NO_CONTENT) {
-                            emptyHttpResultHandler(result, null).handleResult(httpBodyResponseStream, httpResponse, doneCallback);
+                        if (response.getResponseCode() == NO_CONTENT) {
+                            emptyHttpResultHandler(result, null).handleResult(is, response, doneCallback);
                         } else {
-                            objectHttpResultHandler(unmarshaller, result).handleResult(httpBodyResponseStream, httpResponse, doneCallback);
+                            objectHttpResultHandler(unmarshaller, result).handleResult(is, response, doneCallback);
                         }
                     } finally {
                         setContextClassLoader(old);
@@ -140,8 +140,8 @@ final class ClientHandlers {
     }
 
     private static final class ObjectHttpResultHandler implements HttpTargetContext.HttpResultHandler {
-        private final CompletableFuture<Object> result;
         private final Unmarshaller unmarshaller;
+        private final CompletableFuture<Object> result;
 
         private ObjectHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Object> result) {
             this.unmarshaller = unmarshaller;
@@ -149,8 +149,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream httpBodyResponseStream, final ClientResponse httpResponse, final Closeable doneCallback) {
-            try (ByteInput in = new InputStreamByteInput(httpBodyResponseStream)) {
+        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+            try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Object object = deserializeObject(unmarshaller);
                 unmarshaller.finish();

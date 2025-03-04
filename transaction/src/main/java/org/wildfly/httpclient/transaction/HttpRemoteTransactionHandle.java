@@ -20,7 +20,6 @@ package org.wildfly.httpclient.transaction;
 
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
-import static org.wildfly.httpclient.transaction.Utils.newMarshaller;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
@@ -86,7 +85,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
             final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
-            final Marshaller marshaller = newMarshaller(marshallerFactory, result);
+            final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                         xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
@@ -141,7 +140,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
             final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
-            final Marshaller marshaller = newMarshaller(marshallerFactory, result);
+            final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                         xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
