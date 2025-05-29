@@ -51,6 +51,7 @@ import javax.naming.NamingException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidClassException;
+import java.io.OutputStream;
 import java.net.URLDecoder;
 import java.util.Collections;
 import java.util.Deque;
@@ -133,10 +134,11 @@ final class ServerHandlers {
                 exchange.setStatusCode(NO_CONTENT);
             } else {
                 putResponseHeader(exchange, CONTENT_TYPE, VALUE);
-                HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
-                Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
-                ByteOutput out = byteOutputOf(exchange.getOutputStream());
-                try (out) {
+
+                final HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
+                final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
+                final OutputStream os = exchange.getOutputStream();
+                try (ByteOutput out = byteOutputOf(os)) {
                     marshaller.start(out);
                     serializeObject(marshaller, result);
                     marshaller.finish();
@@ -286,7 +288,7 @@ final class ServerHandlers {
             final HttpMarshallerFactory marshallerFactory = config.getHttpUnmarshallerFactory(exchange);
             final InputStream is = exchange.getInputStream();
             try (ByteInput in = byteInputOf(is)) {
-                Unmarshaller unmarshaller = classFilter != null ?
+                final Unmarshaller unmarshaller = classFilter != null ?
                         marshallerFactory.createUnmarshaller(new FilterClassResolver(classFilter)):
                         marshallerFactory.createUnmarshaller();
                 unmarshaller.start(in);

@@ -127,6 +127,7 @@ final class ServerHandlers {
             final HttpMarshallerFactory httpMarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
             final Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
             final InputStream is = exchange.getInputStream();
+
             Xid simpleXid;
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
@@ -161,20 +162,21 @@ final class ServerHandlers {
 
         @Override
         protected void processRequest(final HttpServerExchange exchange) throws Exception {
+            putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION);
+
             final String timeoutString = getRequestHeader(exchange, TIMEOUT);
             final Integer timeout = Integer.parseInt(timeoutString);
-            putResponseHeader(exchange, CONTENT_TYPE, NEW_TRANSACTION);
             final LocalTransaction transaction = ctx.beginTransaction(timeout);
             final Xid xid = xidResolver.apply(transaction);
+            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+            final ByteArrayOutputStream os = new ByteArrayOutputStream();
 
-            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
-            try (ByteOutput out = byteOutputOf(baos)) {
+            try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeXid(marshaller, xid);
                 marshaller.finish();
             }
-            exchange.getResponseSender().send(ByteBuffer.wrap(baos.toByteArray()));
+            exchange.getResponseSender().send(ByteBuffer.wrap(os.toByteArray()));
         }
     }
 
@@ -199,16 +201,15 @@ final class ServerHandlers {
             final int flags = Integer.parseInt(flagsString);
             final String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
             final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
+            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+            final ByteArrayOutputStream os = new ByteArrayOutputStream();
 
-            final ByteArrayOutputStream out = new ByteArrayOutputStream();
-            final ByteOutput byteOutput = byteOutputOf(out);
-            try (byteOutput) {
-                Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
-                marshaller.start(byteOutput);
+            try (ByteOutput out = byteOutputOf(os)) {
+                marshaller.start(out);
                 serializeXidArray(marshaller, recoveryList);
                 marshaller.finish();
             }
-            exchange.getResponseSender().send(ByteBuffer.wrap(out.toByteArray()));
+            exchange.getResponseSender().send(ByteBuffer.wrap(os.toByteArray()));
         }
     }
 

@@ -65,6 +65,7 @@ import org.jboss.ejb.server.CancelHandle;
 import org.jboss.ejb.server.InvocationRequest;
 import org.jboss.ejb.server.ModuleAvailabilityListener;
 import org.jboss.ejb.server.SessionOpenRequest;
+import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.SimpleClassResolver;
@@ -84,6 +85,7 @@ import javax.transaction.xa.XAException;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InvalidClassException;
+import java.io.OutputStream;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -215,9 +217,10 @@ final class ServerHandlers {
                         final Class<?> view = Class.forName(viewName, false, classLoader);
                         final HttpMarshallerFactory unmarshallingFactory = config.getHttpUnmarshallerFactory(exchange);
                         final Unmarshaller unmarshaller = unmarshallingFactory.createUnmarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
+                        final InputStream is = exchange.getInputStream();
 
-                        try (InputStream is = exchange.getInputStream()) {
-                            unmarshaller.start(byteInputOf(is));
+                        try (ByteInput in = byteInputOf(is)) {
+                            unmarshaller.start(in);
                             final TransactionInfo txnInfo = deserializeTransaction(unmarshaller);
                             final Object[] methodParams = new Object[parameterTypeNames.length];
                             deserializeObjectArray(unmarshaller, methodParams);
@@ -408,16 +411,17 @@ final class ServerHandlers {
             }
 
             @Override
-            public void writeInvocationResult(Object result) {
-                if(identifier != null) {
-                    cancellationFlags.remove(identifier);
-                }
+            public void writeInvocationResult(final Object result) {
+                putResponseHeader(exchange, CONTENT_TYPE, Constants.EJB_RESPONSE);
+
+                if (identifier != null) cancellationFlags.remove(identifier);
+
                 try {
-                    putResponseHeader(exchange, CONTENT_TYPE, Constants.EJB_RESPONSE);
     //                                    if (output.getSessionAffinity() != null) {
     //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
     //                                    }
-                    try (final ByteOutput out = byteOutputOf(exchange.getOutputStream())) {
+                    final OutputStream os = exchange.getOutputStream();
+                    try (ByteOutput out = byteOutputOf(os)) {
                         marshaller.start(out);
                         serializeObject(marshaller, result);
                         serializeMap(marshaller, contextData);
@@ -549,9 +553,10 @@ final class ServerHandlers {
                 try {
                     final HttpMarshallerFactory httpUnmarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
                     final Unmarshaller unmarshaller = httpUnmarshallerFactory.createUnmarshaller(HttpProtocolV1ObjectTable.INSTANCE);
+                    final InputStream is = exchange.getInputStream();
 
-                    try (InputStream is = exchange.getInputStream()) {
-                        unmarshaller.start(byteInputOf(is));
+                    try (ByteInput in = byteInputOf(is)) {
+                        unmarshaller.start(in);
                         txnInfo = deserializeTransaction(unmarshaller);
                         unmarshaller.finish();
                     }
@@ -691,20 +696,18 @@ final class ServerHandlers {
         }
 
         @Override
-        protected void handleInternal(HttpServerExchange exchange) throws Exception {
+        protected void handleInternal(final HttpServerExchange exchange) throws Exception {
             putResponseHeader(exchange, CONTENT_TYPE, EJB_DISCOVERY_RESPONSE);
-            byte[] data;
-            final ByteArrayOutputStream out = new ByteArrayOutputStream();
-            Marshaller marshaller = config.getHttpMarshallerFactory(exchange)
-                    .createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
-            ByteOutput byteOutput = byteOutputOf(out);
-            try (byteOutput) {
-                marshaller.start(byteOutput);
+
+            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
+            final ByteArrayOutputStream os = new ByteArrayOutputStream();
+
+            try (ByteOutput out = byteOutputOf(os)) {
+                marshaller.start(out);
                 serializeSet(marshaller, availableModules);
                 marshaller.finish();
-                data = out.toByteArray();
             }
-            exchange.getResponseSender().send(ByteBuffer.wrap(data));
+            exchange.getResponseSender().send(ByteBuffer.wrap(os.toByteArray()));
         }
     }
 
