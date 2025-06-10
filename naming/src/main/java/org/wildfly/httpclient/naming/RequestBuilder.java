@@ -114,7 +114,7 @@ final class RequestBuilder {
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
-        if (!path.startsWith("/")) {
+        if (!path.startsWith("/") || encode) {
             sb.append("/");
         }
         sb.append(encode ? encode(path, UTF_8) : path);
