@@ -219,7 +219,7 @@ final class RequestBuilder {
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
-        if (path == null || !path.startsWith("/")) {
+        if (path == null || !path.startsWith("/") || encode) {
             sb.append("/");
         }
         sb.append(path == null || path.isEmpty() ? "-" : encode ? encode(path, UTF_8) : path);
