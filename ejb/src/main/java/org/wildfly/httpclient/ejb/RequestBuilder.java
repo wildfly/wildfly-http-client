@@ -27,7 +27,6 @@ import static io.undertow.util.Headers.GZIP;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
 
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
-import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.ejb.Constants.EJB_CONTEXT;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.Constants.EJB_EXCEPTION;
@@ -113,18 +112,47 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
 
     // implementation
 
+    @Override
     protected void setRequestPath(final ClientRequest request) {
+        final StringBuilder sb = new StringBuilder();
+        appendOperationPath(sb, EJB_CONTEXT);
         switch (getRequestType()) {
-            case INVOKE: request.setPath(getStartEjbInvocationRequestPath()); break;
-            case CREATE_SESSION: request.setPath(getCreateSessionEjbRequestPath()); break;
-            case DISCOVER: request.setPath(getDiscoverEjbRequestPath()); break;
-            case CANCEL: request.setPath(getCancelEjbInvocationRequestPath()); break;
+            case CANCEL: {
+                appendBeanPath(sb);
+                appendPath(sb, invocationId, false);
+                appendPath(sb, "" + cancelIfRunning, false);
+            } break;
+            case CREATE_SESSION: {
+                appendBeanPath(sb);
+            } break;
+            case DISCOVER: break;
+            case INVOKE: {
+                appendBeanPath(sb);
+                appendPath(sb, beanId, false);
+                appendPath(sb, view, false);
+                appendPath(sb, method.getName(), false);
+                for (Class<?> param : method.getParameterTypes()) {
+                    appendPath(sb, param.getName(), true);
+                }
+            } break;
             default: throw new IllegalStateException();
         }
+        request.setPath(sb.toString());
     }
 
+    @Override
     protected void setRequestHeaders(final ClientRequest request) {
         switch (getRequestType()) {
+            case CANCEL: {
+                // no headers to be added
+            } break;
+            case CREATE_SESSION: {
+                putRequestHeader(request, ACCEPT, EJB_EXCEPTION);
+                putRequestHeader(request, CONTENT_TYPE, SESSION_OPEN);
+            } break;
+            case DISCOVER: {
+                putRequestHeader(request, ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
+            } break;
             case INVOKE: {
                 putRequestHeader(request, ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
                 putRequestHeader(request, CONTENT_TYPE, INVOCATION);
@@ -139,53 +167,16 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
                 }
                 putRequestHeader(request, TRANSFER_ENCODING, CHUNKED);
             } break;
-            case CREATE_SESSION: {
-                putRequestHeader(request, ACCEPT, EJB_EXCEPTION);
-                putRequestHeader(request, CONTENT_TYPE, SESSION_OPEN);
-            } break;
-            case DISCOVER: {
-                putRequestHeader(request, ACCEPT, EJB_DISCOVERY_RESPONSE + "," + EJB_EXCEPTION);
-            } break;
-            case CANCEL: {
-                // no headers to be added
-            } break;
             default: throw new IllegalStateException();
         }
     }
 
-    private String getCreateSessionEjbRequestPath() {
-        final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb);
-        appendBeanPath(sb);
-        return sb.toString();
-    }
-
-    private String getDiscoverEjbRequestPath() {
-        final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb);
-        return sb.toString();
-    }
-
-    private String getCancelEjbInvocationRequestPath() {
-        final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb);
-        appendBeanPath(sb);
-        appendPath(sb, invocationId, false);
-        appendPath(sb, "" + cancelIfRunning, false);
-        return sb.toString();
-    }
-
-    private String getStartEjbInvocationRequestPath() {
-        final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb);
-        appendBeanPath(sb);
-        appendPath(sb, beanId, false);
-        appendPath(sb, view, false);
-        appendPath(sb, method.getName(), false);
-        for (final Class<?> param : method.getParameterTypes()) {
-            appendPath(sb, param.getName(), true);
+    @Override
+    protected void appendPath(final StringBuilder sb, final String path, final boolean encode) {
+        if (path == null || !path.startsWith("/") || encode) {
+            sb.append("/");
         }
-        return sb.toString();
+        sb.append(path == null || path.isEmpty() ? "-" : encode ? encode(path, UTF_8) : path);
     }
 
     private void appendBeanPath(final StringBuilder sb) {
@@ -193,20 +184,6 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
         appendPath(sb, locator.getModuleName(), true);
         appendPath(sb, locator.getDistinctName(), true);
         appendPath(sb, locator.getBeanName(), true);
-    }
-
-    private void appendOperationPath(final StringBuilder sb) {
-        sb.append(getPathPrefix());
-        appendPath(sb, EJB_CONTEXT, false);
-        appendPath(sb, VERSION_PATH + getProtocolVersion(), false);
-        appendPath(sb, getRequestType().getPath(), false);
-    }
-
-    private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
-        if (path == null || !path.startsWith("/") || encode) {
-            sb.append("/");
-        }
-        sb.append(path == null || path.isEmpty() ? "-" : encode ? encode(path, UTF_8) : path);
     }
 
 }

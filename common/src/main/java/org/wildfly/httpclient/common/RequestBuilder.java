@@ -18,6 +18,10 @@
 
 package org.wildfly.httpclient.common;
 
+import static java.net.URLEncoder.encode;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
+
 import io.undertow.client.ClientRequest;
 
 public abstract class RequestBuilder<E extends Enum<? extends RequestType>> {
@@ -57,5 +61,26 @@ public abstract class RequestBuilder<E extends Enum<? extends RequestType>> {
     protected abstract void setRequestPath(final ClientRequest request);
 
     protected abstract void setRequestHeaders(final ClientRequest request);
+
+    protected void setQueryParameter(final StringBuilder sb, final String paramName, final String paramValue) {
+        sb.append("?");
+        sb.append(encode(paramName, UTF_8));
+        sb.append("=");
+        sb.append(encode(paramValue, UTF_8));
+    }
+
+    protected void appendPath(final StringBuilder sb, final String path, final boolean encode) {
+        if (!path.startsWith("/") || encode) {
+            sb.append("/");
+        }
+        sb.append(encode ? encode(path, UTF_8) : path);
+    }
+
+    protected void appendOperationPath(final StringBuilder sb, final String contextPath) {
+        sb.append(getPathPrefix());
+        appendPath(sb, contextPath, false);
+        appendPath(sb, VERSION_PATH + getProtocolVersion(), false);
+        appendPath(sb, ((RequestType) getRequestType()).getPath(), false);
+    }
 
 }
