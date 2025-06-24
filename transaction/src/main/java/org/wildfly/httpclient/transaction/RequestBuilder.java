@@ -21,10 +21,7 @@ package org.wildfly.httpclient.transaction;
 import static java.lang.Boolean.TRUE;
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
-import static java.net.URLEncoder.encode;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
-import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.transaction.Constants.EXCEPTION;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
 import static org.wildfly.httpclient.transaction.Constants.OPC_QUERY_PARAMETER;
@@ -86,14 +83,14 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
 
     // implementation
 
+    @Override
     protected void setRequestPath(final ClientRequest request) {
         final StringBuilder sb = new StringBuilder();
-        sb.append(getPathPrefix());
-        appendPath(sb, TXN_CONTEXT, false);
-        appendPath(sb, VERSION_PATH + getProtocolVersion(), false);
-        appendPath(sb, getRequestType().getPath(), false);
+        appendOperationPath(sb, TXN_CONTEXT);
         if (getRequestType() == XA_COMMIT) {
-            sb.append(onePhase != null && onePhase ? "?" + OPC_QUERY_PARAMETER + "=" + TRUE : "");
+            if (onePhase != null && onePhase) {
+                setQueryParameter(sb, OPC_QUERY_PARAMETER, TRUE.toString());
+            }
         } else if (getRequestType() == XA_RECOVER) {
             appendPath(sb, parentName, false);
         }
@@ -101,6 +98,7 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
     }
 
 
+    @Override
     protected void setRequestHeaders(final ClientRequest request) {
         if (getRequestType() == UT_BEGIN) {
             putRequestHeader(request, ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
@@ -113,13 +111,6 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
             putRequestHeader(request, ACCEPT, EXCEPTION);
             putRequestHeader(request, CONTENT_TYPE, XID);
         }
-    }
-
-    private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
-        if (!path.startsWith("/") || encode) {
-            sb.append("/");
-        }
-        sb.append(encode ? encode(path, UTF_8) : path);
     }
 
 }
