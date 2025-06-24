@@ -75,8 +75,8 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     @Override
     public Xid[] recover(int flag, String parentName) throws XAException {
 
-        final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.XA_RECOVER).setVersion(targetContext.getProtocolVersion()).setFlags(flag).setParent(parentName);
-        final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        final RequestBuilder builder = new RequestBuilder(targetContext, RequestType.XA_RECOVER).setFlags(flag).setParent(parentName);
+        final ClientRequest request = builder.createRequest();
 
         final AuthenticationConfiguration authenticationConfiguration = getAuthenticationConfiguration(targetContext.getUri());
         final SSLContext sslContext;
@@ -112,8 +112,8 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
 
     @Override
     public SimpleTransactionControl begin(int timeout) throws SystemException {
-        final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_BEGIN).setVersion(targetContext.getProtocolVersion()).setTimeout(timeout);
-        final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        final RequestBuilder builder = new RequestBuilder(targetContext, RequestType.UT_BEGIN).setTimeout(timeout);
+        final ClientRequest request = builder.createRequest();
 
         final AuthenticationConfiguration authenticationConfiguration = getAuthenticationConfiguration(targetContext.getUri());
         final SSLContext sslContext;

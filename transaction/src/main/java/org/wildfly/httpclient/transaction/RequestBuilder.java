@@ -39,7 +39,8 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_COMMIT;
 import static org.wildfly.httpclient.transaction.RequestType.XA_RECOVER;
 
 import io.undertow.client.ClientRequest;
-import org.wildfly.httpclient.common.Protocol;
+
+import org.wildfly.httpclient.common.HttpTargetContext;
 
 /**
  * HTTP TXN module client request builder. Encapsulates all information needed to create HTTP TXN client requests.
@@ -48,26 +49,20 @@ import org.wildfly.httpclient.common.Protocol;
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class RequestBuilder {
+final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<RequestType> {
 
-    private RequestType requestType;
-    private int version = Protocol.LATEST;
     private int timeout;
     private int flags;
     private String parentName;
     private Boolean onePhase;
 
+    // constructor
+
+    RequestBuilder(final HttpTargetContext targetContext, final RequestType requestType) {
+        super(targetContext, requestType);
+    }
+
     // setters
-
-    RequestBuilder setRequestType(final RequestType requestType) {
-        this.requestType = requestType;
-        return this;
-    }
-
-    RequestBuilder setVersion(final int version) {
-        this.version = version;
-        return this;
-    }
 
     RequestBuilder setTimeout(final int timeout) {
         this.timeout = timeout;
@@ -89,42 +84,28 @@ final class RequestBuilder {
         return this;
     }
 
-    // helper methods
+    // implementation
 
-    ClientRequest createRequest(final String prefix) {
-        final ClientRequest request = new ClientRequest();
-        setRequestMethod(request);
-        setRequestPath(request, prefix);
-        setRequestHeaders(request);
-        return request;
-    }
-
-    private void setRequestMethod(final ClientRequest request) {
-        request.setMethod(requestType.getMethod());
-    }
-
-    private void setRequestPath(final ClientRequest request, final String prefix) {
+    protected void setRequestPath(final ClientRequest request) {
         final StringBuilder sb = new StringBuilder();
-        if (prefix != null) {
-            sb.append(prefix);
-        }
+        sb.append(getPathPrefix());
         appendPath(sb, TXN_CONTEXT, false);
-        appendPath(sb, VERSION_PATH + version, false);
-        appendPath(sb, requestType.getPath(), false);
-        if (requestType == XA_COMMIT) {
+        appendPath(sb, VERSION_PATH + getProtocolVersion(), false);
+        appendPath(sb, getRequestType().getPath(), false);
+        if (getRequestType() == XA_COMMIT) {
             sb.append(onePhase != null && onePhase ? "?" + OPC_QUERY_PARAMETER + "=" + TRUE : "");
-        } else if (requestType == XA_RECOVER) {
+        } else if (getRequestType() == XA_RECOVER) {
             appendPath(sb, parentName, false);
         }
         request.setPath(sb.toString());
     }
 
 
-    private void setRequestHeaders(final ClientRequest request) {
-        if (requestType == UT_BEGIN) {
+    protected void setRequestHeaders(final ClientRequest request) {
+        if (getRequestType() == UT_BEGIN) {
             putRequestHeader(request, ACCEPT, EXCEPTION + "," + NEW_TRANSACTION);
             putRequestHeader(request, TIMEOUT, String.valueOf(timeout));
-        } else if (requestType == XA_RECOVER) {
+        } else if (getRequestType() == XA_RECOVER) {
             putRequestHeader(request, ACCEPT, XID_LIST + "," + NEW_TRANSACTION);
             putRequestHeader(request, RECOVERY_PARENT_NAME, parentName);
             putRequestHeader(request, RECOVERY_FLAGS, String.valueOf(flags));

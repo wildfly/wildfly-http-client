@@ -41,7 +41,7 @@ import static java.net.URLEncoder.encode;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.ejb.client.EJBLocator;
-import org.wildfly.httpclient.common.Protocol;
+import org.wildfly.httpclient.common.HttpTargetContext;
 
 import java.lang.reflect.Method;
 
@@ -52,18 +52,24 @@ import java.lang.reflect.Method;
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class RequestBuilder {
+final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<RequestType> {
 
     private EJBLocator<?> locator;
     private String beanId;
     private String view;
     private Method method;
-    private RequestType requestType;
     private String invocationId;
-    private int version = Protocol.LATEST;
     private boolean cancelIfRunning;
     private boolean compressRequest;
     private boolean compressResponse;
+
+    // constructor
+
+    RequestBuilder(final HttpTargetContext targetContext, final RequestType requestType) {
+        super(targetContext, requestType);
+    }
+
+    // setters
 
     RequestBuilder setCompressRequest(final boolean compressRequest) {
         this.compressRequest = compressRequest;
@@ -95,18 +101,8 @@ final class RequestBuilder {
         return this;
     }
 
-    RequestBuilder setRequestType(final RequestType requestType) {
-        this.requestType = requestType;
-        return this;
-    }
-
     RequestBuilder setInvocationId(final String invocationId) {
         this.invocationId = invocationId;
-        return this;
-    }
-
-    RequestBuilder setVersion(final int version) {
-        this.version = version;
         return this;
     }
 
@@ -115,30 +111,20 @@ final class RequestBuilder {
         return this;
     }
 
-    ClientRequest createRequest(final String prefix) {
-        final ClientRequest request = new ClientRequest();
-        setRequestMethod(request);
-        setRequestPath(request, prefix);
-        setRequestHeaders(request);
-        return request;
-    }
+    // implementation
 
-    private void setRequestMethod(final ClientRequest request) {
-        request.setMethod(requestType.getMethod());
-    }
-
-    private void setRequestPath(final ClientRequest request, final String prefix) {
-        switch (requestType) {
-            case INVOKE: request.setPath(getStartEjbInvocationRequestPath(prefix)); break;
-            case CREATE_SESSION: request.setPath(getCreateSessionEjbRequestPath(prefix)); break;
-            case DISCOVER: request.setPath(getDiscoverEjbRequestPath(prefix)); break;
-            case CANCEL: request.setPath(getCancelEjbInvocationRequestPath(prefix)); break;
+    protected void setRequestPath(final ClientRequest request) {
+        switch (getRequestType()) {
+            case INVOKE: request.setPath(getStartEjbInvocationRequestPath()); break;
+            case CREATE_SESSION: request.setPath(getCreateSessionEjbRequestPath()); break;
+            case DISCOVER: request.setPath(getDiscoverEjbRequestPath()); break;
+            case CANCEL: request.setPath(getCancelEjbInvocationRequestPath()); break;
             default: throw new IllegalStateException();
         }
     }
 
-    private void setRequestHeaders(final ClientRequest request) {
-        switch (requestType) {
+    protected void setRequestHeaders(final ClientRequest request) {
+        switch (getRequestType()) {
             case INVOKE: {
                 putRequestHeader(request, ACCEPT, INVOCATION_ACCEPT + "," + EJB_EXCEPTION);
                 putRequestHeader(request, CONTENT_TYPE, INVOCATION);
@@ -167,31 +153,31 @@ final class RequestBuilder {
         }
     }
 
-    private String getCreateSessionEjbRequestPath(final String prefix) {
+    private String getCreateSessionEjbRequestPath() {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix);
+        appendOperationPath(sb);
         appendBeanPath(sb);
         return sb.toString();
     }
 
-    private String getDiscoverEjbRequestPath(final String prefix) {
+    private String getDiscoverEjbRequestPath() {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix);
+        appendOperationPath(sb);
         return sb.toString();
     }
 
-    private String getCancelEjbInvocationRequestPath(final String prefix) {
+    private String getCancelEjbInvocationRequestPath() {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix);
+        appendOperationPath(sb);
         appendBeanPath(sb);
         appendPath(sb, invocationId, false);
         appendPath(sb, "" + cancelIfRunning, false);
         return sb.toString();
     }
 
-    private String getStartEjbInvocationRequestPath(final String prefix) {
+    private String getStartEjbInvocationRequestPath() {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, prefix);
+        appendOperationPath(sb);
         appendBeanPath(sb);
         appendPath(sb, beanId, false);
         appendPath(sb, view, false);
@@ -209,13 +195,11 @@ final class RequestBuilder {
         appendPath(sb, locator.getBeanName(), true);
     }
 
-    private void appendOperationPath(final StringBuilder sb, final String prefix) {
-        if (prefix != null) {
-            sb.append(prefix);
-        }
+    private void appendOperationPath(final StringBuilder sb) {
+        sb.append(getPathPrefix());
         appendPath(sb, EJB_CONTEXT, false);
-        appendPath(sb, VERSION_PATH + version, false);
-        appendPath(sb, requestType.getPath(), false);
+        appendPath(sb, VERSION_PATH + getProtocolVersion(), false);
+        appendPath(sb, getRequestType().getPath(), false);
     }
 
     private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
