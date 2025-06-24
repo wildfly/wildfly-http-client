@@ -30,7 +30,8 @@ import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
 
 import io.undertow.client.ClientRequest;
-import org.wildfly.httpclient.common.Protocol;
+
+import org.wildfly.httpclient.common.HttpTargetContext;
 
 import javax.naming.Name;
 
@@ -41,20 +42,19 @@ import javax.naming.Name;
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class RequestBuilder {
+final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<RequestType> {
 
-    private RequestType requestType;
     private Name name;
     private Name newName;
     private Object object;
-    private int version = Protocol.LATEST;
+
+    // constructor
+
+    RequestBuilder(final HttpTargetContext targetContext, final RequestType requestType) {
+        super(targetContext, requestType);
+    }
 
     // setters
-
-    RequestBuilder setRequestType(final RequestType requestType) {
-        this.requestType = requestType;
-        return this;
-    }
 
     RequestBuilder setName(final Name name) {
         this.name = name;
@@ -71,33 +71,14 @@ final class RequestBuilder {
         return this;
     }
 
-    RequestBuilder setVersion(final int version) {
-        this.version = version;
-        return this;
-    }
+    // implementation
 
-    // helper methods
-
-    ClientRequest createRequest(final String prefix) {
-        final ClientRequest request = new ClientRequest();
-        setRequestMethod(request);
-        setRequestPath(request, prefix);
-        setRequestHeaders(request);
-        return request;
-    }
-
-    private void setRequestMethod(final ClientRequest request) {
-        request.setMethod(requestType.getMethod());
-    }
-
-    private void setRequestPath(final ClientRequest request, final String prefix) {
+    protected void setRequestPath(final ClientRequest request) {
         final StringBuilder sb = new StringBuilder();
-        if (prefix != null) {
-            sb.append(prefix);
-        }
+        sb.append(super.getPathPrefix());
         appendPath(sb, NAMING_CONTEXT, false);
-        appendPath(sb, VERSION_PATH + version, false);
-        appendPath(sb, requestType.getPath(), false);
+        appendPath(sb, VERSION_PATH + getProtocolVersion(), false);
+        appendPath(sb, getRequestType().getPath(), false);
         appendPath(sb, name.toString(), true);
         if (newName != null) {
             sb.append("?" + NEW_QUERY_PARAMETER + "=");
@@ -106,7 +87,7 @@ final class RequestBuilder {
         request.setPath(sb.toString());
     }
 
-    private void setRequestHeaders(final ClientRequest request) {
+    protected void setRequestHeaders(final ClientRequest request) {
         putRequestHeader(request, ACCEPT, VALUE + "," + EXCEPTION);
         if (object != null) {
             putRequestHeader(request, CONTENT_TYPE, VALUE);

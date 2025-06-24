@@ -154,8 +154,8 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         }
 
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(newUri, authenticationContext, -1, "ejb", "jboss");
-        final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.DISCOVER).setVersion(targetContext.getProtocolVersion());
-        final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        final RequestBuilder builder = new RequestBuilder(targetContext, RequestType.DISCOVER);
+        final ClientRequest request = builder.createRequest();
         final CompletableFuture<Set<EJBModuleIdentifier>> result = new CompletableFuture<>();
         final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);

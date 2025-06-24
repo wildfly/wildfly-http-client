@@ -80,8 +80,8 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             }
             statusRef.set(Status.STATUS_COMMITTING);
 
-            final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_COMMIT).setVersion(targetContext.getProtocolVersion());
-            final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+            final RequestBuilder builder = new RequestBuilder(targetContext, RequestType.UT_COMMIT);
+            final ClientRequest request = builder.createRequest();
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
             final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
@@ -135,8 +135,8 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
             statusRef.set(Status.STATUS_COMMITTING);
 
-            final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_ROLLBACK).setVersion(targetContext.getProtocolVersion());
-            final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+            final RequestBuilder builder = new RequestBuilder(targetContext, RequestType.UT_ROLLBACK);
+            final ClientRequest request = builder.createRequest();
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
             final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
