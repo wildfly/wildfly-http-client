@@ -299,7 +299,6 @@ public class HttpTargetContext extends AbstractAttachable {
                                         failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
                                         //close the connection to be safe
                                         connection.done(true);
-
                                     } else {
                                         if (httpResultHandler != null) {
                                             final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
@@ -312,7 +311,6 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 connection.done(false);
                                             };
                                             if (response.getResponseCode() == NO_CONTENT) {
-                                                IoUtils.safeClose(in);
                                                 httpResultHandler.handleResult(null, response, doneCallback);
                                             } else {
                                                 String encoding = getResponseHeader(response, CONTENT_ENCODING);
@@ -335,7 +333,6 @@ public class HttpTargetContext extends AbstractAttachable {
                                             connection.done(false);
                                         }
                                     }
-
                                 } catch (Exception e) {
                                     try {
                                         failureHandler.handleFailure(e);
