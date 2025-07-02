@@ -271,16 +271,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                     if (isException) {
                                         final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
                                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
-                                            InputStream in = inputStream;
-                                            String encoding = getResponseHeader(response, CONTENT_ENCODING);
-                                            if (encoding != null) {
-                                                String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                if (GZIP.toString().equals(lowerEncoding)) {
-                                                    in = new GZIPInputStream(in);
-                                                } else if (!lowerEncoding.equals(IDENTITY.toString())) {
-                                                    throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
-                                                }
-                                            }
+                                            final InputStream in = identityOrGzipInputStream(response, inputStream);
                                             unmarshaller.start(byteInputOf(in));
                                             Throwable exception = (Throwable) unmarshaller.readObject();
                                             Map<String, Object> attachments = readAttachments(unmarshaller);
@@ -302,7 +293,6 @@ public class HttpTargetContext extends AbstractAttachable {
                                     } else {
                                         if (httpResultHandler != null) {
                                             final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
-                                            InputStream inputStream = in;
                                             Closeable doneCallback = () -> {
                                                 IoUtils.safeClose(in);
                                                 if (completedTask != null) {
@@ -313,15 +303,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                             if (response.getResponseCode() == NO_CONTENT) {
                                                 httpResultHandler.handleResult(null, response, doneCallback);
                                             } else {
-                                                String encoding = getResponseHeader(response, CONTENT_ENCODING);
-                                                if (encoding != null) {
-                                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                    if (GZIP.toString().equals(lowerEncoding)) {
-                                                        inputStream = new GZIPInputStream(inputStream);
-                                                    } else if (!lowerEncoding.equals(IDENTITY.toString())) {
-                                                        throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
-                                                    }
-                                                }
+                                                final InputStream inputStream = identityOrGzipInputStream(response, in);
                                                 httpResultHandler.handleResult(inputStream, response, doneCallback);
                                             }
                                         } else {
@@ -398,6 +380,19 @@ public class HttpTargetContext extends AbstractAttachable {
                 connection.done(true);
             }
         }
+    }
+
+    private static InputStream identityOrGzipInputStream(final ClientResponse response, final InputStream is) throws IOException {
+        final String encoding = getResponseHeader(response, CONTENT_ENCODING);
+        if (encoding != null) {
+            final String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+            if (GZIP.toString().equals(lowerEncoding)) {
+                return new GZIPInputStream(is);
+            } else if (!lowerEncoding.equals(IDENTITY.toString())) {
+                throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
+            }
+        }
+        return is;
     }
 
     private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
