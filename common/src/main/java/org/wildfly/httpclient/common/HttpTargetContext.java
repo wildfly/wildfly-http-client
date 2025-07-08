@@ -219,8 +219,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                     //retry the invocation
                                                     sendRequestInternal(connection, request, finalAuthenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
                                                 } else {
-                                                    failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed());
-                                                    connection.done(true);
+                                                    HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.authenticationFailed());
                                                 }
                                             }, failureHandler::handleFailure, false, finalSslContext);
 
@@ -254,9 +253,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                 }
 
                                 if (!ok) {
-                                    failureHandler.handleFailure(failureDescription(response));
-                                    //close the connection to be safe
-                                    connection.done(true);
+                                    HttpTargetContext.failed(connection, failureHandler, failureDescription(response));
                                     return;
                                 }
                                 try {
@@ -280,10 +277,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                             failureHandler.handleFailure(exception);
                                         }
                                     } else if (response.getResponseCode() >= 400) {
-                                        //unknown error
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
-                                        //close the connection to be safe
-                                        connection.done(true);
+                                        HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
                                     } else {
                                         if (httpResultHandler != null) {
                                             final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
@@ -310,22 +304,14 @@ public class HttpTargetContext extends AbstractAttachable {
                                         }
                                     }
                                 } catch (Exception e) {
-                                    try {
-                                        failureHandler.handleFailure(e);
-                                    } finally {
-                                        connection.done(true);
-                                    }
+                                     HttpTargetContext.failed(connection, failureHandler, e);
                                 }
                             });
                         }
 
                         @Override
                         public void failed(IOException e) {
-                            try {
-                                failureHandler.handleFailure(e);
-                            } finally {
-                                connection.done(true);
-                            }
+                            HttpTargetContext.failed(connection, failureHandler, e);
                         }
                     });
 
@@ -335,11 +321,7 @@ public class HttpTargetContext extends AbstractAttachable {
                             try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
                                 httpMarshaller.marshall(identityOrGzipOutputStream(request, outputStream));
                             } catch (Exception e) {
-                                try {
-                                    failureHandler.handleFailure(e);
-                                } finally {
-                                    connection.done(true);
-                                }
+                                HttpTargetContext.failed(connection, failureHandler, e);
                             }
                         });
                     }
@@ -347,19 +329,11 @@ public class HttpTargetContext extends AbstractAttachable {
 
                 @Override
                 public void failed(IOException e) {
-                    try {
-                        failureHandler.handleFailure(e);
-                    } finally {
-                        connection.done(true);
-                    }
+                    HttpTargetContext.failed(connection, failureHandler, e);
                 }
             });
         } catch (Throwable e) {
-            try {
-                failureHandler.handleFailure(e);
-            } finally {
-                connection.done(true);
-            }
+            HttpTargetContext.failed(connection, failureHandler, e);
         }
     }
 
@@ -371,6 +345,14 @@ public class HttpTargetContext extends AbstractAttachable {
             return HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response);
         } else {
             return HttpClientMessages.MESSAGES.invalidResponseType(type);
+        }
+    }
+
+    private static void failed(final HttpConnectionPool.ConnectionHandle connection, final HttpFailureHandler failureHandler, final Throwable t) {
+        try {
+            failureHandler.handleFailure(t);
+        } finally {
+            connection.done(true);
         }
     }
 
