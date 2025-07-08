@@ -30,6 +30,7 @@ import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 
 import javax.transaction.xa.Xid;
 import java.io.InputStream;
@@ -48,8 +49,8 @@ final class ClientHandlers {
         // forbidden instantiation
     }
 
-    static HttpTargetContext.HttpMarshaller xidHttpMarshaller(final Marshaller marshaller, final Xid xid) {
-        return new XidHttpMarshaller(marshaller, xid);
+    static HttpBodyEncoder xidHttpBodyEncoder(final Marshaller marshaller, final Xid xid) {
+        return new XidHttpBodyEncoder(marshaller, xid);
     }
 
     static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
@@ -64,17 +65,17 @@ final class ClientHandlers {
         return new XidArrayHttpResultHandler(unmarshaller, result);
     }
 
-    private static final class XidHttpMarshaller implements HttpTargetContext.HttpMarshaller {
+    private static final class XidHttpBodyEncoder implements HttpBodyEncoder {
         private final Marshaller marshaller;
         private final Xid xid;
 
-        private XidHttpMarshaller(final Marshaller marshaller, final Xid xid) {
+        private XidHttpBodyEncoder(final Marshaller marshaller, final Xid xid) {
             this.marshaller = marshaller;
             this.xid = xid;
         }
 
         @Override
-        public void marshall(final OutputStream os, final ClientRequest request) throws Exception {
+        public void encode(final OutputStream os, final ClientRequest request) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeXid(marshaller, xid);

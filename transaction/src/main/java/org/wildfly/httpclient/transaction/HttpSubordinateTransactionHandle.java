@@ -21,7 +21,7 @@ package org.wildfly.httpclient.transaction;
 import static java.lang.Boolean.TRUE;
 import static java.lang.Boolean.parseBoolean;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
-import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
+import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpBodyEncoder;
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
 import static org.wildfly.httpclient.transaction.Constants.READ_ONLY;
 import static org.wildfly.httpclient.transaction.RequestType.XA_BEFORE_COMPLETION;
@@ -115,7 +115,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final Marshaller marshaller = marshallerFactory.createMarshaller(result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                    xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, resultFunction), result::completeExceptionally, null, null);
+                    xidHttpBodyEncoder(marshaller, id), emptyHttpResultHandler(result, resultFunction), result::completeExceptionally, null, null);
         }
         try {
             try {

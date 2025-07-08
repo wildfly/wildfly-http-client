@@ -39,6 +39,7 @@ import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 import org.xnio.IoUtils;
 
 import java.io.InputStream;
@@ -61,12 +62,12 @@ final class ClientHandlers {
         // forbidden instantiation
     }
 
-    static HttpTargetContext.HttpMarshaller invokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
-        return new InvokeHttpMarshaller(marshaller, txnInfo, objects, map);
+    static HttpBodyEncoder invokeHttpBodyEncoder(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
+        return new InvokeHttpBodyEncoder(marshaller, txnInfo, objects, map);
     }
 
-    static HttpTargetContext.HttpMarshaller createSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo) {
-        return new CreateSessionHttpMarshaller(marshaller, txnInfo);
+    static HttpBodyEncoder createSessionHttpBodyEncoder(final Marshaller marshaller, final TransactionInfo txnInfo) {
+        return new CreateSessionHttpBodyEncoder(marshaller, txnInfo);
     }
 
     static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
@@ -93,13 +94,13 @@ final class ClientHandlers {
         return new InvokeHttpResultHandler(unmarshaller, result);
     }
 
-    private static final class InvokeHttpMarshaller implements HttpTargetContext.HttpMarshaller {
+    private static final class InvokeHttpBodyEncoder implements HttpBodyEncoder {
         private final Marshaller marshaller;
         private final TransactionInfo txnInfo;
         private final Object[] objects;
         private final Map<String, Object> map;
 
-        private InvokeHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
+        private InvokeHttpBodyEncoder(final Marshaller marshaller, final TransactionInfo txnInfo, final Object[] objects, final Map<String, Object> map) {
             this.marshaller = marshaller;
             this.txnInfo = txnInfo;
             this.objects = objects;
@@ -107,7 +108,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream os, final ClientRequest request) throws Exception {
+        public void encode(final OutputStream os, final ClientRequest request) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
@@ -118,17 +119,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class CreateSessionHttpMarshaller implements HttpTargetContext.HttpMarshaller {
+    private static final class CreateSessionHttpBodyEncoder implements HttpBodyEncoder {
         private final Marshaller marshaller;
         private final TransactionInfo txnInfo;
 
-        private CreateSessionHttpMarshaller(final Marshaller marshaller, final TransactionInfo txnInfo) {
+        private CreateSessionHttpBodyEncoder(final Marshaller marshaller, final TransactionInfo txnInfo) {
             this.marshaller = marshaller;
             this.txnInfo = txnInfo;
         }
 
         @Override
-        public void marshall(final OutputStream os, final ClientRequest request) throws Exception {
+        public void encode(final OutputStream os, final ClientRequest request) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);

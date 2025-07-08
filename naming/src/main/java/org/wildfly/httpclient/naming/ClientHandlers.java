@@ -31,6 +31,7 @@ import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 import org.wildfly.naming.client.NamingProvider;
 
 import java.io.InputStream;
@@ -49,8 +50,8 @@ final class ClientHandlers {
         // forbidden instantiation
     }
 
-    static HttpTargetContext.HttpMarshaller objectHttpMarshaller(final Marshaller marshaller, final Object object) {
-        return new ObjectHttpMarshaller(marshaller, object);
+    static HttpBodyEncoder objectHttpBodyEncoder(final Marshaller marshaller, final Object object) {
+        return new ObjectHttpBodyEncoder(marshaller, object);
     }
 
     static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
@@ -65,17 +66,17 @@ final class ClientHandlers {
         return new ObjectHttpResultHandler(unmarshaller, result);
     }
 
-    private static final class ObjectHttpMarshaller implements HttpTargetContext.HttpMarshaller {
+    private static final class ObjectHttpBodyEncoder implements HttpBodyEncoder {
         private final Marshaller marshaller;
         private final Object object;
 
-        private ObjectHttpMarshaller(final Marshaller marshaller, final Object object) {
+        private ObjectHttpBodyEncoder(final Marshaller marshaller, final Object object) {
             this.marshaller = marshaller;
             this.object = object;
         }
 
         @Override
-        public void marshall(final OutputStream os, final ClientRequest request) throws Exception {
+        public void encode(final OutputStream os, final ClientRequest request) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeObject(marshaller, object);

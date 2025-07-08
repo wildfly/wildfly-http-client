@@ -22,7 +22,7 @@ import static java.security.AccessController.doPrivileged;
 import static org.wildfly.httpclient.naming.ClassLoaderUtils.getContextClassLoader;
 import static org.wildfly.httpclient.naming.ClientHandlers.emptyHttpResultHandler;
 import static org.wildfly.httpclient.naming.ClientHandlers.optionalObjectHttpResultHandler;
-import static org.wildfly.httpclient.naming.ClientHandlers.objectHttpMarshaller;
+import static org.wildfly.httpclient.naming.ClientHandlers.objectHttpBodyEncoder;
 import static org.wildfly.httpclient.naming.Constants.HTTPS_PORT;
 import static org.wildfly.httpclient.naming.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.naming.Constants.HTTP_PORT;
@@ -324,7 +324,7 @@ public class HttpRootContext extends AbstractContext {
         final Marshaller marshaller = marshallerFactory.createMarshaller(objectResolver, result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                    object != null ? objectHttpMarshaller(marshaller, object) : null, emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+                    object != null ? objectHttpBodyEncoder(marshaller, object) : null, emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
         }
         try {
             result.get();

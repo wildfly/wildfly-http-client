@@ -23,8 +23,8 @@ import static org.wildfly.httpclient.ejb.ClientHandlers.cancelInvocationResponse
 import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpResultHandler;
 import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionResponseFunction;
 import static org.wildfly.httpclient.ejb.ClientHandlers.emptyHttpResultHandler;
-import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpMarshaller;
-import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionHttpMarshaller;
+import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpBodyEncoder;
+import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionHttpBodyEncoder;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_PORT;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.Constants.HTTP_PORT;
@@ -172,7 +172,7 @@ class HttpEJBReceiver extends EJBReceiver {
         Object[] parameters = clientInvocationContext.getParameters();
         Map<String, Object> contextData = clientInvocationContext.getContextData();
         final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpMarshaller(marshaller, transactionInfo, parameters, contextData),
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpBodyEncoder(marshaller, transactionInfo, parameters, contextData),
                 invokeHttpResultHandler(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
@@ -208,7 +208,7 @@ class HttpEJBReceiver extends EJBReceiver {
         TransactionInfo transactionInfo = getTransactionInfo(ContextTransactionManager.getInstance().getTransaction(), targetContext.getUri());
         Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
         targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                createSessionHttpMarshaller(marshaller, transactionInfo),
+                createSessionHttpBodyEncoder(marshaller, transactionInfo),
                 emptyHttpResultHandler(result, createSessionResponseFunction()),
                 result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
 
