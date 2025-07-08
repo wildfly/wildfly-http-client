@@ -28,6 +28,7 @@ import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
 import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
 
+import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBModuleIdentifier;
@@ -106,7 +107,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream os) throws Exception {
+        public void marshall(final OutputStream os, final ClientRequest request) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
@@ -127,7 +128,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream os) throws Exception {
+        public void marshall(final OutputStream os, final ClientRequest request) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
