@@ -38,7 +38,7 @@ import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyDecoder;
 import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 import org.xnio.IoUtils;
 
@@ -70,16 +70,16 @@ final class ClientHandlers {
         return new CreateSessionHttpBodyEncoder(marshaller, txnInfo);
     }
 
-    static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
-        return new EmptyHttpResultHandler<T>(result, function);
+    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        return new EmptyHttpBodyDecoder<T>(result, function);
     }
 
-    static HttpTargetContext.HttpResultHandler discoveryHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Set<EJBModuleIdentifier>> result) {
-        return new DiscoveryHttpResultHandler(unmarshaller, result);
+    static HttpBodyDecoder discoveryHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Set<EJBModuleIdentifier>> result) {
+        return new DiscoveryHttpBodyDecoder(unmarshaller, result);
     }
 
-    static HttpTargetContext.HttpResultHandler invokeHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
-        return new EjbClassLoaderAwareHttpResultHandler(unmarshaller, receiverCtx, clientCtx);
+    static HttpBodyDecoder invokeHttpBodyDecoder(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
+        return new EjbClassLoaderAwareHttpBodyDecoder(unmarshaller, receiverCtx, clientCtx);
     }
 
     static Function<ClientResponse, Boolean> cancelInvocationResponseFunction() {
@@ -90,8 +90,8 @@ final class ClientHandlers {
         return new CreateSessionResponseFunction();
     }
 
-    private static HttpTargetContext.HttpResultHandler invokeHttpResultHandlerInternal(final Unmarshaller unmarshaller, final CompletableFuture<InvocationInfo> result) {
-        return new InvokeHttpResultHandler(unmarshaller, result);
+    private static HttpBodyDecoder invokeHttpBodyDecoderInternal(final Unmarshaller unmarshaller, final CompletableFuture<InvocationInfo> result) {
+        return new InvokeHttpBodyDecoder(unmarshaller, result);
     }
 
     private static final class InvokeHttpBodyEncoder implements HttpBodyEncoder {
@@ -138,17 +138,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class EmptyHttpResultHandler<T> implements HttpTargetContext.HttpResultHandler {
+    private static final class EmptyHttpBodyDecoder<T> implements HttpBodyDecoder {
         private final CompletableFuture<T> result;
         private final Function<ClientResponse, T> function;
 
-        private EmptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
             this.result = result;
             this.function = function;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (is) {
                 result.complete(function != null ? function.apply(response) : null);
             } catch (Exception e) {
@@ -157,17 +157,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class DiscoveryHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class DiscoveryHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<Set<EJBModuleIdentifier>> result;
 
-        private DiscoveryHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Set<EJBModuleIdentifier>> result) {
+        private DiscoveryHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Set<EJBModuleIdentifier>> result) {
             this.unmarshaller = unmarshaller;
             this.result = result;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 Set<EJBModuleIdentifier> modules;
                 unmarshaller.start(in);
@@ -180,7 +180,7 @@ final class ClientHandlers {
         }
     }
 
-    private static final class EjbClassLoaderAwareHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class EjbClassLoaderAwareHttpBodyDecoder implements HttpBodyDecoder {
         private static final Set<String> WELL_KNOWN_KEYS;
 
         static {
@@ -192,18 +192,18 @@ final class ClientHandlers {
         private final EJBReceiverInvocationContext receiverCtx;
         private final EJBClientInvocationContext clientCtx;
 
-        private EjbClassLoaderAwareHttpResultHandler(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
+        private EjbClassLoaderAwareHttpBodyDecoder(final Unmarshaller unmarshaller, final EJBReceiverInvocationContext receiverCtx, final EJBClientInvocationContext clientCtx) {
             this.unmarshaller = unmarshaller;
             this.receiverCtx = receiverCtx;
             this.clientCtx = clientCtx;
         }
 
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             receiverCtx.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                 @Override
                 public Object getResult() throws Exception {
                     final CompletableFuture<InvocationInfo> result = new CompletableFuture<>();
-                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(is, response);
+                    invokeHttpBodyDecoderInternal(unmarshaller, result).decode(is, response);
 
                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
                     Set<String> returnedContextDataKeys = (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
@@ -233,17 +233,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class InvokeHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class InvokeHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<InvocationInfo> result;
 
-        private InvokeHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<InvocationInfo> result) {
+        private InvokeHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<InvocationInfo> result) {
             this.unmarshaller = unmarshaller;
             this.result = result;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 final Object returned = deserializeObject(unmarshaller);

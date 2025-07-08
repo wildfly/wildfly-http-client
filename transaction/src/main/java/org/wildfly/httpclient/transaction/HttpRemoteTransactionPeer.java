@@ -19,8 +19,8 @@
 package org.wildfly.httpclient.transaction;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.transaction.ClientHandlers.xidArrayHttpResultHandler;
-import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpResultHandler;
+import static org.wildfly.httpclient.transaction.ClientHandlers.xidArrayHttpBodyDecoder;
+import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpBodyDecoder;
 import static org.wildfly.httpclient.transaction.Constants.NEW_TRANSACTION;
 
 import io.undertow.client.ClientRequest;
@@ -93,7 +93,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
-                    xidArrayHttpResultHandler(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
+                    xidArrayHttpBodyDecoder(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
         }
         try {
             return result.get();
@@ -128,7 +128,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
-                    xidHttpResultHandler(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
+                    xidHttpBodyDecoder(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
         }
         try {
             Xid xid = result.get();

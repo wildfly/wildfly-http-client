@@ -20,9 +20,9 @@ package org.wildfly.httpclient.ejb;
 
 import static java.security.AccessController.doPrivileged;
 import static org.wildfly.httpclient.ejb.ClientHandlers.cancelInvocationResponseFunction;
-import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpResultHandler;
+import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpBodyDecoder;
 import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionResponseFunction;
-import static org.wildfly.httpclient.ejb.ClientHandlers.emptyHttpResultHandler;
+import static org.wildfly.httpclient.ejb.ClientHandlers.emptyHttpBodyDecoder;
 import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpBodyEncoder;
 import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionHttpBodyEncoder;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_PORT;
@@ -173,7 +173,7 @@ class HttpEJBReceiver extends EJBReceiver {
         Map<String, Object> contextData = clientInvocationContext.getContextData();
         final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpBodyEncoder(marshaller, transactionInfo, parameters, contextData),
-                invokeHttpResultHandler(unmarshaller, receiverContext, clientInvocationContext),
+                invokeHttpBodyDecoder(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
 
@@ -209,7 +209,7 @@ class HttpEJBReceiver extends EJBReceiver {
         Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
         targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                 createSessionHttpBodyEncoder(marshaller, transactionInfo),
-                emptyHttpResultHandler(result, createSessionResponseFunction()),
+                emptyHttpBodyDecoder(result, createSessionResponseFunction()),
                 result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
 
         return result.get();
@@ -254,7 +254,7 @@ class HttpEJBReceiver extends EJBReceiver {
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
         ClientRequest request = builder.createRequest();
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
-                emptyHttpResultHandler(result, cancelInvocationResponseFunction()),
+                emptyHttpBodyDecoder(result, cancelInvocationResponseFunction()),
                 result::completeExceptionally, null, null);
         try {
             return result.get();

@@ -29,7 +29,7 @@ import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyDecoder;
 import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 
 import javax.transaction.xa.Xid;
@@ -53,16 +53,16 @@ final class ClientHandlers {
         return new XidHttpBodyEncoder(marshaller, xid);
     }
 
-    static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
-        return new EmptyHttpResultHandler<T>(result, function);
+    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        return new EmptyHttpBodyDecoder<T>(result, function);
     }
 
-    static HttpTargetContext.HttpResultHandler xidHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
-        return new XidHttpResultHandler(unmarshaller, result);
+    static HttpBodyDecoder xidHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
+        return new XidHttpBodyDecoder(unmarshaller, result);
     }
 
-    static HttpTargetContext.HttpResultHandler xidArrayHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
-        return new XidArrayHttpResultHandler(unmarshaller, result);
+    static HttpBodyDecoder xidArrayHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
+        return new XidArrayHttpBodyDecoder(unmarshaller, result);
     }
 
     private static final class XidHttpBodyEncoder implements HttpBodyEncoder {
@@ -84,17 +84,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class EmptyHttpResultHandler<T> implements HttpTargetContext.HttpResultHandler {
+    private static final class EmptyHttpBodyDecoder<T> implements HttpBodyDecoder {
         private final CompletableFuture<T> result;
         private final Function<ClientResponse, T> function;
 
-        private EmptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
             this.result = result;
             this.function = function;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (is) {
                 result.complete(function != null ? function.apply(response) : null);
             } catch (Exception e) {
@@ -103,17 +103,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class XidHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class XidHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<Xid> result;
 
-        private XidHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
+        private XidHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
             this.unmarshaller = unmarshaller;
             this.result = result;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid xid = deserializeXid(unmarshaller);
@@ -125,17 +125,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class XidArrayHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class XidArrayHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<Xid[]> result;
 
-        private XidArrayHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
+        private XidArrayHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
             this.unmarshaller = unmarshaller;
             this.result = result;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid[] ret = deserializeXidArray(unmarshaller);

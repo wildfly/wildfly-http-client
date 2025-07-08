@@ -30,7 +30,7 @@ import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyDecoder;
 import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 import org.wildfly.naming.client.NamingProvider;
 
@@ -54,16 +54,16 @@ final class ClientHandlers {
         return new ObjectHttpBodyEncoder(marshaller, object);
     }
 
-    static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
-        return new EmptyHttpResultHandler<T>(result, function);
+    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        return new EmptyHttpBodyDecoder<T>(result, function);
     }
 
-    static HttpTargetContext.HttpResultHandler optionalObjectHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Object> result, final NamingProvider namingProvider, final ClassLoader classLoader) {
-        return new OptionalObjectHttpResultHandler(unmarshaller, result, namingProvider, classLoader);
+    static HttpBodyDecoder optionalObjectHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Object> result, final NamingProvider namingProvider, final ClassLoader classLoader) {
+        return new OptionalObjectHttpBodyDecoder(unmarshaller, result, namingProvider, classLoader);
     }
 
-    private static HttpTargetContext.HttpResultHandler objectHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Object> result) {
-        return new ObjectHttpResultHandler(unmarshaller, result);
+    private static HttpBodyDecoder objectHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Object> result) {
+        return new ObjectHttpBodyDecoder(unmarshaller, result);
     }
 
     private static final class ObjectHttpBodyEncoder implements HttpBodyEncoder {
@@ -85,17 +85,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class EmptyHttpResultHandler<T> implements HttpTargetContext.HttpResultHandler {
+    private static final class EmptyHttpBodyDecoder<T> implements HttpBodyDecoder {
         private final CompletableFuture<T> result;
         private final Function<ClientResponse, T> function;
 
-        private EmptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
             this.result = result;
             this.function = function;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (is) {
                 result.complete(function != null ? function.apply(response) : null);
             } catch (Exception e) {
@@ -104,13 +104,13 @@ final class ClientHandlers {
         }
     }
 
-    private static final class OptionalObjectHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class OptionalObjectHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<Object> result;
         private final NamingProvider namingProvider;
         private final ClassLoader classLoader;
 
-        private OptionalObjectHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Object> result, final NamingProvider namingProvider, final ClassLoader classLoader) {
+        private OptionalObjectHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Object> result, final NamingProvider namingProvider, final ClassLoader classLoader) {
             this.unmarshaller = unmarshaller;
             this.result = result;
             this.namingProvider = namingProvider;
@@ -118,14 +118,14 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             namingProvider.performExceptionAction((a, b) -> {
                 ClassLoader old = setContextClassLoader(classLoader);
                 try {
                     if (response.getResponseCode() == NO_CONTENT) {
-                        emptyHttpResultHandler(result, null).handleResult(is, response);
+                        emptyHttpBodyDecoder(result, null).decode(is, response);
                     } else {
-                        objectHttpResultHandler(unmarshaller, result).handleResult(is, response);
+                        objectHttpBodyDecoder(unmarshaller, result).decode(is, response);
                     }
                 } finally {
                     setContextClassLoader(old);
@@ -135,17 +135,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class ObjectHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class ObjectHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<Object> result;
 
-        private ObjectHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Object> result) {
+        private ObjectHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Object> result) {
             this.unmarshaller = unmarshaller;
             this.result = result;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response) {
+        public void decode(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Object object = deserializeObject(unmarshaller);
