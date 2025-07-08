@@ -254,13 +254,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                 }
 
                                 if (!ok) {
-                                    if (response.getResponseCode() == 401 && !isLegacyAuthenticationFailedException()) {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed(response));
-                                    } else if (response.getResponseCode() >= 400) {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
-                                    } else {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseType(type));
-                                    }
+                                    failureHandler.handleFailure(failureDescription(response));
                                     //close the connection to be safe
                                     connection.done(true);
                                     return;
@@ -366,6 +360,17 @@ public class HttpTargetContext extends AbstractAttachable {
             } finally {
                 connection.done(true);
             }
+        }
+    }
+
+    private static Throwable failureDescription(final ClientResponse response) {
+        final ContentType type = ContentType.parse(getResponseHeader(response, CONTENT_TYPE));
+        if (response.getResponseCode() == 401 && !isLegacyAuthenticationFailedException()) {
+            return HttpClientMessages.MESSAGES.authenticationFailed(response);
+        } else if (response.getResponseCode() >= 400) {
+            return HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response);
+        } else {
+            return HttpClientMessages.MESSAGES.invalidResponseType(type);
         }
     }
 
