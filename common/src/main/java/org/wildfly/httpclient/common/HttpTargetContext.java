@@ -339,20 +339,7 @@ public class HttpTargetContext extends AbstractAttachable {
                         //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
                         connection.getConnection().getWorker().execute(() -> {
                             try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
-
-                                // marshall the locator and method params
-                                // start the marshaller
-                                boolean compress = false;
-                                String encoding = getRequestHeader(request, CONTENT_ENCODING);
-                                if (encoding != null) {
-                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                    if (GZIP.toString().equals(lowerEncoding)) {
-                                        compress = true;
-                                    }
-                                }
-
-                                httpMarshaller.marshall(compress ? new GZIPOutputStream(outputStream) : outputStream);
-
+                                httpMarshaller.marshall(identityOrGzipOutputStream(request, outputStream));
                             } catch (Exception e) {
                                 try {
                                     failureHandler.handleFailure(e);
@@ -393,6 +380,18 @@ public class HttpTargetContext extends AbstractAttachable {
             }
         }
         return is;
+    }
+
+    private static OutputStream identityOrGzipOutputStream(final ClientRequest request, final OutputStream os) throws IOException {
+        final String encoding = getRequestHeader(request, CONTENT_ENCODING);
+        if (encoding != null) {
+            final String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+            if (GZIP.toString().equals(lowerEncoding)) {
+                return new GZIPOutputStream(os);
+            }
+            // TODO: identityOrGzipInputStream() checks for IDENTITY but this method does not. Fix this asymmetry!
+        }
+        return os;
     }
 
     private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
