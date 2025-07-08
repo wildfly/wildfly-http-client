@@ -35,6 +35,7 @@ import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
+import static org.xnio.IoUtils.safeClose;
 
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
@@ -51,7 +52,6 @@ import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
-import org.xnio.IoUtils;
 import org.xnio.channels.StreamSourceChannel;
 
 import javax.net.ssl.SSLContext;
@@ -261,7 +261,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
                                     if (isException) {
                                         final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
-                                        try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
+                                        try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), null)) {
                                             final InputStream in = identityOrGzipInputStream(response, inputStream);
                                             unmarshaller.start(byteInputOf(in));
                                             Throwable exception = (Throwable) unmarshaller.readObject();
@@ -271,7 +271,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 HttpClientMessages.MESSAGES.debugf("Unexpected data when reading exception from %s", response);
                                                 connection.done(true);
                                             } else {
-                                                IoUtils.safeClose(inputStream);
+                                                safeClose(inputStream);
                                                 connection.done(false);
                                             }
                                             failureHandler.handleFailure(exception);
@@ -280,27 +280,22 @@ public class HttpTargetContext extends AbstractAttachable {
                                         HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
                                     } else {
                                         if (httpResultHandler != null) {
-                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
-                                            Closeable doneCallback = () -> {
-                                                IoUtils.safeClose(in);
-                                                if (completedTask != null) {
-                                                    completedTask.run();
-                                                }
-                                                connection.done(false);
-                                            };
+                                            final Closeable doneCallback = completionCallback(completedTask, connection);
+                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), doneCallback);
                                             if (response.getResponseCode() == NO_CONTENT) {
-                                                httpResultHandler.handleResult(null, response, doneCallback);
+                                                try {
+                                                    httpResultHandler.handleResult(null, response);
+                                                } finally {
+                                                    safeClose(in); // drain input
+                                                }
                                             } else {
                                                 final InputStream inputStream = identityOrGzipInputStream(response, in);
-                                                httpResultHandler.handleResult(inputStream, response, doneCallback);
+                                                httpResultHandler.handleResult(inputStream, response); // not wrapped with try-finally because we do not want to drain input
                                             }
                                         } else {
-                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
-                                            IoUtils.safeClose(in);
-                                            if (completedTask != null) {
-                                                completedTask.run();
-                                            }
-                                            connection.done(false);
+                                            final Closeable doneCallback = completionCallback(completedTask, connection);
+                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), doneCallback);
+                                            safeClose(in); // drain input
                                         }
                                     }
                                 } catch (Exception e) {
@@ -335,6 +330,17 @@ public class HttpTargetContext extends AbstractAttachable {
         } catch (Throwable e) {
             HttpTargetContext.failed(connection, failureHandler, e);
         }
+    }
+
+    private static Closeable completionCallback(final Runnable completedTask, final HttpConnectionPool.ConnectionHandle connection) {
+        return new Closeable() {
+            public void close() {
+                if (completedTask != null) {
+                    completedTask.run();
+                }
+                connection.done(false);
+            }
+        };
     }
 
     private static Throwable failureDescription(final ClientResponse response) {
@@ -477,7 +483,7 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public interface HttpResultHandler {
-        void handleResult(InputStream result, ClientResponse response, Closeable doneCallback);
+        void handleResult(InputStream result, ClientResponse response);
     }
 
     public interface HttpFailureHandler {

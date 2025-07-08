@@ -21,6 +21,7 @@ package org.wildfly.httpclient.common;
 import static org.xnio.Bits.allAreClear;
 import static org.xnio.Bits.anyAreSet;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -37,6 +38,7 @@ class WildflyClientInputStream extends InputStream {
     private final Object lock = new Object();
     private final ByteBufferPool bufferPool;
     private final StreamSourceChannel channel;
+    private final Closeable doneCallback;
 
     private PooledByteBuffer pooledByteBuffer;
     private IOException ioException;
@@ -102,9 +104,10 @@ class WildflyClientInputStream extends InputStream {
     };
 
 
-    WildflyClientInputStream(ByteBufferPool bufferPool, StreamSourceChannel channel) {
+    WildflyClientInputStream(ByteBufferPool bufferPool, StreamSourceChannel channel, Closeable doneCallback) {
         this.bufferPool = bufferPool;
         this.channel = channel;
+        this.doneCallback = doneCallback;
     }
 
     @Override
@@ -184,23 +187,27 @@ class WildflyClientInputStream extends InputStream {
         if (anyAreSet(state, FLAG_CLOSED)) {
             return;
         }
-        synchronized (lock) {
-            IoUtils.safeClose(pooledByteBuffer);
-            pooledByteBuffer = null;
-            while (allAreClear(state, FLAG_MINUS_ONE_READ) && ioException == null) {
-                runReadTask();
-                try {
-                    lock.wait();
-                } catch (InterruptedException e) {
-                    IoUtils.safeClose(pooledByteBuffer, channel);
-                    throw new InterruptedIOException(e.getMessage());
-                }
+        try {
+            synchronized (lock) {
                 IoUtils.safeClose(pooledByteBuffer);
                 pooledByteBuffer = null;
+                while (allAreClear(state, FLAG_MINUS_ONE_READ) && ioException == null) {
+                    runReadTask();
+                    try {
+                        lock.wait();
+                    } catch (InterruptedException e) {
+                        IoUtils.safeClose(pooledByteBuffer, channel);
+                        throw new InterruptedIOException(e.getMessage());
+                    }
+                    IoUtils.safeClose(pooledByteBuffer);
+                    pooledByteBuffer = null;
+                }
+                if (ioException != null) {
+                    throw new IOException(ioException);
+                }
             }
-            if (ioException != null) {
-                throw new IOException(ioException);
-            }
+        } finally {
+            IoUtils.safeClose(doneCallback);
         }
     }
 }

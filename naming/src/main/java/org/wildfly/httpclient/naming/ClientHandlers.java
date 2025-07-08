@@ -23,7 +23,6 @@ import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
 import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 import static org.wildfly.httpclient.naming.ClassLoaderUtils.setContextClassLoader;
-import static org.xnio.IoUtils.safeClose;
 
 import io.undertow.client.ClientResponse;
 import org.jboss.marshalling.ByteInput;
@@ -33,7 +32,6 @@ import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.naming.client.NamingProvider;
 
-import java.io.Closeable;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
@@ -95,11 +93,11 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
-            try {
+        public void handleResult(final InputStream is, final ClientResponse response) {
+            try (is) {
                 result.complete(function != null ? function.apply(response) : null);
-            } finally {
-                safeClose(doneCallback);
+            } catch (Exception e) {
+                result.completeExceptionally(e);
             }
         }
     }
@@ -118,24 +116,20 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
-            try {
-                namingProvider.performExceptionAction((a, b) -> {
-                    ClassLoader old = setContextClassLoader(classLoader);
-                    try {
-                        if (response.getResponseCode() == NO_CONTENT) {
-                            emptyHttpResultHandler(result, null).handleResult(is, response, doneCallback);
-                        } else {
-                            objectHttpResultHandler(unmarshaller, result).handleResult(is, response, doneCallback);
-                        }
-                    } finally {
-                        setContextClassLoader(old);
+        public void handleResult(final InputStream is, final ClientResponse response) {
+            namingProvider.performExceptionAction((a, b) -> {
+                ClassLoader old = setContextClassLoader(classLoader);
+                try {
+                    if (response.getResponseCode() == NO_CONTENT) {
+                        emptyHttpResultHandler(result, null).handleResult(is, response);
+                    } else {
+                        objectHttpResultHandler(unmarshaller, result).handleResult(is, response);
                     }
-                    return null;
-                }, null, null);
-            } finally {
-                safeClose(doneCallback);
-            }
+                } finally {
+                    setContextClassLoader(old);
+                }
+                return null;
+            }, null, null);
         }
     }
 
@@ -149,7 +143,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Object object = deserializeObject(unmarshaller);
@@ -157,8 +151,6 @@ final class ClientHandlers {
                 result.complete(object);
             } catch (Exception e) {
                 result.completeExceptionally(e);
-            } finally {
-                safeClose(doneCallback);
             }
         }
     }

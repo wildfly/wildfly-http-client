@@ -29,10 +29,8 @@ import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
-import org.xnio.IoUtils;
 
 import javax.transaction.xa.Xid;
-import java.io.Closeable;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
@@ -94,11 +92,11 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
-            try {
+        public void handleResult(final InputStream is, final ClientResponse response) {
+            try (is) {
                 result.complete(function != null ? function.apply(response) : null);
-            } finally {
-                IoUtils.safeClose(doneCallback);
+            } catch (Exception e) {
+                result.completeExceptionally(e);
             }
         }
     }
@@ -113,7 +111,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid xid = deserializeXid(unmarshaller);
@@ -121,8 +119,6 @@ final class ClientHandlers {
                 result.complete(xid);
             } catch (Exception e) {
                 result.completeExceptionally(e);
-            } finally {
-                IoUtils.safeClose(doneCallback);
             }
         }
     }
@@ -137,7 +133,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 Xid[] ret = deserializeXidArray(unmarshaller);
@@ -145,8 +141,6 @@ final class ClientHandlers {
                 result.complete(ret);
             } catch (Exception e) {
                 result.completeExceptionally(e);
-            } finally {
-                IoUtils.safeClose(doneCallback);
             }
         }
     }

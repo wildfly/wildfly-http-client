@@ -27,7 +27,6 @@ import static org.wildfly.httpclient.ejb.Serializer.serializeMap;
 import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
 import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
-import static org.xnio.IoUtils.safeClose;
 
 import io.undertow.client.ClientResponse;
 import org.jboss.ejb.client.EJBClientInvocationContext;
@@ -41,7 +40,6 @@ import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.xnio.IoUtils;
 
-import java.io.Closeable;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Base64;
@@ -148,11 +146,11 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
-            try {
+        public void handleResult(final InputStream is, final ClientResponse response) {
+            try (is) {
                 result.complete(function != null ? function.apply(response) : null);
-            } finally {
-                IoUtils.safeClose(doneCallback);
+            } catch (Exception e) {
+                result.completeExceptionally(e);
             }
         }
     }
@@ -167,7 +165,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 Set<EJBModuleIdentifier> modules;
                 unmarshaller.start(in);
@@ -176,8 +174,6 @@ final class ClientHandlers {
                 result.complete(modules);
             } catch (Exception e) {
                 result.completeExceptionally(e);
-            } finally {
-                safeClose(doneCallback);
             }
         }
     }
@@ -200,12 +196,12 @@ final class ClientHandlers {
             this.clientCtx = clientCtx;
         }
 
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response) {
             receiverCtx.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                 @Override
                 public Object getResult() throws Exception {
                     final CompletableFuture<InvocationInfo> result = new CompletableFuture<>();
-                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(is, response, doneCallback);
+                    invokeHttpResultHandlerInternal(unmarshaller, result).handleResult(is, response);
 
                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
                     Set<String> returnedContextDataKeys = (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
@@ -228,7 +224,6 @@ final class ClientHandlers {
 
                 @Override
                 public void discardResult() {
-                    IoUtils.safeClose(doneCallback);
                     IoUtils.safeClose(is);
                 }
             });
@@ -246,7 +241,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
+        public void handleResult(final InputStream is, final ClientResponse response) {
             try (ByteInput in = byteInputOf(is)) {
                 unmarshaller.start(in);
                 final Object returned = deserializeObject(unmarshaller);
@@ -255,8 +250,6 @@ final class ClientHandlers {
                 result.complete(InvocationInfo.newInstance(returned, attachments));
             } catch (Exception e) {
                 result.completeExceptionally(e);
-            } finally {
-                safeClose(doneCallback);
             }
         }
     }

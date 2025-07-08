@@ -82,7 +82,7 @@ public class AuthenticationExceptionTestCase {
         context.sendRequest(request, null, AuthenticationConfiguration.empty(), null,
                 new HttpTargetContext.HttpResultHandler() {
                     @Override
-                    public void handleResult(InputStream result, ClientResponse response, Closeable doneCallback) {
+                    public void handleResult(InputStream result, ClientResponse response) {
                         responseFuture.complete(response);
                     }
                 }, new HttpTargetContext.HttpFailureHandler() {

@@ -65,7 +65,7 @@ public class ClientHostHeaderTestCase {
         context.sendRequest(request, null, AuthenticationConfiguration.empty(), null,
                 new HttpTargetContext.HttpResultHandler() {
                     @Override
-                    public void handleResult(InputStream result, ClientResponse response, Closeable doneCallback) {
+                    public void handleResult(InputStream result, ClientResponse response) {
                         latch.countDown();
                     }
                 }, new HttpTargetContext.HttpFailureHandler() {
