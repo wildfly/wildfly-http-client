@@ -21,7 +21,7 @@ import static java.security.AccessController.doPrivileged;
 import static org.jboss.ejb.client.EJBClientContext.getCurrent;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.Constants.HTTP_SCHEME;
-import static org.wildfly.httpclient.ejb.ClientHandlers.discoveryHttpResultHandler;
+import static org.wildfly.httpclient.ejb.ClientHandlers.discoveryHttpBodyDecoder;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.ejb.client.EJBClientConnection;
@@ -161,7 +161,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
-                    discoveryHttpResultHandler(unmarshaller, result),
+                    discoveryHttpBodyDecoder(unmarshaller, result),
                     result::completeExceptionally, Constants.EJB_DISCOVERY_RESPONSE, null);
         }
         try {

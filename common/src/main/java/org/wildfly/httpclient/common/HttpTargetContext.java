@@ -162,16 +162,16 @@ public class HttpTargetContext extends AbstractAttachable {
         }, null, latch::countDown);
     }
 
-    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
-        sendRequest(request, sslContext, authenticationConfiguration, encoder, httpResultHandler, failureHandler, expectedResponse, completedTask, false);
+    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
+        sendRequest(request, sslContext, authenticationConfiguration, encoder, decoder, failureHandler, expectedResponse, completedTask, false);
     }
 
-    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
+    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
         final ClassLoader tccl = getContextClassLoader();
-        connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, encoder, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
+        connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, encoder, decoder, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
     }
 
-    private void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, final ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
+    private void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, final ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
         if (sessionId != null) {
             addRequestHeader(request, COOKIE, JSESSIONID + "=" + sessionId);
         }
@@ -217,7 +217,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                             connectionPool.getConnection((connection) -> {
                                                 if (connection.getAuthenticationContext().prepareRequest(uri, request, finalAuthenticationConfiguration)) {
                                                     //retry the invocation
-                                                    sendRequestInternal(connection, request, finalAuthenticationConfiguration, encoder, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
+                                                    sendRequestInternal(connection, request, finalAuthenticationConfiguration, encoder, decoder, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
                                                 } else {
                                                     HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.authenticationFailed());
                                                 }
@@ -279,18 +279,18 @@ public class HttpTargetContext extends AbstractAttachable {
                                     } else if (response.getResponseCode() >= 400) {
                                         HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
                                     } else {
-                                        if (httpResultHandler != null) {
+                                        if (decoder != null) {
                                             final Closeable doneCallback = completionCallback(completedTask, connection);
                                             final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), doneCallback);
                                             if (response.getResponseCode() == NO_CONTENT) {
                                                 try {
-                                                    httpResultHandler.handleResult(null, response);
+                                                    decoder.decode(null, response);
                                                 } finally {
                                                     safeClose(in); // drain input
                                                 }
                                             } else {
                                                 final InputStream inputStream = identityOrGzipInputStream(response, in);
-                                                httpResultHandler.handleResult(inputStream, response); // not wrapped with try-finally because we do not want to drain input
+                                                decoder.decode(inputStream, response); // not wrapped with try-finally because we do not want to drain input (reason: some decoders are asynchronous)
                                             }
                                         } else {
                                             final Closeable doneCallback = completionCallback(completedTask, connection);
@@ -482,8 +482,8 @@ public class HttpTargetContext extends AbstractAttachable {
         void encode(OutputStream output, ClientRequest request) throws Exception;
     }
 
-    public interface HttpResultHandler {
-        void handleResult(InputStream input, ClientResponse response);
+    public interface HttpBodyDecoder {
+        void decode(InputStream input, ClientResponse response);
     }
 
     public interface HttpFailureHandler {

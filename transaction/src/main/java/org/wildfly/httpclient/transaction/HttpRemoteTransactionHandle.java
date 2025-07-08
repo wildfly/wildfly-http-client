@@ -18,7 +18,7 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
+import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpBodyDecoder;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpBodyEncoder;
 
 import io.undertow.client.ClientRequest;
@@ -88,7 +88,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpBodyEncoder(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {
@@ -143,7 +143,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpBodyEncoder(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {
