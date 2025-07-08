@@ -314,7 +314,7 @@ public class HttpTargetContext extends AbstractAttachable {
                         //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
                         connection.getConnection().getWorker().execute(() -> {
                             try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
-                                httpMarshaller.marshall(identityOrGzipOutputStream(request, outputStream));
+                                httpMarshaller.marshall(identityOrGzipOutputStream(request, outputStream), request);
                             } catch (Exception e) {
                                 HttpTargetContext.failed(connection, failureHandler, e);
                             }
@@ -479,14 +479,15 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public interface HttpMarshaller {
-        void marshall(OutputStream output) throws Exception;
+        void marshall(OutputStream output, ClientRequest request) throws Exception;
     }
 
     public interface HttpResultHandler {
-        void handleResult(InputStream result, ClientResponse response);
+        void handleResult(InputStream input, ClientResponse response);
     }
 
     public interface HttpFailureHandler {
         void handleFailure(Throwable throwable);
     }
+
 }

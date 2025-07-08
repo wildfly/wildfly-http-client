@@ -23,6 +23,7 @@ import static org.wildfly.httpclient.transaction.Serializer.deserializeXid;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXidArray;
 import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
 
+import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
@@ -73,7 +74,7 @@ final class ClientHandlers {
         }
 
         @Override
-        public void marshall(final OutputStream os) throws Exception {
+        public void marshall(final OutputStream os, final ClientRequest request) throws Exception {
             try (ByteOutput out = byteOutputOf(os)) {
                 marshaller.start(out);
                 serializeXid(marshaller, xid);
