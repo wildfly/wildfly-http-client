@@ -476,7 +476,7 @@ public class HttpTargetContext extends AbstractAttachable {
         return sessionId;
     }
 
-    private boolean isLegacyAuthenticationFailedException() {
+    private static boolean isLegacyAuthenticationFailedException() {
         return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
             @Override
             public Boolean run() {
