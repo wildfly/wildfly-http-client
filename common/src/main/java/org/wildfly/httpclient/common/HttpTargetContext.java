@@ -45,6 +45,7 @@ import io.undertow.server.handlers.Cookie;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
+import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
@@ -284,13 +285,13 @@ public class HttpTargetContext extends AbstractAttachable {
                                             final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), doneCallback);
                                             if (response.getResponseCode() == NO_CONTENT) {
                                                 try {
-                                                    decoder.decode(null, response);
+                                                    decoder.decode(ResponseContextImpl.of(InputStream.nullInputStream(), response, HttpTargetContext.this.getProtocolVersion()));
                                                 } finally {
                                                     safeClose(in); // drain input
                                                 }
                                             } else {
                                                 final InputStream inputStream = identityOrGzipInputStream(response, in);
-                                                decoder.decode(inputStream, response); // not wrapped with try-finally because we do not want to drain input (reason: some decoders are asynchronous)
+                                                decoder.decode(ResponseContextImpl.of(inputStream, response, HttpTargetContext.this.getProtocolVersion())); // not wrapped with try-finally because we do not want to drain input (reason: some decoders are asynchronous)
                                             }
                                         } else {
                                             final Closeable doneCallback = completionCallback(completedTask, connection);
@@ -314,7 +315,7 @@ public class HttpTargetContext extends AbstractAttachable {
                         //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
                         connection.getConnection().getWorker().execute(() -> {
                             try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
-                                encoder.encode(identityOrGzipOutputStream(request, outputStream), request);
+                                encoder.encode(RequestContextImpl.of(identityOrGzipOutputStream(request, outputStream), request, HttpTargetContext.this.getProtocolVersion()));
                             } catch (Exception e) {
                                 HttpTargetContext.failed(connection, failureHandler, e);
                             }
@@ -479,15 +480,95 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public interface HttpBodyEncoder {
-        void encode(OutputStream output, ClientRequest request) throws Exception;
+        void encode(RequestContext ctx) throws Exception;
     }
 
     public interface HttpBodyDecoder {
-        void decode(InputStream input, ClientResponse response);
+        void decode(ResponseContext ctx);
     }
 
     public interface HttpFailureHandler {
         void handleFailure(Throwable throwable);
+    }
+
+    public interface RequestContext {
+        OutputStream getRequestBody();
+        String getRequestHeader(String headerName);
+        int getHandshakedVersion();
+    }
+
+    private static class RequestContextImpl implements RequestContext {
+        private final OutputStream os;
+        private final ClientRequest request;
+        private final int handshakedVersion;
+
+        private RequestContextImpl(final OutputStream os, final ClientRequest request, final int handshakedVersion) {
+            this.os = os;
+            this.request = request;
+            this.handshakedVersion = handshakedVersion;
+        }
+
+        private static RequestContext of(final OutputStream os, final ClientRequest request, final int handshakedVersion) {
+            return new RequestContextImpl(os, request, handshakedVersion);
+        }
+
+        @Override
+        public OutputStream getRequestBody() {
+            return os;
+        }
+
+        @Override
+        public String getRequestHeader(final String headerName) {
+            return HeadersHelper.getRequestHeader(request, HttpString.tryFromString(headerName));
+        }
+
+        @Override
+        public int getHandshakedVersion() {
+            return handshakedVersion;
+        }
+    }
+
+    public interface ResponseContext {
+        InputStream getResponseBody();
+        String getResponseHeader(String headerName);
+        int getResponseCode();
+        int getHandshakedVersion();
+    }
+
+    private static class ResponseContextImpl implements ResponseContext {
+        private final InputStream is;
+        private final ClientResponse response;
+        private final int handshakedVersion;
+
+        private ResponseContextImpl(final InputStream is, final ClientResponse response, final int handshakedVersion) {
+            this.is = is;
+            this.response = response;
+            this.handshakedVersion = handshakedVersion;
+        }
+
+        private static ResponseContext of(final InputStream is, final ClientResponse response, final int handshakedVersion) {
+            return new ResponseContextImpl(is, response, handshakedVersion);
+        }
+
+        @Override
+        public InputStream getResponseBody() {
+            return is;
+        }
+
+        @Override
+        public String getResponseHeader(final String headerName) {
+            return HeadersHelper.getResponseHeader(response, HttpString.tryFromString(headerName));
+        }
+
+        @Override
+        public int getResponseCode() {
+            return response.getResponseCode();
+        }
+
+        @Override
+        public int getHandshakedVersion() {
+            return handshakedVersion;
+        }
     }
 
 }

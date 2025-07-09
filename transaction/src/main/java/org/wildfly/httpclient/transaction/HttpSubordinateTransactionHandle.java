@@ -20,7 +20,6 @@ package org.wildfly.httpclient.transaction;
 
 import static java.lang.Boolean.TRUE;
 import static java.lang.Boolean.parseBoolean;
-import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpBodyEncoder;
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpBodyDecoder;
 import static org.wildfly.httpclient.transaction.Constants.READ_ONLY;
@@ -31,10 +30,10 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
 import org.jboss.marshalling.Marshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
 import org.wildfly.httpclient.common.HttpTargetContext;
+import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SubordinateTransactionControl;
 
@@ -92,7 +91,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     @Override
     public int prepare() throws XAException {
         boolean readOnly = processOperation(XA_PREPARE, (result) -> {
-            String header = getResponseHeader(result, READ_ONLY);
+            String header = result.getResponseHeader(READ_ONLY.toString());
             return parseBoolean(header);
         }, null);
         return readOnly ? XAResource.XA_RDONLY : XAResource.XA_OK;
@@ -107,7 +106,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         processOperation(requestType, null, null);
     }
 
-    private <T> T processOperation(RequestType requestType, Function<ClientResponse, T> resultFunction, Boolean onePhase) throws XAException {
+    private <T> T processOperation(RequestType requestType, Function<ResponseContext, T> resultFunction, Boolean onePhase) throws XAException {
         final RequestBuilder builder = new RequestBuilder(targetContext, requestType).setOnePhase(onePhase);
         final ClientRequest request = builder.createRequest();
         final CompletableFuture<T> result = new CompletableFuture<>();

@@ -17,7 +17,6 @@
  */
 package org.wildfly.httpclient.ejb;
 
-import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.ejb.Constants.EJB_SESSION_ID;
@@ -28,8 +27,6 @@ import static org.wildfly.httpclient.ejb.Serializer.serializeObjectArray;
 import static org.wildfly.httpclient.ejb.Serializer.serializeTransaction;
 import static org.wildfly.httpclient.ejb.Serializer.deserializeMap;
 
-import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBModuleIdentifier;
 import org.jboss.ejb.client.EJBReceiverInvocationContext;
@@ -38,12 +35,13 @@ import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.httpclient.common.HttpTargetContext.RequestContext;
+import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
 import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyDecoder;
 import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 import org.xnio.IoUtils;
 
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.Map;
@@ -70,7 +68,7 @@ final class ClientHandlers {
         return new CreateSessionHttpBodyEncoder(marshaller, txnInfo);
     }
 
-    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ResponseContext, T> function) {
         return new EmptyHttpBodyDecoder<T>(result, function);
     }
 
@@ -82,11 +80,11 @@ final class ClientHandlers {
         return new EjbClassLoaderAwareHttpBodyDecoder(unmarshaller, receiverCtx, clientCtx);
     }
 
-    static Function<ClientResponse, Boolean> cancelInvocationResponseFunction() {
+    static Function<ResponseContext, Boolean> cancelInvocationResponseFunction() {
         return new CancelInvocationResponseFunction();
     }
 
-    static Function<ClientResponse, SessionID> createSessionResponseFunction() {
+    static Function<ResponseContext, SessionID> createSessionResponseFunction() {
         return new CreateSessionResponseFunction();
     }
 
@@ -108,8 +106,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void encode(final OutputStream os, final ClientRequest request) throws Exception {
-            try (ByteOutput out = byteOutputOf(os)) {
+        public void encode(final RequestContext ctx) throws Exception {
+            try (ByteOutput out = byteOutputOf(ctx.getRequestBody())) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
                 serializeObjectArray(marshaller, objects);
@@ -129,8 +127,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void encode(final OutputStream os, final ClientRequest request) throws Exception {
-            try (ByteOutput out = byteOutputOf(os)) {
+        public void encode(final RequestContext ctx) throws Exception {
+            try (ByteOutput out = byteOutputOf(ctx.getRequestBody())) {
                 marshaller.start(out);
                 serializeTransaction(marshaller, txnInfo);
                 marshaller.finish();
@@ -140,17 +138,18 @@ final class ClientHandlers {
 
     private static final class EmptyHttpBodyDecoder<T> implements HttpBodyDecoder {
         private final CompletableFuture<T> result;
-        private final Function<ClientResponse, T> function;
+        private final Function<ResponseContext, T> function;
 
-        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ResponseContext, T> function) {
             this.result = result;
             this.function = function;
         }
 
         @Override
-        public void decode(final InputStream is, final ClientResponse response) {
+        public void decode(final ResponseContext ctx) {
+            final InputStream is = ctx.getResponseBody();
             try (is) {
-                result.complete(function != null ? function.apply(response) : null);
+                result.complete(function != null ? function.apply(ctx) : null);
             } catch (Exception e) {
                 result.completeExceptionally(e);
             }
@@ -167,8 +166,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void decode(final InputStream is, final ClientResponse response) {
-            try (ByteInput in = byteInputOf(is)) {
+        public void decode(final ResponseContext ctx) {
+            try (ByteInput in = byteInputOf(ctx.getResponseBody())) {
                 Set<EJBModuleIdentifier> modules;
                 unmarshaller.start(in);
                 modules = deserializeSet(unmarshaller);
@@ -198,12 +197,12 @@ final class ClientHandlers {
             this.clientCtx = clientCtx;
         }
 
-        public void decode(final InputStream is, final ClientResponse response) {
+        public void decode(final ResponseContext ctx) {
             receiverCtx.resultReady(new EJBReceiverInvocationContext.ResultProducer() {
                 @Override
                 public Object getResult() throws Exception {
                     final CompletableFuture<InvocationInfo> result = new CompletableFuture<>();
-                    invokeHttpBodyDecoderInternal(unmarshaller, result).decode(is, response);
+                    invokeHttpBodyDecoderInternal(unmarshaller, result).decode(ctx);
 
                     // WEJBHTTP-83 - remove jboss.returned.keys values from the local context data, so that after unmarshalling the response, we have the correct ContextData
                     Set<String> returnedContextDataKeys = (Set<String>) clientCtx.getContextData().get(EJBClientInvocationContext.RETURNED_CONTEXT_DATA_KEY);
@@ -226,7 +225,7 @@ final class ClientHandlers {
 
                 @Override
                 public void discardResult() {
-                    IoUtils.safeClose(is);
+                    IoUtils.safeClose(ctx.getResponseBody());
                 }
             });
 
@@ -243,8 +242,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void decode(final InputStream is, final ClientResponse response) {
-            try (ByteInput in = byteInputOf(is)) {
+        public void decode(final ResponseContext ctx) {
+            try (ByteInput in = byteInputOf(ctx.getResponseBody())) {
                 unmarshaller.start(in);
                 final Object returned = deserializeObject(unmarshaller);
                 final Map<String, Object> attachments = deserializeMap(unmarshaller);
@@ -256,17 +255,17 @@ final class ClientHandlers {
         }
     }
 
-    private static final class CancelInvocationResponseFunction implements Function<ClientResponse, Boolean> {
+    private static final class CancelInvocationResponseFunction implements Function<ResponseContext, Boolean> {
         @Override
-        public Boolean apply(final ClientResponse response) {
+        public Boolean apply(final ResponseContext ctx) {
             return true;
         }
     }
 
-    private static final class CreateSessionResponseFunction implements Function<ClientResponse, SessionID> {
+    private static final class CreateSessionResponseFunction implements Function<ResponseContext, SessionID> {
         @Override
-        public SessionID apply(final ClientResponse response) {
-            final String sessionId = getResponseHeader(response, EJB_SESSION_ID);
+        public SessionID apply(final ResponseContext ctx) {
+            final String sessionId = ctx.getResponseHeader(EJB_SESSION_ID.toString());
             if (sessionId != null) {
                 return SessionID.createSessionID(Base64.getUrlDecoder().decode(sessionId));
             }
