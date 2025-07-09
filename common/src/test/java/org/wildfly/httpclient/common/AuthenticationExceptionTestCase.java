@@ -3,9 +3,7 @@ package org.wildfly.httpclient.common;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static org.wildfly.httpclient.common.HeadersHelper.addResponseHeader;
 
-import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.CompletableFuture;
@@ -13,7 +11,6 @@ import java.util.concurrent.CompletionException;
 import javax.naming.AuthenticationException;
 
 import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Methods;
@@ -21,6 +18,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 
 /**
@@ -59,7 +57,7 @@ public class AuthenticationExceptionTestCase {
 
     private void assertRequestException(Class<? extends Exception> exceptionType) throws URISyntaxException {
         ClientRequest request = new ClientRequest().setMethod(Methods.GET).setPath("/");
-        CompletableFuture<ClientResponse> responseFuture = doClientRequest(request);
+        CompletableFuture<ResponseContext> responseFuture = doClientRequest(request);
 
         try {
             responseFuture.join();
@@ -74,16 +72,16 @@ public class AuthenticationExceptionTestCase {
         }
     }
 
-    private CompletableFuture<ClientResponse> doClientRequest(ClientRequest request) throws URISyntaxException {
+    private CompletableFuture<ResponseContext> doClientRequest(ClientRequest request) throws URISyntaxException {
         ClientAuthUtils.setupBasicAuth(request, new URI(HTTPTestServer.getDefaultServerURL() + request.getPath()));
 
-        CompletableFuture<ClientResponse> responseFuture = new CompletableFuture<>();
+        CompletableFuture<ResponseContext> responseFuture = new CompletableFuture<>();
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(new URI(HTTPTestServer.getDefaultServerURL()));
         context.sendRequest(request, null, AuthenticationConfiguration.empty(), null,
                 new HttpTargetContext.HttpBodyDecoder() {
                     @Override
-                    public void decode(InputStream result, ClientResponse response) {
-                        responseFuture.complete(response);
+                    public void decode(ResponseContext ctx) {
+                        responseFuture.complete(ctx);
                     }
                 }, new HttpTargetContext.HttpFailureHandler() {
                     @Override

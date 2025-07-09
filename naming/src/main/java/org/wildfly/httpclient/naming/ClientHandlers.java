@@ -24,18 +24,17 @@ import static org.wildfly.httpclient.naming.Serializer.deserializeObject;
 import static org.wildfly.httpclient.naming.Serializer.serializeObject;
 import static org.wildfly.httpclient.naming.ClassLoaderUtils.setContextClassLoader;
 
-import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
+import org.wildfly.httpclient.common.HttpTargetContext.RequestContext;
+import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
 import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyDecoder;
 import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 import org.wildfly.naming.client.NamingProvider;
 
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -54,7 +53,7 @@ final class ClientHandlers {
         return new ObjectHttpBodyEncoder(marshaller, object);
     }
 
-    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ResponseContext, T> function) {
         return new EmptyHttpBodyDecoder<T>(result, function);
     }
 
@@ -76,8 +75,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void encode(final OutputStream os, final ClientRequest request) throws Exception {
-            try (ByteOutput out = byteOutputOf(os)) {
+        public void encode(final RequestContext ctx) throws Exception {
+            try (ByteOutput out = byteOutputOf(ctx.getRequestBody())) {
                 marshaller.start(out);
                 serializeObject(marshaller, object);
                 marshaller.finish();
@@ -87,17 +86,18 @@ final class ClientHandlers {
 
     private static final class EmptyHttpBodyDecoder<T> implements HttpBodyDecoder {
         private final CompletableFuture<T> result;
-        private final Function<ClientResponse, T> function;
+        private final Function<ResponseContext, T> function;
 
-        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ResponseContext, T> function) {
             this.result = result;
             this.function = function;
         }
 
         @Override
-        public void decode(final InputStream is, final ClientResponse response) {
+        public void decode(final ResponseContext ctx) {
+            final InputStream is = ctx.getResponseBody();
             try (is) {
-                result.complete(function != null ? function.apply(response) : null);
+                result.complete(function != null ? function.apply(ctx) : null);
             } catch (Exception e) {
                 result.completeExceptionally(e);
             }
@@ -118,14 +118,14 @@ final class ClientHandlers {
         }
 
         @Override
-        public void decode(final InputStream is, final ClientResponse response) {
+        public void decode(final ResponseContext ctx) {
             namingProvider.performExceptionAction((a, b) -> {
                 ClassLoader old = setContextClassLoader(classLoader);
                 try {
-                    if (response.getResponseCode() == NO_CONTENT) {
-                        emptyHttpBodyDecoder(result, null).decode(is, response);
+                    if (ctx.getResponseCode() == NO_CONTENT) {
+                        emptyHttpBodyDecoder(result, null).decode(ctx);
                     } else {
-                        objectHttpBodyDecoder(unmarshaller, result).decode(is, response);
+                        objectHttpBodyDecoder(unmarshaller, result).decode(ctx);
                     }
                 } finally {
                     setContextClassLoader(old);
@@ -145,8 +145,8 @@ final class ClientHandlers {
         }
 
         @Override
-        public void decode(final InputStream is, final ClientResponse response) {
-            try (ByteInput in = byteInputOf(is)) {
+        public void decode(final ResponseContext ctx) {
+            try (ByteInput in = byteInputOf(ctx.getResponseBody())) {
                 unmarshaller.start(in);
                 Object object = deserializeObject(unmarshaller);
                 unmarshaller.finish();

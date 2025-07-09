@@ -4,8 +4,6 @@ import static io.undertow.util.Headers.HOST;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 
-import java.io.Closeable;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -18,9 +16,9 @@ import java.util.logging.Logger;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import io.undertow.client.ClientRequest;
-import io.undertow.client.ClientResponse;
 import io.undertow.util.Methods;
 
 @RunWith(HTTPTestServer.class)
@@ -65,7 +63,7 @@ public class ClientHostHeaderTestCase {
         context.sendRequest(request, null, AuthenticationConfiguration.empty(), null,
                 new HttpTargetContext.HttpBodyDecoder() {
                     @Override
-                    public void decode(InputStream result, ClientResponse response) {
+                    public void decode(ResponseContext ctx) {
                         latch.countDown();
                     }
                 }, new HttpTargetContext.HttpFailureHandler() {
