@@ -25,14 +25,43 @@
     <parent>
         <groupId>org.jboss</groupId>
         <artifactId>jboss-parent</artifactId>
-        <version>48</version>
+        <version>50</version>
     </parent>
 
     <groupId>org.wildfly.wildfly-http-client</groupId>
     <artifactId>wildfly-http-client-parent</artifactId>
     <version>2.1.2.Final-SNAPSHOT</version>
-    <name>Wildfly HTTP Client Parent - Jakarta EE Variant</name>
+
     <packaging>pom</packaging>
+
+    <name>Wildfly HTTP Client Parent - Jakarta EE Variant</name>
+    <description>Wildfly HTTP Client Parent - Jakarta EE Variant</description>
+    <url>${wildfly.httpclient.scm.url}</url>
+
+    <developers>
+        <developer>
+            <id>frainone</id>
+            <name>Flavia Rainone</name>
+            <url>https://github.com/fl4via</url>
+            <organization>IBM</organization>
+            <organizationUrl>https://www.ibm.com</organizationUrl>
+        </developer>
+        <developer>
+            <id>rachmato</id>
+            <name>Richard Achmatowicz</name>
+            <url>https://github.com/rachmatowicz</url>
+            <organization>IBM</organization>
+            <organizationUrl>https://www.ibm.com</organizationUrl>
+        </developer>
+        <developer>
+            <id>ropalka</id>
+            <name>Richard Opalka</name>
+            <url>https://github.com/ropalka</url>
+            <organization>IBM</organization>
+            <organizationUrl>https://www.ibm.com</organizationUrl>
+        </developer>
+        <!-- and many others -->
+    </developers>
 
     <licenses>
         <license>
@@ -42,10 +71,22 @@
         </license>
     </licenses>
 
+    <scm>
+        <connection>scm:git:${wildfly.httpclient.scm.connection}</connection>
+        <developerConnection>scm:git:${wildfly.httpclient.scm.connection}</developerConnection>
+        <url>${wildfly.httpclient.scm.url}</url>
+    </scm>
+
     <properties>
         <test.level>DEBUG</test.level>
-        <maven.compiler.target>11</maven.compiler.target>
-        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.release>11</maven.compiler.release>
+        <!-- Release Info -->
+        <wildfly.httpclient.scm.connection>git@github.com:wildfly/wildfly-http-client.git</wildfly.httpclient.scm.connection>
+        <wildfly.httpclient.scm.url>https://github.com/wildfly/wildfly-http-client</wildfly.httpclient.scm.url>
+        <!-- Repository Deployment Settings -->
+        <nexus.repository.staging>wildfly-staging</nexus.repository.staging>
+        <nexus.repository.release>ejb-common</nexus.repository.release>
+        <nexus.staging.tag>wildfly-http-client-${project.version}</nexus.staging.tag>
         <!-- Versions -->
         <version.io.undertow>2.3.18.Final</version.io.undertow>
         <version.org.jboss.logging-tools>3.0.4.Final</version.org.jboss.logging-tools>
