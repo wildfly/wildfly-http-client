@@ -24,7 +24,8 @@ import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 import org.wildfly.client.config.ClientConfiguration;
 import org.wildfly.client.config.ConfigXMLParseException;
@@ -34,13 +35,36 @@ import org.wildfly.client.config.ConfigurationXMLStreamReader;
  * @author Stuart Douglas
  */
 final class HttpClientXmlParser {
-    private static final String NS_EJB_HTTP_CLIENT = "urn:wildfly-http-client:1.0";
+    private static final String NS_EJB_HTTP_CLIENT_1_0 = "urn:wildfly-http-client:1.0";
+    private static final String NS_EJB_HTTP_CLIENT_1_1 = "urn:wildfly-http-client:1.1";
+
+    private static final String ATTR_ADDRESS = "address";
+    private static final String ATTR_BUFFER_SIZE = "buffer-size";
+    private static final String ATTR_DIRECT = "direct";
+    private static final String ATTR_MAX_SIZE = "max-size";
+    private static final String ATTR_PORT = "port";
+    private static final String ATTR_THREAD_LOCAL_SIZE = "thread-local-size";
+    private static final String ATTR_URI = "uri";
+    private static final String ATTR_VALUE = "value";
+
+    private static final String ELEM_BIND_ADDRESS = "bind-address";
+    private static final String ELEM_BUFFER_POOL = "buffer-pool";
+    private static final String ELEM_CONFIG = "config";
+    private static final String ELEM_CONFIGS = "configs";
+    private static final String ELEM_DEFAULTS = "defaults";
+    private static final String ELEM_EAGERLY_ACQUIRE_SESSION = "eagerly-acquire-session";
+    private static final String ELEM_ENABLE_HTTP2 = "enable-http2";
+    private static final String ELEM_IDLE_TIMEOUT = "idle-timeout";
+    private static final String ELEM_MAX_CONNECTIONS = "max-connections";
+    private static final String ELEM_MAX_STREAMS_PER_CONNECTION = "max-streams-per-connection";
+    private static final String ELEM_TCP_NO_DELAY = "tcp-no-delay";
+    private static final String ELEM_HTTP_CLIENT = "http-client";
 
     static WildflyHttpContext parseHttpContext() throws ConfigXMLParseException, IOException {
         final ClientConfiguration clientConfiguration = ClientConfiguration.getInstance();
         final WildflyHttpContext.Builder builder = new WildflyHttpContext.Builder();
         if (clientConfiguration != null) {
-            try (final ConfigurationXMLStreamReader streamReader = clientConfiguration.readConfiguration(Collections.singleton(NS_EJB_HTTP_CLIENT))) {
+            try (final ConfigurationXMLStreamReader streamReader = clientConfiguration.readConfiguration(Set.of(NS_EJB_HTTP_CLIENT_1_0, NS_EJB_HTTP_CLIENT_1_1))) {
                 parseDocument(streamReader, builder);
             }
         }
@@ -50,33 +74,36 @@ final class HttpClientXmlParser {
     //for testing
     static WildflyHttpContext.Builder parseConfig(URI uri) throws ConfigXMLParseException {
         final WildflyHttpContext.Builder builder = new WildflyHttpContext.Builder();
-        try (final ConfigurationXMLStreamReader streamReader = ClientConfiguration.getInstance(uri).readConfiguration(Collections.singleton(NS_EJB_HTTP_CLIENT))) {
+        try (final ConfigurationXMLStreamReader streamReader = ClientConfiguration.getInstance(uri).readConfiguration(Set.of(NS_EJB_HTTP_CLIENT_1_0, NS_EJB_HTTP_CLIENT_1_1))) {
             parseDocument(streamReader, builder);
             return builder;
         }
     }
 
     private static void parseDocument(final ConfigurationXMLStreamReader reader, final WildflyHttpContext.Builder builder) throws ConfigXMLParseException {
-        if (reader.hasNext()) switch (reader.nextTag()) {
-            case START_ELEMENT: {
-                switch (reader.getNamespaceURI()) {
-                    case NS_EJB_HTTP_CLIENT:
-                        break;
-                    default:
-                        throw reader.unexpectedElement();
-                }
-                switch (reader.getLocalName()) {
-                    case "http-client": {
-                        parseRootElement(reader, builder);
-                        break;
+        if (reader.hasNext()) {
+            switch (reader.nextTag()) {
+                case START_ELEMENT: {
+                    switch (reader.getNamespaceURI()) {
+                        case NS_EJB_HTTP_CLIENT_1_0:
+                        case NS_EJB_HTTP_CLIENT_1_1:
+                            break;
+                        default:
+                            throw reader.unexpectedElement();
                     }
-                    default:
-                        throw reader.unexpectedElement();
+                    switch (reader.getLocalName()) {
+                        case ELEM_HTTP_CLIENT: {
+                            parseRootElement(reader, builder);
+                            break;
+                        }
+                        default:
+                            throw reader.unexpectedElement();
+                    }
+                    break;
                 }
-                break;
-            }
-            default: {
-                throw reader.unexpectedContent();
+                default: {
+                    throw reader.unexpectedContent();
+                }
             }
         }
     }
@@ -95,17 +122,18 @@ final class HttpClientXmlParser {
             switch (reader.nextTag()) {
                 case START_ELEMENT: {
                     switch (reader.getNamespaceURI()) {
-                        case NS_EJB_HTTP_CLIENT:
+                        case NS_EJB_HTTP_CLIENT_1_0:
+                        case NS_EJB_HTTP_CLIENT_1_1:
                             break;
                         default:
                             throw reader.unexpectedElement();
                     }
                     switch (reader.getLocalName()) {
-                        case "configs": {
+                        case ELEM_CONFIGS: {
                             parseConfigsElement(reader, builder);
                             break;
                         }
-                        case "defaults": {
+                        case ELEM_DEFAULTS: {
                             parseDefaults(reader, builder);
                             break;
                         }
@@ -127,11 +155,11 @@ final class HttpClientXmlParser {
         int port = 0;
         for (int i = 0; i < attributeCount; i++) {
             switch (reader.getAttributeLocalName(i)) {
-                case "address": {
+                case ATTR_ADDRESS: {
                     address = reader.getAttributeValueResolved(i);
                     break;
                 }
-                case "port": {
+                case ATTR_PORT: {
                     port = reader.getIntAttributeValueResolved(i);
                     if (port < 0 || port > 65535) {
                         throw HttpClientMessages.MESSAGES.portValueOutOfRange(port);
@@ -144,7 +172,7 @@ final class HttpClientXmlParser {
             }
         }
         if (address == null) {
-            throw reader.missingRequiredAttribute(null, "address");
+            throw reader.missingRequiredAttribute(null, ATTR_ADDRESS);
         }
         final InetSocketAddress bindAddress = InetSocketAddress.createUnresolved(address, port);
         switch (reader.nextTag()) {
@@ -162,7 +190,7 @@ final class HttpClientXmlParser {
         Long value = null;
         for (int i = 0; i < attributeCount; i++) {
             switch (reader.getAttributeLocalName(i)) {
-                case "value": {
+                case ATTR_VALUE: {
                     value = reader.getLongAttributeValueResolved(i);
                     break;
                 }
@@ -172,7 +200,7 @@ final class HttpClientXmlParser {
             }
         }
         if (value == null) {
-            throw reader.missingRequiredAttribute(null, "value");
+            throw reader.missingRequiredAttribute(null, ATTR_VALUE);
         }
         switch (reader.nextTag()) {
             case END_ELEMENT: {
@@ -189,7 +217,7 @@ final class HttpClientXmlParser {
         Integer value = null;
         for (int i = 0; i < attributeCount; i++) {
             switch (reader.getAttributeLocalName(i)) {
-                case "value": {
+                case ATTR_VALUE: {
                     value = reader.getIntAttributeValueResolved(i);
                     break;
                 }
@@ -199,7 +227,7 @@ final class HttpClientXmlParser {
             }
         }
         if (value == null) {
-            throw reader.missingRequiredAttribute(null, "value");
+            throw reader.missingRequiredAttribute(null, ATTR_VALUE);
         }
         switch (reader.nextTag()) {
             case END_ELEMENT: {
@@ -216,7 +244,7 @@ final class HttpClientXmlParser {
         Boolean value = null;
         for (int i = 0; i < attributeCount; i++) {
             switch (reader.getAttributeLocalName(i)) {
-                case "value": {
+                case ATTR_VALUE: {
                     value = reader.getBooleanAttributeValueResolved(i);
                     break;
                 }
@@ -226,7 +254,7 @@ final class HttpClientXmlParser {
             }
         }
         if (value == null) {
-            throw reader.missingRequiredAttribute(null, "value");
+            throw reader.missingRequiredAttribute(null, ATTR_VALUE);
         }
         switch (reader.nextTag()) {
             case END_ELEMENT: {
@@ -247,13 +275,14 @@ final class HttpClientXmlParser {
             switch (reader.nextTag()) {
                 case START_ELEMENT: {
                     switch (reader.getNamespaceURI()) {
-                        case NS_EJB_HTTP_CLIENT:
+                        case NS_EJB_HTTP_CLIENT_1_0:
+                        case NS_EJB_HTTP_CLIENT_1_1:
                             break;
                         default:
                             throw reader.unexpectedElement();
                     }
                     switch (reader.getLocalName()) {
-                        case "config": {
+                        case ELEM_CONFIG: {
                             parseConfig(reader, builder);
                             break;
                         }
@@ -273,41 +302,52 @@ final class HttpClientXmlParser {
         if (reader.getAttributeCount() > 0) {
             throw reader.unexpectedAttribute(0);
         }
+
+        HttpClientSchemaVersion version = HttpClientSchemaVersion.V1_0;
         while (reader.hasNext()) {
             switch (reader.nextTag()) {
                 case START_ELEMENT: {
                     switch (reader.getNamespaceURI()) {
-                        case NS_EJB_HTTP_CLIENT:
+                        case NS_EJB_HTTP_CLIENT_1_0:
+                            break;
+                        case NS_EJB_HTTP_CLIENT_1_1:
+                            version = HttpClientSchemaVersion.V1_1;
                             break;
                         default:
                             throw reader.unexpectedElement();
                     }
-                    switch (reader.getLocalName()) {
-                        case "bind-address": {
+
+                    final String localName = version.getLocalName(reader);
+                    switch (localName) {
+                        case ELEM_BIND_ADDRESS: {
                             builder.setDefaultBindAddress(parseBind(reader));
                             break;
                         }
-                        case "idle-timeout": {
+                        case ELEM_IDLE_TIMEOUT: {
                             builder.setIdleTimeout(parseLongElement(reader));
                             break;
                         }
-                        case "max-connections": {
+                        case ELEM_MAX_CONNECTIONS: {
                             builder.setMaxConnections(parseIntElement(reader));
                             break;
                         }
-                        case "max-streams-per-connection": {
+                        case ELEM_MAX_STREAMS_PER_CONNECTION: {
                             builder.setMaxStreamsPerConnection(parseIntElement(reader));
                             break;
                         }
-                        case "eagerly-acquire-session": {
+                        case ELEM_EAGERLY_ACQUIRE_SESSION: {
                             builder.setEagerlyAcquireSession(parseBooleanElement(reader));
                             break;
                         }
-                        case "enable-http2": {
+                        case ELEM_ENABLE_HTTP2: {
                             builder.setEnableHttp2(parseBooleanElement(reader));
                             break;
                         }
-                        case "buffer-pool": {
+                        case ELEM_TCP_NO_DELAY: {
+                            builder.setTcpNoDelay(parseBooleanElement(reader));
+                            break;
+                        }
+                        case ELEM_BUFFER_POOL: {
                             builder.setBufferConfig(parseBufferConfig(reader));
                             break;
                         }
@@ -331,19 +371,19 @@ final class HttpClientXmlParser {
         Boolean direct = null;
         for (int i = 0; i < attributeCount; i++) {
             switch (reader.getAttributeLocalName(i)) {
-                case "buffer-size": {
+                case ATTR_BUFFER_SIZE: {
                     bufferSize = reader.getIntAttributeValueResolved(i);
                     break;
                 }
-                case "max-size": {
+                case ATTR_MAX_SIZE: {
                     maxSize = reader.getIntAttributeValueResolved(i);
                     break;
                 }
-                case "thread-local-size": {
+                case ATTR_THREAD_LOCAL_SIZE: {
                     threadLocalSize = reader.getIntAttributeValueResolved(i);
                     break;
                 }
-                case "direct": {
+                case ATTR_DIRECT: {
                     direct = reader.getBooleanAttributeValueResolved(i);
                     break;
                 }
@@ -353,7 +393,7 @@ final class HttpClientXmlParser {
             }
         }
         if (bufferSize == null) {
-            throw reader.missingRequiredAttribute(null, "value");
+            throw reader.missingRequiredAttribute(null, ATTR_VALUE);
         }
         WildflyHttpContext.BufferBuilder value = new WildflyHttpContext.BufferBuilder();
         value.setBufferSize(bufferSize);
@@ -375,13 +415,14 @@ final class HttpClientXmlParser {
             }
         }
     }
+
     private static void parseConfig(final ConfigurationXMLStreamReader reader, final WildflyHttpContext.Builder builder) throws ConfigXMLParseException {
 
         final int attributeCount = reader.getAttributeCount();
         URI uri = null;
         for (int i = 0; i < attributeCount; i++) {
             switch (reader.getAttributeLocalName(i)) {
-                case "uri": {
+                case ATTR_URI: {
                     uri = reader.getURIAttributeValueResolved(i);
                     break;
                 }
@@ -391,42 +432,52 @@ final class HttpClientXmlParser {
             }
         }
         if (uri == null) {
-            throw reader.missingRequiredAttribute(null, "uri");
+            throw reader.missingRequiredAttribute(null, ATTR_URI);
         }
         final WildflyHttpContext.Builder.HttpConfigBuilder targetBuilder = builder.addConfig(uri);
 
+        HttpClientSchemaVersion version = HttpClientSchemaVersion.V1_0;
         while (reader.hasNext()) {
             switch (reader.nextTag()) {
                 case START_ELEMENT: {
                     switch (reader.getNamespaceURI()) {
-                        case NS_EJB_HTTP_CLIENT:
+                        case NS_EJB_HTTP_CLIENT_1_0:
+                            break;
+                        case NS_EJB_HTTP_CLIENT_1_1:
+                            version = HttpClientSchemaVersion.V1_1;
                             break;
                         default:
                             throw reader.unexpectedElement();
                     }
-                    switch (reader.getLocalName()) {
-                        case "idle-timeout": {
+
+                    final String localName = version.getLocalName(reader);
+                    switch (localName) {
+                        case ELEM_IDLE_TIMEOUT: {
                             targetBuilder.setIdleTimeout(parseLongElement(reader));
                             break;
                         }
-                        case "max-connections": {
+                        case ELEM_MAX_CONNECTIONS: {
                             targetBuilder.setMaxConnections(parseIntElement(reader));
                             break;
                         }
-                        case "max-streams-per-connection": {
+                        case ELEM_MAX_STREAMS_PER_CONNECTION: {
                             targetBuilder.setMaxStreamsPerConnection(parseIntElement(reader));
                             break;
                         }
-                        case "eagerly-acquire-session": {
+                        case ELEM_EAGERLY_ACQUIRE_SESSION: {
                             targetBuilder.setEagerlyAcquireSession(parseBooleanElement(reader));
                             break;
                         }
-                        case "enable-http2": {
+                        case ELEM_ENABLE_HTTP2: {
                             targetBuilder.setEnableHttp2(parseBooleanElement(reader));
                             break;
                         }
-                        case "bind-address": {
+                        case ELEM_BIND_ADDRESS: {
                             targetBuilder.setBindAddress(parseBind(reader));
+                            break;
+                        }
+                        case ELEM_TCP_NO_DELAY: {
+                            targetBuilder.setTcpNoDelay(parseBooleanElement(reader));
                             break;
                         }
                         default:
@@ -441,4 +492,39 @@ final class HttpClientXmlParser {
         }
     }
 
+    enum HttpClientSchemaVersion {
+        V1_0(NS_EJB_HTTP_CLIENT_1_0,
+            List.of(
+                ELEM_BIND_ADDRESS, ELEM_BUFFER_POOL, ELEM_CONFIG, ELEM_CONFIGS, ELEM_DEFAULTS,
+                ELEM_EAGERLY_ACQUIRE_SESSION, ELEM_ENABLE_HTTP2, ELEM_IDLE_TIMEOUT, ELEM_MAX_CONNECTIONS,
+                ELEM_MAX_STREAMS_PER_CONNECTION
+            )),
+        V1_1(NS_EJB_HTTP_CLIENT_1_1,
+            List.of(
+                ELEM_BIND_ADDRESS, ELEM_BUFFER_POOL, ELEM_CONFIG, ELEM_CONFIGS, ELEM_DEFAULTS,
+                ELEM_EAGERLY_ACQUIRE_SESSION, ELEM_ENABLE_HTTP2, ELEM_IDLE_TIMEOUT, ELEM_MAX_CONNECTIONS,
+                ELEM_MAX_STREAMS_PER_CONNECTION, ELEM_TCP_NO_DELAY
+            ));
+
+        private final String namespace;
+        private final List<String> elements;
+
+        HttpClientSchemaVersion(String namespace, List<String> elements) {
+            this.namespace = namespace;
+            this.elements = elements;
+        }
+
+        public String getNamespace() {
+            return namespace;
+        }
+
+        public String getLocalName(ConfigurationXMLStreamReader reader) throws ConfigXMLParseException {
+            String element = reader.getLocalName();
+            if (!elements.contains(element)) {
+                throw reader.unexpectedElement();
+            }
+
+            return element;
+        }
+    }
 }
