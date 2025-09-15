@@ -51,7 +51,7 @@ public class HttpRemoteEjbService {
         this(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, classResolverFilter);
     }
 
-    private HttpRemoteEjbService(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+    protected HttpRemoteEjbService(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                                  Function<String, Boolean> classResolverFilter) {
         this.config = config;
         this.serverHandlers = ServerHandlers.newInstance(config, association, executorService, localTransactionContext, classResolverFilter);
