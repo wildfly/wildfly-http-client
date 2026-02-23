@@ -20,7 +20,6 @@ package org.wildfly.httpclient.common;
 
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 
 import io.undertow.client.ClientRequest;
 
@@ -38,8 +37,8 @@ public abstract class RequestBuilder<E extends Enum<? extends RequestType>> {
         return requestType;
     }
 
-    protected int getProtocolVersion() {
-        return targetContext.getProtocolVersion();
+    protected Version getVersion() {
+        return targetContext.getVersion();
     }
 
     protected String getPathPrefix() {
@@ -79,8 +78,15 @@ public abstract class RequestBuilder<E extends Enum<? extends RequestType>> {
     protected void appendOperationPath(final StringBuilder sb, final String contextPath) {
         sb.append(getPathPrefix());
         appendPath(sb, contextPath, false);
-        appendPath(sb, VERSION_PATH + getProtocolVersion(), false);
+        appendPath(sb, getVersionPath(), false);
         appendPath(sb, ((RequestType) getRequestType()).getPath(), false);
+    }
+
+    private String getVersionPath() {
+        final Version.Handler handlerVersion = getVersion().handler();
+        if (handlerVersion == Version.Handler.VERSION_1) return Protocol.VERSION_ONE_PATH;
+        if (handlerVersion == Version.Handler.VERSION_2) return Protocol.VERSION_TWO_PATH;
+        throw new IllegalStateException();
     }
 
 }

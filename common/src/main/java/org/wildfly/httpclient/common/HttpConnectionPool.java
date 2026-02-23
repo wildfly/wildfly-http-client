@@ -109,8 +109,8 @@ public class HttpConnectionPool implements Closeable {
         return new ClientConnectionHolder(connection, uri, sslContext);
     }
 
-    int getProtocolVersion() {
-        return Protocol.LATEST;
+    Version getVersion() {
+        return Version.JAVA_EE_8; // client default is Java EE API because of backward compatibility
     }
 
     private void runPending() {

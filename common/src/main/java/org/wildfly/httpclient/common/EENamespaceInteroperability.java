@@ -46,11 +46,12 @@ import java.util.List;
 import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
 import static org.wildfly.httpclient.common.HeadersHelper.addResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
-import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
 import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
 import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
+import static org.wildfly.httpclient.common.Version.JAVA_EE_8;
+import static org.wildfly.httpclient.common.Version.LATEST;
 
 /**
  * EE namespace interoperability implementation for allowing Jakarta EE namespace servers and clients communication with
@@ -142,15 +143,15 @@ final class EENamespaceInteroperability {
      */
 
     private static class HttpConnectionPool extends org.wildfly.httpclient.common.HttpConnectionPool {
-        private volatile int protocolVersion = -1;
+        private volatile Version version;
 
         protected HttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout) {
             super(maxConnections, maxStreamsPerConnection, worker, byteBufferPool, options, hostPool, connectionIdleTimeout);
         }
 
         @Override
-        int getProtocolVersion() {
-            return protocolVersion == -1? 1 : protocolVersion;
+        Version getVersion() {
+            return version == null ? JAVA_EE_8 : version;
         }
 
         @Override
@@ -166,22 +167,18 @@ final class EENamespaceInteroperability {
 
             @Override
             public void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback) {
-                switch (protocolVersion) {
-                    case -1:
-                        // new connection pool: send the protocol version header once with LATEST_VERSION value to see what will be the response
-                        putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
-                        request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                        break;
-                    case Protocol.JAVAEE_PROTOCOL_VERSION:
-                        // connection is Javax EE, so we need to transform class names Javax<->Jakarta
-                        request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                        break;
-                    case org.wildfly.httpclient.common.Protocol.JAKARTAEE_PROTOCOL_VERSION:
-                    default:
-                        // connection already set as Jakarta namespace, default factory can be used for marshalling
-                        // (no transformation needed)
-                        putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
-                        request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
+                if (version == null) {
+                    // new connection pool: send the protocol version header once with LATEST_VERSION value to see what will be the response
+                    LATEST.writeTo(request);
+                    putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
+                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                } else if (version == JAVA_EE_8) {
+                    // connection is Java EE, so we need to transform class names Javax<->Jakarta
+                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                } else {
+                    // connection set as Jakarta EE - no transformation needed
+                    putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
+                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
                 }
                 super.sendRequest(request, new ClientCallback<ClientExchange>() {
                     @Override
@@ -212,19 +209,17 @@ final class EENamespaceInteroperability {
                         public void completed(ClientExchange result) {
                             // this method adds the factory to the request instead of response, this is more efficient
                             // we prevent adding when jakartaEE is already true and creating a new entry in the response attachment map
-                            final ClientResponse response = result.getResponse();
-                            if (protocolVersion == -1) {
+                            if (version == null) {
+                                version = Version.readFrom(result);
+                                result.putAttachment(Version.KEY, version);
                                 // we need to check for protocol version header to define the protocol version of the pool
-                                if (LATEST_VERSION.equals(getResponseHeader(response, PROTOCOL_VERSION))) {
-                                    // this indicates this is the first response server sends, set the protocol to 2
-                                    protocolVersion = Protocol.LATEST;
+                                if (version == Version.JAVA_EE_8) {
+                                    // regarding marshalling factory key, do nothing, the connection is
+                                    // not Jakarta and the marshalling factory provider is already interoperable
+                                } else {
                                     // overwrite previous attachment, no transformation is needed for this connection any more
                                     result.getRequest().putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
-                                } else {
-                                    protocolVersion = Protocol.JAVAEE_PROTOCOL_VERSION;
-                                    //regarding marsh. factory key, do nothing, the connection is not Jakarta and the marshalling factory provider is already interoperable
                                 }
-
                             } // else: do nothing, request already contains the default marshalling factory
                             responseListener.completed(result);
                         }
