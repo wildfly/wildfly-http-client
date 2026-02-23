@@ -40,6 +40,7 @@ import java.util.Deque;
 public abstract class AbstractServerHttpHandler implements HttpHandler {
 
     protected final HttpServiceConfig config;
+    private final Version serverVersion = Version.LATEST;
 
     protected AbstractServerHttpHandler(final HttpServiceConfig config) {
         this.config = config;
@@ -53,9 +54,21 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
             if (!containsRequiredContentType(exchange)) return;
             if (!containsRequiredRequestHeaders(exchange)) return;
             if (!containsRequiredQueryParameters(exchange)) return;
+            handshakeVersion(exchange);
             processRequest(exchange);
         } catch (Throwable e) {
             sendException(exchange, INTERNAL_SERVER_ERROR, e);
+        }
+    }
+
+    private void handshakeVersion(final HttpServerExchange exchange) {
+        final Version clientVersion = Version.readFrom(exchange);
+        if (clientVersion.compareTo(serverVersion) < 0) {
+            exchange.putAttachment(Version.KEY, clientVersion);
+            clientVersion.writeTo(exchange);
+        } else {
+            exchange.putAttachment(Version.KEY, serverVersion);
+            serverVersion.writeTo(exchange);
         }
     }
 
