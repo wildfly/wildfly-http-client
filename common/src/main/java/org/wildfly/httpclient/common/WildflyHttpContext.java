@@ -24,6 +24,7 @@ import io.undertow.server.DefaultByteBufferPool;
 import org.wildfly.common.context.ContextManager;
 import org.wildfly.common.context.Contextual;
 import org.xnio.OptionMap;
+import org.xnio.Options;
 import org.xnio.XnioWorker;
 
 import java.net.InetSocketAddress;
@@ -69,11 +70,14 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
     private final XnioWorker worker;
     private final ByteBufferPool pool;
     private final boolean enableHttp2;
+    private final boolean tcpNoDelay;
     private final HttpConnectionPoolFactory httpConnectionPoolFactory;
     private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
 
-    WildflyHttpContext(ConfigSection[] targets, int maxConnections, int maxStreamsPerConnection, long idleTimeout, boolean eagerlyAcquireAffinity, XnioWorker worker, ByteBufferPool pool, boolean enableHttp2,
-                       HttpConnectionPoolFactory httpConnectionPoolFactory, HttpMarshallerFactoryProvider httpMarshallerFactoryProvider) {
+    WildflyHttpContext(ConfigSection[] targets, int maxConnections, int maxStreamsPerConnection, long idleTimeout,
+                       boolean eagerlyAcquireAffinity, XnioWorker worker, ByteBufferPool pool, boolean enableHttp2,
+                       boolean tcpNoDelay, HttpConnectionPoolFactory httpConnectionPoolFactory,
+                       HttpMarshallerFactoryProvider httpMarshallerFactoryProvider) {
         this.targets = targets;
         this.maxConnections = maxConnections;
         this.maxStreamsPerConnection = maxStreamsPerConnection;
@@ -82,6 +86,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
         this.worker = worker;
         this.pool = pool;
         this.enableHttp2 = enableHttp2;
+        this.tcpNoDelay = tcpNoDelay;
         this.httpConnectionPoolFactory = httpConnectionPoolFactory;
         this.httpMarshallerFactoryProvider = httpMarshallerFactoryProvider;
     }
@@ -118,7 +123,9 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
                 return context;
             }
             HttpConnectionPool pool = httpConnectionPoolFactory.createHttpConnectionPool(
-                    maxConnections, maxStreamsPerConnection, worker, this.pool, OptionMap.create(UndertowOptions.ENABLE_HTTP2, enableHttp2), new HostPool(uri), idleTimeout);
+                    maxConnections, maxStreamsPerConnection, worker, this.pool,
+                OptionMap.create(UndertowOptions.ENABLE_HTTP2, enableHttp2,
+                    Options.TCP_NODELAY, tcpNoDelay), new HostPool(uri), idleTimeout);
             uriConnectionPools.put(uri, context = new HttpTargetContext(pool, eagerlyAcquireAffinity, uri, httpMarshallerFactoryProvider));
             context.init();
             return context;
@@ -151,6 +158,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
         private Boolean eagerlyAcquireSession;
         private final List<HttpConfigBuilder> targets = new ArrayList<>();
         private Boolean enableHttp2;
+        private Boolean tcpNoDelay = false;
 
         private BufferBuilder bufferConfig;
 
@@ -159,7 +167,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             XnioWorker worker = XnioWorker.getContextManager().get();
             ByteBufferPool pool;
             if(bufferConfig == null) {
-            pool=new DefaultByteBufferPool(true, 1024, 100, 0, LEAK_DETECTION); //TODO
+                pool = new DefaultByteBufferPool(true, 1024, 100, 0, LEAK_DETECTION); //TODO
             } else {
                 pool = new DefaultByteBufferPool(bufferConfig.isDirect(), bufferConfig.getBufferSize(), bufferConfig.getMaxSize(), bufferConfig.getThreadLocalSize(), LEAK_DETECTION);
             }
@@ -191,13 +199,17 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
                     http2 = sb.getEnableHttp2();
                 }
                 ConfigSection connection = new ConfigSection(new HttpTargetContext(
-                        httpConnectionPoolFactory.createHttpConnectionPool(sb.getMaxConnections() > 0 ? sb.getMaxConnections() : maxConnections, sb.getMaxStreamsPerConnection() > 0 ? sb.getMaxStreamsPerConnection() : maxStreamsPerConnection, worker, pool, OptionMap.create(UndertowOptions.ENABLE_HTTP2, http2),
-                                hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout), eager, sb.getUri(), httpMarshallerFactoryProvider),
-                        sb.getUri());
+                    httpConnectionPoolFactory.createHttpConnectionPool(sb.getMaxConnections() > 0 ? sb.getMaxConnections() : maxConnections, sb.getMaxStreamsPerConnection() > 0 ? sb.getMaxStreamsPerConnection() : maxStreamsPerConnection, worker, pool,
+                        OptionMap.create(
+                            UndertowOptions.ENABLE_HTTP2, http2,
+                            Options.TCP_NODELAY, tcpNoDelay),
+                        hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout), eager, sb.getUri(), httpMarshallerFactoryProvider),
+                    sb.getUri());
                 connections[i] = connection;
             }
             return new WildflyHttpContext(connections, maxConnections, maxStreamsPerConnection, idleTimeout,
-                    eagerlyAcquireSession == null ? false : eagerlyAcquireSession, worker, pool, enableHttp2 == null ? true : enableHttp2,
+                    eagerlyAcquireSession == null ? false : eagerlyAcquireSession, worker, pool,
+                    enableHttp2 == null ? true : enableHttp2, tcpNoDelay,
                     httpConnectionPoolFactory, httpMarshallerFactoryProvider);
         }
 
@@ -269,6 +281,14 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             return enableHttp2;
         }
 
+        public void setTcpNoDelay(Boolean tcpNoDelay) {
+            this.tcpNoDelay = tcpNoDelay;
+        }
+
+        public Boolean getTcpNoDelay() {
+            return tcpNoDelay;
+        }
+
         class HttpConfigBuilder {
             final URI uri;
             private InetSocketAddress bindAddress;
@@ -277,6 +297,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             private int maxStreamsPerConnection;
             private Boolean eagerlyAcquireSession;
             private Boolean enableHttp2;
+            private Boolean tcpNoDelay = false;
 
             HttpConfigBuilder(URI uri) {
                 this.uri = uri;
@@ -332,6 +353,14 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
 
             public Boolean getEnableHttp2() {
                 return enableHttp2;
+            }
+
+            public void setTcpNoDelay(Boolean tcpNoDelay) {
+                this.tcpNoDelay = tcpNoDelay;
+            }
+
+            public Boolean getTcpNoDelay() {
+                return tcpNoDelay;
             }
         }
     }

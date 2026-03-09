@@ -32,8 +32,23 @@ import org.wildfly.client.config.ConfigXMLParseException;
 public class WildflyClientParserTestCase {
 
     @Test
-    public void testXMLParsing() throws URISyntaxException, ConfigXMLParseException {
-        WildflyHttpContext.Builder builder = HttpClientXmlParser.parseConfig(getClass().getClassLoader().getResource("ejb-client.xml").toURI());
+    public void testXMLParsing10() throws URISyntaxException, ConfigXMLParseException {
+        WildflyHttpContext.Builder builder = HttpClientXmlParser.parseConfig(getClass().getClassLoader().getResource("ejb-client-1.0.xml").toURI());
+        testValues10(builder);
+        WildflyHttpContext.Builder.HttpConfigBuilder context = builder.getTargets().get(0);
+        Assert.assertFalse(context.getTcpNoDelay());
+    }
+
+    @Test
+    public void testXMLParsing11() throws URISyntaxException, ConfigXMLParseException {
+        WildflyHttpContext.Builder builder = HttpClientXmlParser.parseConfig(getClass().getClassLoader().getResource("ejb-client-1.1.xml").toURI());
+        testValues10(builder);
+
+        WildflyHttpContext.Builder.HttpConfigBuilder context = builder.getTargets().get(0);
+        Assert.assertTrue(context.getTcpNoDelay());
+    }
+
+    private static void testValues10(WildflyHttpContext.Builder builder) throws URISyntaxException {
         Assert.assertEquals(InetSocketAddress.createUnresolved("127.0.0.1", 3456), builder.getDefaultBindAddress());
 
         Assert.assertEquals(10000, builder.getIdleTimeout());
@@ -51,7 +66,6 @@ public class WildflyClientParserTestCase {
         Assert.assertEquals(true, context.getEagerlyAcquireSession());
 
         Assert.assertEquals(new URI("http://localhost:8080"), context.getUri());
-
     }
 
 }
