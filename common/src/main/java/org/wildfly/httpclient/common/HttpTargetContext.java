@@ -357,31 +357,42 @@ public class HttpTargetContext extends AbstractAttachable {
                     });
 
                     if (httpMarshaller != null) {
-                        //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
-                        connection.getConnection().getWorker().execute(() -> {
-                            try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
+                        var runnable = new Runnable() {
+                            @Override
+                            public void run() {
+                                try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
 
-                                // marshall the locator and method params
-                                // start the marshaller
-                                boolean compress = false;
-                                String encoding = getRequestHeader(request, CONTENT_ENCODING);
-                                if (encoding != null) {
-                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                    if (GZIP.toString().equals(lowerEncoding)) {
-                                        compress = true;
+                                    // marshall the locator and method params
+                                    // start the marshaller
+                                    boolean compress = false;
+                                    String encoding = getRequestHeader(request, CONTENT_ENCODING);
+                                    if (encoding != null) {
+                                        String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+                                        if (GZIP.toString().equals(lowerEncoding)) {
+                                            compress = true;
+                                        }
+                                    }
+
+                                    httpMarshaller.marshall(compress ? new GZIPOutputStream(outputStream) : outputStream);
+
+                                } catch (Exception e) {
+                                    try {
+                                        failureHandler.handleFailure(e);
+                                    } finally {
+                                        connection.done(true);
                                     }
                                 }
-
-                                httpMarshaller.marshall(compress ? new GZIPOutputStream(outputStream) : outputStream);
-
-                            } catch (Exception e) {
-                                try {
-                                    failureHandler.handleFailure(e);
-                                } finally {
-                                    connection.done(true);
-                                }
                             }
-                        });
+                        };
+
+                        if (connection.getConnection().getIoThread() == Thread.currentThread()) {
+                            System.err.println("On IO thread");
+                            runnable.run();
+                        } else {
+                            System.err.println("Not on IO thread");
+                            //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
+                            connection.getConnection().getWorker().execute(runnable::run);
+                        }
                     }
                 }
 
