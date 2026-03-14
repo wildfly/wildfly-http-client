@@ -69,6 +69,12 @@ public final class Version implements Comparable<Version>{
         return new Version(handlerVersion, specVersion, encodingVersion);
     }
 
+    static Version of(final Handler handlerVersion, final Specification specVersion) {
+        if (Handler.VERSION_1.equals(handlerVersion) && Specification.JAVA_EE_8.equals(specVersion)) return JAVA_EE_8;
+        if (Handler.VERSION_2.equals(handlerVersion) && Specification.JAKARTA_EE_10.equals(specVersion)) return JAKARTA_EE_10;
+        return new Version(handlerVersion, specVersion, Encoding.JBOSS_MARSHALLING);
+    }
+
     @Override
     public String toString() {
         return String.valueOf(this == JAVA_EE_8 ? 1 : version);
@@ -142,7 +148,7 @@ public final class Version implements Comparable<Version>{
             this.value = value;
         }
 
-        private static Handler of(final int value) {
+        static Handler of(final int value) {
             for (Handler handler : values()) {
                 if (value == handler.value) return handler;
             }
@@ -160,7 +166,7 @@ public final class Version implements Comparable<Version>{
             this.value = value;
         }
 
-        private static Specification of(final int value) {
+        static Specification of(final int value) {
             for (Specification spec : values()) {
                 if (value == spec.value) return spec;
             }
