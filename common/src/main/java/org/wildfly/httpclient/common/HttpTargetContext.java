@@ -35,6 +35,8 @@ import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
+import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
+import static org.wildfly.httpclient.common.HttpMarshallerFactory.INTEROPERABLE_FACTORY;
 import static org.xnio.IoUtils.safeClose;
 
 import io.undertow.client.ClientCallback;
@@ -427,7 +429,9 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest request) {
-        return this.httpMarshallerFactoryProvider.getMarshallerFactory(request);
+        HttpMarshallerFactory factory = httpMarshallerFactoryProvider.getMarshallerFactory(request);
+        if (factory != null) return factory;
+        return getVersion() == Version.JAVA_EE_8 ? INTEROPERABLE_FACTORY : DEFAULT_FACTORY;
     }
 
     public HttpConnectionPool getConnectionPool() {

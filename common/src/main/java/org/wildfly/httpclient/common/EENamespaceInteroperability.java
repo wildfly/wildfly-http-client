@@ -43,15 +43,14 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 
-import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
 import static org.wildfly.httpclient.common.HeadersHelper.addResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
+import static org.wildfly.httpclient.common.HttpMarshallerFactory.INTEROPERABLE_FACTORY;
 import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
 import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 import static org.wildfly.httpclient.common.Version.JAVA_EE_8;
-import static org.wildfly.httpclient.common.Version.LATEST;
 
 /**
  * EE namespace interoperability implementation for allowing Jakarta EE namespace servers and clients communication with
@@ -78,8 +77,6 @@ final class EENamespaceInteroperability {
     private static final AttachmentKey<HttpMarshallerFactory> HTTP_MARSHALLER_FACTORY_KEY = AttachmentKey.create(HttpMarshallerFactory.class);
     // key used to attach an http unmarshaller factory to a server exchange
     private static final AttachmentKey<HttpMarshallerFactory> HTTP_UNMARSHALLER_FACTORY_KEY = AttachmentKey.create(HttpMarshallerFactory.class);
-    // marshaller factory to be used when Javax<->Jakarta transformation is needed
-    private static final HttpMarshallerFactory INTEROPERABLE_MARSHALLER_FACTORY = new HttpMarshallerFactory(JAVAEE_TO_JAKARTAEE);
 
     static {
         if (EE_NAMESPACE_INTEROPERABLE_MODE) {
@@ -143,15 +140,8 @@ final class EENamespaceInteroperability {
      */
 
     private static class HttpConnectionPool extends org.wildfly.httpclient.common.HttpConnectionPool {
-        private volatile Version version;
-
-        protected HttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout) {
-            super(maxConnections, maxStreamsPerConnection, worker, byteBufferPool, options, hostPool, connectionIdleTimeout);
-        }
-
-        @Override
-        Version getVersion() {
-            return version == null ? JAVA_EE_8 : version;
+        protected HttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout, Version version) {
+            super(maxConnections, maxStreamsPerConnection, worker, byteBufferPool, options, hostPool, connectionIdleTimeout, version);
         }
 
         @Override
@@ -167,17 +157,12 @@ final class EENamespaceInteroperability {
 
             @Override
             public void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback) {
-                if (version == null) {
-                    // new connection pool: send the protocol version header once with LATEST_VERSION value to see what will be the response
-                    LATEST.writeTo(request);
-                    putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
-                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                } else if (version == JAVA_EE_8) {
+                if (getVersion() == JAVA_EE_8) {
                     // connection is Java EE, so we need to transform class names Javax<->Jakarta
-                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                    request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_FACTORY);
                 } else {
                     // connection set as Jakarta EE - no transformation needed
-                    putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
+                    putRequestHeader(request, PROTOCOL_VERSION, getVersion().toString());
                     request.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
                 }
                 super.sendRequest(request, new ClientCallback<ClientExchange>() {
@@ -197,6 +182,7 @@ final class EENamespaceInteroperability {
             private final class EEInteroperableClientExchange implements ClientExchange {
 
                 private final ClientExchange wrappedExchange;
+                private volatile Version version;
 
                 public EEInteroperableClientExchange(ClientExchange clientExchange) {
                     this.wrappedExchange = clientExchange;
@@ -317,7 +303,7 @@ final class EENamespaceInteroperability {
                 // respond that this end also supports version two
                 addResponseHeader(exchange, PROTOCOL_VERSION, LATEST_VERSION);
                 // transformation is required for unmarshalling because client is on EE namespace interoperable mode
-                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_FACTORY);
                 // no transformation required for marshalling, server is sending response in Jakarta
                 exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
             } else {
@@ -325,8 +311,8 @@ final class EENamespaceInteroperability {
                 // because server is interoperable mode and the lack of a header indicates this is
                 // either a Javax EE client or a Jakarta EE client that is not interoperable
                 // the latter case will lead to an error when unmarshalling at client side)
-                exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
-                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_MARSHALLER_FACTORY);
+                exchange.putAttachment(HTTP_MARSHALLER_FACTORY_KEY, INTEROPERABLE_FACTORY);
+                exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, INTEROPERABLE_FACTORY);
             }
             next.handleRequest(exchange);
         }

@@ -42,10 +42,10 @@ final class HttpClientXmlParser {
     private static final String ATTR_ADDRESS = "address";
     private static final String ATTR_BUFFER_SIZE = "buffer-size";
     private static final String ATTR_DIRECT = "direct";
-    private static final String ATTR_HANDLER = "handler";
+    private static final String ATTR_HANDLER_VERSION = "handler-version";
     private static final String ATTR_MAX_SIZE = "max-size";
     private static final String ATTR_PORT = "port";
-    private static final String ATTR_SPECIFICATION = "specification";
+    private static final String ATTR_SPECIFICATION_VERSION = "specification-version";
     private static final String ATTR_THREAD_LOCAL_SIZE = "thread-local-size";
     private static final String ATTR_URI = "uri";
     private static final String ATTR_VALUE = "value";
@@ -197,7 +197,7 @@ final class HttpClientXmlParser {
         Version.Specification specification = null;
         for (int i = 0; i < attributeCount; i++) {
             switch (reader.getAttributeLocalName(i)) {
-                case ATTR_HANDLER: {
+                case ATTR_HANDLER_VERSION: {
                     int handlerId = reader.getIntAttributeValueResolved(i);
                     if (1 <= handlerId && handlerId <= 127) {
                         handler = Version.Handler.of(reader.getIntAttributeValueResolved(i));
@@ -206,7 +206,7 @@ final class HttpClientXmlParser {
                     }
                     break;
                 }
-                case ATTR_SPECIFICATION: {
+                case ATTR_SPECIFICATION_VERSION: {
                     int specId = reader.getIntAttributeValueResolved(i);
                     if (specId == 8) {
                         specification = Version.Specification.JAVA_EE_8;
@@ -223,10 +223,10 @@ final class HttpClientXmlParser {
             }
         }
         if (handler == null) {
-            throw reader.missingRequiredAttribute(null, ATTR_HANDLER);
+            throw reader.missingRequiredAttribute(null, ATTR_HANDLER_VERSION);
         }
         if (specification == null) {
-            throw reader.missingRequiredAttribute(null, ATTR_SPECIFICATION);
+            throw reader.missingRequiredAttribute(null, ATTR_SPECIFICATION_VERSION);
         }
         switch (reader.nextTag()) {
             case END_ELEMENT: {
@@ -381,7 +381,7 @@ final class HttpClientXmlParser {
                             break;
                         }
                         case ELEM_VERSION: {
-                            builder.setDefaultVersion(parseVersion(reader));
+                            builder.setVersion(parseVersion(reader));
                             break;
                         }
                         case ELEM_IDLE_TIMEOUT: {

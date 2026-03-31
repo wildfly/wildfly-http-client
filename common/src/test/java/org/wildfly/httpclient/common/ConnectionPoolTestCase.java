@@ -66,7 +66,7 @@ public class ConnectionPoolTestCase {
             connections.add(exchange.getConnection());
         }));
 
-        HttpConnectionPool pool = new HttpConnectionPool(1, 1, HTTPTestServer.getWorker(), HTTPTestServer.getBufferPool(), OptionMap.EMPTY, new HostPool(new URI(HTTPTestServer.getDefaultRootServerURL())), CONNECTION_IDLE_TIMEOUT);
+        HttpConnectionPool pool = new HttpConnectionPool(1, 1, HTTPTestServer.getWorker(), HTTPTestServer.getBufferPool(), OptionMap.EMPTY, new HostPool(new URI(HTTPTestServer.getDefaultRootServerURL())), CONNECTION_IDLE_TIMEOUT, null);
         final AtomicReference<Throwable> failed = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(2);
         doInvocation(IDLE_TIMEOUT_PATH, pool, latch, failed);
@@ -103,7 +103,7 @@ public class ConnectionPoolTestCase {
                 currentRequests--;
             }
         }));
-        HttpConnectionPool pool = new HttpConnectionPool(MAX_CONNECTION_COUNT, 1, HTTPTestServer.getWorker(), HTTPTestServer.getBufferPool(), OptionMap.EMPTY, new HostPool(new URI(HTTPTestServer.getDefaultRootServerURL())), -1);
+        HttpConnectionPool pool = new HttpConnectionPool(MAX_CONNECTION_COUNT, 1, HTTPTestServer.getWorker(), HTTPTestServer.getBufferPool(), OptionMap.EMPTY, new HostPool(new URI(HTTPTestServer.getDefaultRootServerURL())), -1, null);
         ExecutorService executor = Executors.newFixedThreadPool(THREADS);
         List<CountDownLatch> results = new ArrayList<>();
         final AtomicReference<Throwable> failed = new AtomicReference<>();
