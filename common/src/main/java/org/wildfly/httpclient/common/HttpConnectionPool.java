@@ -45,11 +45,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
-import static org.wildfly.httpclient.common.EENamespaceInteroperability.EE_NAMESPACE_INTEROPERABLE_MODE;
-import static org.wildfly.httpclient.common.EENamespaceInteroperability.LATEST_VERSION;
-import static org.wildfly.httpclient.common.EENamespaceInteroperability.PROTOCOL_VERSION;
-
 /**
  * A pool of HTTP connections for a given host pool.
  *
@@ -329,7 +324,6 @@ public class HttpConnectionPool implements Closeable {
 
         @Override
         public void sendRequest(ClientRequest request, ClientCallback<ClientExchange> callback) {
-            if (!EE_NAMESPACE_INTEROPERABLE_MODE) putRequestHeader(request, PROTOCOL_VERSION, LATEST_VERSION);
             connection.sendRequest(request, callback);
         }
 
