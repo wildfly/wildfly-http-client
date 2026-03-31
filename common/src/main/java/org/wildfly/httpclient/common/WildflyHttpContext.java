@@ -73,11 +73,12 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
     private final boolean tcpNoDelay;
     private final HttpConnectionPoolFactory httpConnectionPoolFactory;
     private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
+    private final Version version;
 
     WildflyHttpContext(ConfigSection[] targets, int maxConnections, int maxStreamsPerConnection, long idleTimeout,
                        boolean eagerlyAcquireAffinity, XnioWorker worker, ByteBufferPool pool, boolean enableHttp2,
                        boolean tcpNoDelay, HttpConnectionPoolFactory httpConnectionPoolFactory,
-                       HttpMarshallerFactoryProvider httpMarshallerFactoryProvider) {
+                       HttpMarshallerFactoryProvider httpMarshallerFactoryProvider, Version version) {
         this.targets = targets;
         this.maxConnections = maxConnections;
         this.maxStreamsPerConnection = maxStreamsPerConnection;
@@ -89,6 +90,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
         this.tcpNoDelay = tcpNoDelay;
         this.httpConnectionPoolFactory = httpConnectionPoolFactory;
         this.httpMarshallerFactoryProvider = httpMarshallerFactoryProvider;
+        this.version = version;
     }
 
     public static WildflyHttpContext getCurrent() {
@@ -125,7 +127,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             HttpConnectionPool pool = httpConnectionPoolFactory.createHttpConnectionPool(
                     maxConnections, maxStreamsPerConnection, worker, this.pool,
                 OptionMap.create(UndertowOptions.ENABLE_HTTP2, enableHttp2,
-                    Options.TCP_NODELAY, tcpNoDelay), new HostPool(uri), idleTimeout);
+                    Options.TCP_NODELAY, tcpNoDelay), new HostPool(uri), idleTimeout, version);
             uriConnectionPools.put(uri, context = new HttpTargetContext(pool, eagerlyAcquireAffinity, uri, httpMarshallerFactoryProvider));
             context.init();
             return context;
@@ -152,7 +154,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
 
     static class Builder {
         private InetSocketAddress defaultBindAddress;
-        private Version defaultVersion;
+        private Version version;
         private long idleTimeout = 50000; //the server defaults to an idle timeout of 60 seconds, we default ours to 50 to prevent possible races
         private int maxConnections;
         private int maxStreamsPerConnection;
@@ -204,14 +206,14 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
                         OptionMap.create(
                             UndertowOptions.ENABLE_HTTP2, http2,
                             Options.TCP_NODELAY, tcpNoDelay),
-                        hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout), eager, sb.getUri(), httpMarshallerFactoryProvider),
+                        hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout, version), eager, sb.getUri(), httpMarshallerFactoryProvider),
                     sb.getUri());
                 connections[i] = connection;
             }
             return new WildflyHttpContext(connections, maxConnections, maxStreamsPerConnection, idleTimeout,
                     eagerlyAcquireSession == null ? false : eagerlyAcquireSession, worker, pool,
                     enableHttp2 == null ? true : enableHttp2, tcpNoDelay,
-                    httpConnectionPoolFactory, httpMarshallerFactoryProvider);
+                    httpConnectionPoolFactory, httpMarshallerFactoryProvider, version);
         }
 
         void setDefaultBindAddress(InetSocketAddress defaultBindAddress) {
@@ -222,12 +224,12 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             return defaultBindAddress;
         }
 
-        void setDefaultVersion(Version defaultVersion) {
-            this.defaultVersion = defaultVersion;
+        void setVersion(Version version) {
+            this.version = version;
         }
 
-        Version getDefaultVersion() {
-            return defaultVersion;
+        Version getVersion() {
+            return version;
         }
 
         HttpConfigBuilder addConfig(URI uri) {

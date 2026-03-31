@@ -41,9 +41,10 @@ interface HttpConnectionPoolFactory {
      *                                used as targets for the connections in the pool
      * @param connectionIdleTimeout   the idle timeout, after which any idle connection in the pool will
      *                                be closed
+     * @param version                 protocol version
      * @return the connection pool
      */
-    HttpConnectionPool createHttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout);
+    HttpConnectionPool createHttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout, Version version);
 
     /**
      * Returns the default HttpConnectionPoolFactory.
