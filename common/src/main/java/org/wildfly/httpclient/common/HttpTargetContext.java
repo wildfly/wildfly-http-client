@@ -428,9 +428,7 @@ public class HttpTargetContext extends AbstractAttachable {
         return attachments;
     }
 
-    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest request) {
-        HttpMarshallerFactory factory = httpMarshallerFactoryProvider.getMarshallerFactory(request);
-        if (factory != null) return factory;
+    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest request) { // TODO: eliminate method parameter
         return getVersion() == Version.JAVA_EE_8 ? INTEROPERABLE_FACTORY : DEFAULT_FACTORY;
     }
 

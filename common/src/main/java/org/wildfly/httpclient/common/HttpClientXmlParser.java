@@ -42,10 +42,10 @@ final class HttpClientXmlParser {
     private static final String ATTR_ADDRESS = "address";
     private static final String ATTR_BUFFER_SIZE = "buffer-size";
     private static final String ATTR_DIRECT = "direct";
-    private static final String ATTR_HANDLER_VERSION = "handler-version";
+    private static final String ATTR_HANDLER_VERSION = "handler";
     private static final String ATTR_MAX_SIZE = "max-size";
     private static final String ATTR_PORT = "port";
-    private static final String ATTR_SPECIFICATION_VERSION = "specification-version";
+    private static final String ATTR_SPECIFICATION_VERSION = "specification";
     private static final String ATTR_THREAD_LOCAL_SIZE = "thread-local-size";
     private static final String ATTR_URI = "uri";
     private static final String ATTR_VALUE = "value";
