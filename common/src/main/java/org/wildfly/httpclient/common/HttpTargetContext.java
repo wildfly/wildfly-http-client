@@ -283,16 +283,20 @@ public class HttpTargetContext extends AbstractAttachable {
                                     } else {
                                         if (decoder != null) {
                                             final Closeable doneCallback = completionCallback(completedTask, connection);
+                                            final Version version = Version.readFrom(result);
+                                            if (!version.equals(HttpTargetContext.this.getVersion())) {
+                                                throw HttpClientMessages.MESSAGES.versionMismatch();
+                                            }
                                             final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), doneCallback);
                                             if (response.getResponseCode() == NO_CONTENT) {
                                                 try {
-                                                    decoder.decode(ResponseContextImpl.of(InputStream.nullInputStream(), response, HttpTargetContext.this.getVersion()));
+                                                    decoder.decode(ResponseContextImpl.of(InputStream.nullInputStream(), response, version));
                                                 } finally {
                                                     safeClose(in); // drain input
                                                 }
                                             } else {
                                                 final InputStream inputStream = identityOrGzipInputStream(response, in);
-                                                decoder.decode(ResponseContextImpl.of(inputStream, response, HttpTargetContext.this.getVersion())); // not wrapped with try-finally because we do not want to drain input (reason: some decoders are asynchronous)
+                                                decoder.decode(ResponseContextImpl.of(inputStream, response, version)); // not wrapped with try-finally because we do not want to drain input (reason: some decoders are asynchronous)
                                             }
                                         } else {
                                             final Closeable doneCallback = completionCallback(completedTask, connection);

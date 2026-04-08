@@ -56,6 +56,7 @@ public class ClientSNITestCase {
         final List<SNIServerName> result = new ArrayList<>(1);
         HTTPTestServer.registerPathHandler(path, exchange -> {
             if (path.equals(exchange.getRequestURI())) {
+                Version.LATEST.writeTo(exchange);
                 SSLSessionInfo ssl = exchange.getConnection().getSslSessionInfo();
                 if (ssl != null && ssl.getSSLSession() instanceof ExtendedSSLSession) {
                     result.addAll(((ExtendedSSLSession) ssl.getSSLSession()).getRequestedServerNames());
@@ -83,6 +84,7 @@ public class ClientSNITestCase {
         final List<SNIServerName> result = new ArrayList<>(1);
         HTTPTestServer.registerPathHandler(path, exchange -> {
             if (path.equals(exchange.getRequestURI())) {
+                Version.LATEST.writeTo(exchange);
                 SSLSessionInfo ssl = exchange.getConnection().getSslSessionInfo();
                 if (ssl != null && ssl.getSSLSession() instanceof ExtendedSSLSession) {
                     result.addAll(((ExtendedSSLSession) ssl.getSSLSession()).getRequestedServerNames());
