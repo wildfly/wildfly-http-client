@@ -110,7 +110,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final RequestBuilder builder = new RequestBuilder(targetContext, requestType).setOnePhase(onePhase);
         final ClientRequest request = builder.createRequest();
         final CompletableFuture<T> result = new CompletableFuture<>();
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
         final Marshaller marshaller = marshallerFactory.createMarshaller(result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,

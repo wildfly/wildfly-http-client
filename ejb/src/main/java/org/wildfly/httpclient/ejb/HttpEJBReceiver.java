@@ -167,11 +167,11 @@ class HttpEJBReceiver extends EJBReceiver {
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
-        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         TransactionInfo transactionInfo = getTransactionInfo(clientInvocationContext.getTransaction(), targetContext.getUri());
         Object[] parameters = clientInvocationContext.getParameters();
         Map<String, Object> contextData = clientInvocationContext.getContextData();
-        final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpBodyEncoder(marshaller, transactionInfo, parameters, contextData),
                 invokeHttpBodyDecoder(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
@@ -206,7 +206,7 @@ class HttpEJBReceiver extends EJBReceiver {
         RequestBuilder builder = new RequestBuilder(targetContext, RequestType.CREATE_SESSION).setLocator(locator).setView(locator.getViewType().getName());
         ClientRequest request = builder.createRequest();
         TransactionInfo transactionInfo = getTransactionInfo(ContextTransactionManager.getInstance().getTransaction(), targetContext.getUri());
-        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                 createSessionHttpBodyEncoder(marshaller, transactionInfo),
                 emptyHttpBodyDecoder(result, createSessionResponseFunction()),

@@ -89,7 +89,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         }
 
         final CompletableFuture<Xid[]> result = new CompletableFuture<>();
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
@@ -124,7 +124,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         }
 
         final CompletableFuture<Xid> result = new CompletableFuture<>();
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
