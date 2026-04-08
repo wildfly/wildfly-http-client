@@ -45,7 +45,7 @@ public class HttpRemoteNamingService {
 
     private HttpRemoteNamingService(final HttpServiceConfig config, final Context localContext, final Function<String, Boolean> classResolverFilter) {
         this.config = config;
-        this.serverHandlers = ServerHandlers.newInstance(config, localContext, classResolverFilter);
+        this.serverHandlers = ServerHandlers.newInstance(localContext, classResolverFilter);
     }
 
     public HttpHandler createHandler() {

@@ -41,11 +41,9 @@ import java.util.Deque;
  */
 public abstract class AbstractServerHttpHandler implements HttpHandler {
 
-    protected final HttpServiceConfig config;
     private final Version serverVersion = Version.LATEST;
 
-    protected AbstractServerHttpHandler(final HttpServiceConfig config) {
-        this.config = config;
+    protected AbstractServerHttpHandler() {
     }
 
     protected abstract void processRequest(final HttpServerExchange exchange) throws Exception;

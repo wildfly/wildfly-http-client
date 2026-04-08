@@ -74,7 +74,6 @@ import org.wildfly.httpclient.common.AbstractServerHttpHandler;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.common.annotation.NotNull;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
@@ -106,37 +105,35 @@ import java.util.function.Function;
  */
 final class ServerHandlers {
 
-    private final HttpServiceConfig config;
     private final Association association;
     private final ExecutorService executorService;
     private final LocalTransactionContext ctx;
     private final Function<String, Boolean> classFilter;
     private final Map<InvocationIdentifier, CancelHandle> cancellationFlags = new ConcurrentHashMap<>();
 
-    private ServerHandlers(final HttpServiceConfig config, final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
+    private ServerHandlers(final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
                            final Function<String, Boolean> classFilter) {
-        this.config = config;
         this.association = association;
         this.executorService = executorService;
         this.ctx = ctx;
         this.classFilter = classFilter;
     }
 
-    static ServerHandlers newInstance(final HttpServiceConfig config, final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
+    static ServerHandlers newInstance(final Association association, final ExecutorService executorService, final LocalTransactionContext ctx,
                                       final Function<String, Boolean> classFilter) {
-        return new ServerHandlers(config, association, executorService, ctx, classFilter);
+        return new ServerHandlers(association, executorService, ctx, classFilter);
     }
 
     HttpHandler handlerOf(final RequestType requestType) {
         switch (requestType) {
             case INVOKE:
-                return new HttpInvocationHandler(config, association, executorService, ctx, cancellationFlags, classFilter);
+                return new HttpInvocationHandler(association, executorService, ctx, cancellationFlags, classFilter);
             case CANCEL :
-                return new HttpCancelHandler(config, executorService, cancellationFlags);
+                return new HttpCancelHandler(executorService, cancellationFlags);
             case CREATE_SESSION:
-                return new HttpSessionOpenHandler(config, association, executorService, ctx);
+                return new HttpSessionOpenHandler(association, executorService, ctx);
             case DISCOVER:
-                return new HttpDiscoveryHandler(config, executorService, association);
+                return new HttpDiscoveryHandler(executorService, association);
             default:
                 throw new IllegalStateException();
         }
@@ -149,9 +146,9 @@ final class ServerHandlers {
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
         private final Function<String, Boolean> classResolverFilter;
 
-        HttpInvocationHandler(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
+        HttpInvocationHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                               Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter) {
-            super(config, executorService);
+            super(executorService);
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
@@ -468,8 +465,8 @@ final class ServerHandlers {
 
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
 
-        HttpCancelHandler(HttpServiceConfig config, ExecutorService executorService, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
-            super(config, executorService);
+        HttpCancelHandler(ExecutorService executorService, Map<InvocationIdentifier, CancelHandle> cancellationFlags) {
+            super(executorService);
             this.cancellationFlags = cancellationFlags;
         }
 
@@ -513,8 +510,8 @@ final class ServerHandlers {
         private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
         private final LocalTransactionContext localTransactionContext;
 
-        HttpSessionOpenHandler(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
-            super(config, executorService);
+        HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
+            super(executorService);
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
@@ -680,8 +677,8 @@ final class ServerHandlers {
     private static final class HttpDiscoveryHandler extends AbstractEjbHandler {
         private final Set<EJBModuleIdentifier> availableModules = new HashSet<>();
 
-        public HttpDiscoveryHandler(HttpServiceConfig config, ExecutorService executorService, Association association) {
-            super(config, executorService);
+        public HttpDiscoveryHandler(ExecutorService executorService, Association association) {
+            super(executorService);
             association.registerModuleAvailabilityListener(new ModuleAvailabilityListener() {
                 @Override
                 public void moduleAvailable(List<EJBModuleIdentifier> modules) {
@@ -716,8 +713,7 @@ final class ServerHandlers {
 
         private static final AttachmentKey<ExecutorService> EXECUTOR = AttachmentKey.create(ExecutorService.class);
 
-        public AbstractEjbHandler(final HttpServiceConfig config, final ExecutorService executorService) {
-            super(config);
+        public AbstractEjbHandler(final ExecutorService executorService) {
             this.executorService = executorService;
         }
 

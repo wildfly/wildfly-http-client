@@ -41,7 +41,6 @@ import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.AbstractServerHttpHandler;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpServiceConfig;
 
 import javax.naming.Binding;
 import javax.naming.Context;
@@ -66,40 +65,38 @@ final class ServerHandlers {
 
     private final Context ctx;
     private final Function<String, Boolean> classFilter;
-    private final HttpServiceConfig config;
 
-    private ServerHandlers(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
-        this.config = config;
+    private ServerHandlers(final Context ctx, final Function<String, Boolean> classFilter) {
         this.ctx = ctx;
         this.classFilter = classFilter;
     }
 
-    static ServerHandlers newInstance(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
-        return new ServerHandlers(config, ctx, classFilter);
+    static ServerHandlers newInstance(final Context ctx, final Function<String, Boolean> classFilter) {
+        return new ServerHandlers(ctx, classFilter);
     }
 
     HttpHandler handlerOf(final RequestType requestType) {
         switch (requestType) {
             case BIND:
-                return new BindHandler(config, ctx, classFilter);
+                return new BindHandler(ctx, classFilter);
             case CREATE_SUBCONTEXT:
-                return new CreateSubContextHandler(config, ctx);
+                return new CreateSubContextHandler(ctx);
             case DESTROY_SUBCONTEXT:
-                return new DestroySubContextHandler(config, ctx);
+                return new DestroySubContextHandler(ctx);
             case LIST:
-                return new ListHandler(config, ctx);
+                return new ListHandler(ctx);
             case LIST_BINDINGS:
-                return new ListBindingsHandler(config, ctx);
+                return new ListBindingsHandler(ctx);
             case LOOKUP:
-                return new LookupHandler(config, ctx);
+                return new LookupHandler(ctx);
             case LOOKUP_LINK:
-                return new LookupLinkHandler(config, ctx);
+                return new LookupLinkHandler(ctx);
             case REBIND:
-                return new RebindHandler(config, ctx, classFilter);
+                return new RebindHandler(ctx, classFilter);
             case RENAME:
-                return new RenameHandler(config, ctx);
+                return new RenameHandler(ctx);
             case UNBIND:
-                return new UnbindHandler(config, ctx);
+                return new UnbindHandler(ctx);
             default:
                 throw new IllegalStateException();
         }
@@ -109,12 +106,11 @@ final class ServerHandlers {
         protected final Context ctx;
         protected final Function<String, Boolean> classFilter;
 
-        private AbstractNamingHandler(final HttpServiceConfig config, final Context ctx) {
-            this(config, ctx, null);
+        private AbstractNamingHandler(final Context ctx) {
+            this(ctx, null);
         }
 
-        private AbstractNamingHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
-            super(config);
+        private AbstractNamingHandler(final Context ctx, final Function<String, Boolean> classFilter) {
             this.ctx = ctx;
             this.classFilter = classFilter;
         }
@@ -150,8 +146,8 @@ final class ServerHandlers {
     }
 
     private static final class LookupHandler extends AbstractNamingHandler {
-        private LookupHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private LookupHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -161,8 +157,8 @@ final class ServerHandlers {
     }
 
     private static final class LookupLinkHandler extends AbstractNamingHandler {
-        private LookupLinkHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private LookupLinkHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -172,8 +168,8 @@ final class ServerHandlers {
     }
 
     private static final class CreateSubContextHandler extends AbstractNamingHandler {
-        private CreateSubContextHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private CreateSubContextHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -183,8 +179,8 @@ final class ServerHandlers {
     }
 
     private static final class UnbindHandler extends AbstractNamingHandler {
-        private UnbindHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private UnbindHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -195,8 +191,8 @@ final class ServerHandlers {
     }
 
     private static final class ListBindingsHandler extends AbstractNamingHandler {
-        private ListBindingsHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private ListBindingsHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -207,8 +203,8 @@ final class ServerHandlers {
     }
 
     private static final class RenameHandler extends AbstractNamingHandler {
-        private RenameHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private RenameHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -226,8 +222,8 @@ final class ServerHandlers {
     }
 
     private static final class DestroySubContextHandler extends AbstractNamingHandler {
-        private DestroySubContextHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private DestroySubContextHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -238,8 +234,8 @@ final class ServerHandlers {
     }
 
     private static final class ListHandler extends AbstractNamingHandler {
-        private ListHandler(final HttpServiceConfig config, final Context ctx) {
-            super(config, ctx);
+        private ListHandler(final Context ctx) {
+            super(ctx);
         }
 
         @Override
@@ -250,8 +246,8 @@ final class ServerHandlers {
     }
 
     private class RebindHandler extends AbstractClassFilteringNamingHandler {
-        private RebindHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
-            super(config, ctx, classFilter);
+        private RebindHandler(final Context ctx, final Function<String, Boolean> classFilter) {
+            super(ctx, classFilter);
         }
 
 
@@ -262,8 +258,8 @@ final class ServerHandlers {
     }
 
     private class BindHandler extends AbstractClassFilteringNamingHandler {
-        private BindHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
-            super(config, ctx, classFilter);
+        private BindHandler(final Context ctx, final Function<String, Boolean> classFilter) {
+            super(ctx, classFilter);
         }
 
 
@@ -274,8 +270,8 @@ final class ServerHandlers {
     }
 
     private abstract static class AbstractClassFilteringNamingHandler extends AbstractNamingHandler {
-        private AbstractClassFilteringNamingHandler(final HttpServiceConfig config, final Context ctx, final Function<String, Boolean> classFilter) {
-            super(config, ctx, classFilter);
+        private AbstractClassFilteringNamingHandler(final Context ctx, final Function<String, Boolean> classFilter) {
+            super(ctx, classFilter);
         }
 
         @Override

@@ -44,7 +44,6 @@ import org.wildfly.common.function.ExceptionBiFunction;
 import org.wildfly.httpclient.common.AbstractServerHttpHandler;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
-import org.wildfly.httpclient.common.HttpServiceConfig;
 import org.wildfly.transaction.client.ImportResult;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.LocalTransactionContext;
@@ -65,38 +64,36 @@ final class ServerHandlers {
 
     private final LocalTransactionContext ctx;
     private final Function<LocalTransaction, Xid> xidResolver;
-    private final HttpServiceConfig config;
 
-    private ServerHandlers(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
-        this.config = config;
+    private ServerHandlers(final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
         this.ctx = ctx;
         this.xidResolver = xidResolver;
     }
 
-    static ServerHandlers newInstance(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
-        return new ServerHandlers(config, ctx, xidResolver);
+    static ServerHandlers newInstance(final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
+        return new ServerHandlers(ctx, xidResolver);
     }
 
     HttpHandler handlerOf(final RequestType requestType) {
         switch (requestType) {
             case UT_BEGIN:
-                return new BeginHandler(config, ctx, xidResolver);
+                return new BeginHandler(ctx, xidResolver);
             case UT_COMMIT:
-                return new UTCommitHandler(config, ctx);
+                return new UTCommitHandler(ctx);
             case UT_ROLLBACK:
-                return new UTRollbackHandler(config, ctx);
+                return new UTRollbackHandler(ctx);
             case XA_BEFORE_COMPLETION:
-                return new XABeforeCompletionHandler(config, ctx);
+                return new XABeforeCompletionHandler(ctx);
             case XA_COMMIT:
-                return new XACommitHandler(config, ctx);
+                return new XACommitHandler(ctx);
             case XA_FORGET:
-                return new XAForgetHandler(config, ctx);
+                return new XAForgetHandler(ctx);
             case XA_PREPARE:
-                return new XAPrepHandler(config, ctx);
+                return new XAPrepHandler(ctx);
             case XA_RECOVER:
-                return new XARecoveryHandler(config, ctx);
+                return new XARecoveryHandler(ctx);
             case XA_ROLLBACK:
-                return new XARollbackHandler(config, ctx);
+                return new XARollbackHandler(ctx);
             default:
                 throw new IllegalStateException();
         }
@@ -107,12 +104,11 @@ final class ServerHandlers {
         protected final LocalTransactionContext ctx;
         protected final Function<LocalTransaction, Xid> xidResolver;
 
-        private AbstractTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            this(config, ctx, null);
+        private AbstractTransactionHandler(final LocalTransactionContext ctx) {
+            this(ctx, null);
         }
 
-        private AbstractTransactionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
-            super(config);
+        private AbstractTransactionHandler(final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
             this.ctx = ctx;
             this.xidResolver = xidResolver;
         }
@@ -146,8 +142,8 @@ final class ServerHandlers {
     }
 
     private static final class BeginHandler extends AbstractTransactionHandler {
-        private BeginHandler(final HttpServiceConfig config, final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
-            super(config, ctx, xidResolver);
+        private BeginHandler(final LocalTransactionContext ctx, final Function<LocalTransaction, Xid> xidResolver) {
+            super(ctx, xidResolver);
         }
 
         @Override
@@ -181,8 +177,8 @@ final class ServerHandlers {
     }
 
     private static final class XARecoveryHandler extends AbstractTransactionHandler {
-        private XARecoveryHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private XARecoveryHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
@@ -214,8 +210,8 @@ final class ServerHandlers {
     }
 
     private static final class UTRollbackHandler extends AbstractTransactionHandler {
-        private UTRollbackHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private UTRollbackHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
@@ -225,8 +221,8 @@ final class ServerHandlers {
     }
 
     private static final class UTCommitHandler extends AbstractTransactionHandler {
-        private UTCommitHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private UTCommitHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
@@ -236,8 +232,8 @@ final class ServerHandlers {
     }
 
     private static final class XABeforeCompletionHandler extends AbstractTransactionHandler {
-        private XABeforeCompletionHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private XABeforeCompletionHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
@@ -247,8 +243,8 @@ final class ServerHandlers {
     }
 
     private static final class XAForgetHandler extends AbstractTransactionHandler {
-        private XAForgetHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private XAForgetHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
@@ -258,8 +254,8 @@ final class ServerHandlers {
     }
 
     private static final class XAPrepHandler extends AbstractTransactionHandler {
-        private XAPrepHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private XAPrepHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
@@ -269,8 +265,8 @@ final class ServerHandlers {
     }
 
     private static final class XARollbackHandler extends AbstractTransactionHandler {
-        private XARollbackHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private XARollbackHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
@@ -280,8 +276,8 @@ final class ServerHandlers {
     }
 
     private static final class XACommitHandler extends AbstractTransactionHandler {
-        private XACommitHandler(final HttpServiceConfig config, final LocalTransactionContext ctx) {
-            super(config, ctx);
+        private XACommitHandler(final LocalTransactionContext ctx) {
+            super(ctx);
         }
 
         @Override
