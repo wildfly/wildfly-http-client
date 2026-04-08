@@ -262,7 +262,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                     handleSessionAffinity(request, response);
 
                                     if (isException) {
-                                        final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
+                                        final Unmarshaller unmarshaller = getHttpMarshallerFactory().createUnmarshaller(classLoader);
                                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), null)) {
                                             final InputStream in = identityOrGzipInputStream(response, inputStream);
                                             unmarshaller.start(byteInputOf(in));
@@ -426,7 +426,7 @@ public class HttpTargetContext extends AbstractAttachable {
         return attachments;
     }
 
-    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest request) { // TODO: eliminate method parameter
+    public HttpMarshallerFactory getHttpMarshallerFactory() {
         return getVersion() == Version.JAVA_EE_8 ? INTEROPERABLE_FACTORY : DEFAULT_FACTORY;
     }
 

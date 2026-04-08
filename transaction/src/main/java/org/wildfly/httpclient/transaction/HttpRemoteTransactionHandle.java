@@ -84,7 +84,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final ClientRequest request = builder.createRequest();
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
-            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
@@ -139,7 +139,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final ClientRequest request = builder.createRequest();
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
-            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,

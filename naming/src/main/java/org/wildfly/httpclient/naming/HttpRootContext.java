@@ -269,7 +269,7 @@ public class HttpRootContext extends AbstractContext {
 
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(objectResolver, result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
@@ -320,7 +320,7 @@ public class HttpRootContext extends AbstractContext {
 
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
         final Marshaller marshaller = marshallerFactory.createMarshaller(objectResolver, result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
