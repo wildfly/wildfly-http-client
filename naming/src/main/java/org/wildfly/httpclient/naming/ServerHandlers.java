@@ -136,7 +136,7 @@ final class ServerHandlers {
                 putResponseHeader(exchange, CONTENT_TYPE, VALUE);
 
                 final HttpNamingServerObjectResolver resolver = new HttpNamingServerObjectResolver(exchange);
-                final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(resolver);
+                final Marshaller marshaller = getHttpMarshallerFactory(exchange).createMarshaller(resolver);
                 final OutputStream os = exchange.getOutputStream();
                 try (ByteOutput out = byteOutputOf(os)) {
                     marshaller.start(out);
@@ -285,7 +285,7 @@ final class ServerHandlers {
 
         @Override
         protected Object doOperation(final HttpServerExchange exchange, final String name) throws NamingException {
-            final HttpMarshallerFactory marshallerFactory = config.getHttpUnmarshallerFactory(exchange);
+            final HttpMarshallerFactory marshallerFactory = getHttpMarshallerFactory(exchange);
             final InputStream is = exchange.getInputStream();
             try (ByteInput in = byteInputOf(is)) {
                 final Unmarshaller unmarshaller = classFilter != null ?
