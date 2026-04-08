@@ -43,7 +43,7 @@ public class HttpRemoteTransactionService {
 
     private  HttpRemoteTransactionService(final HttpServiceConfig config, final LocalTransactionContext transactionContext, final Function<LocalTransaction, Xid> xidResolver) {
         this.config = config;
-        this.serverHandlers = ServerHandlers.newInstance(config, transactionContext, xidResolver);
+        this.serverHandlers = ServerHandlers.newInstance(transactionContext, xidResolver);
     }
 
     public HttpHandler createHandler() {
