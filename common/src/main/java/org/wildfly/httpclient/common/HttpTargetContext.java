@@ -102,7 +102,6 @@ public class HttpTargetContext extends AbstractAttachable {
     private final AuthenticationContext initAuthenticationContext;
 
     private final AtomicBoolean affinityRequestSent = new AtomicBoolean();
-    private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
 
     private static ClassLoader getContextClassLoader() {
         if(System.getSecurityManager() == null) {
@@ -117,12 +116,11 @@ public class HttpTargetContext extends AbstractAttachable {
         }
     }
 
-    HttpTargetContext(HttpConnectionPool connectionPool, boolean eagerlyAcquireAffinity, URI uri, HttpMarshallerFactoryProvider provider) {
+    HttpTargetContext(HttpConnectionPool connectionPool, boolean eagerlyAcquireAffinity, URI uri) {
         this.connectionPool = connectionPool;
         this.eagerlyAcquireAffinity = eagerlyAcquireAffinity;
         this.uri = uri;
         this.initAuthenticationContext = AuthenticationContext.captureCurrent();
-        this.httpMarshallerFactoryProvider = provider;
     }
 
     void init() {
