@@ -24,6 +24,8 @@ import static io.undertow.util.StatusCodes.INTERNAL_SERVER_ERROR;
 import static org.wildfly.httpclient.common.ByteOutputs.byteOutputOf;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.putResponseHeader;
+import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
+import static org.wildfly.httpclient.common.HttpMarshallerFactory.INTEROPERABLE_FACTORY;
 
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
@@ -72,6 +74,10 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
         }
     }
 
+    protected Version getVersion(final HttpServerExchange exchange) {
+        return exchange.getAttachment(Version.KEY);
+    }
+
     private boolean containsRequiredContentType(final HttpServerExchange exchange) {
         final ContentType expectedCT = getRequiredContentType();
         if (expectedCT == null) return true;
@@ -104,7 +110,7 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
     private boolean containsRequiredQueryParameters(final HttpServerExchange exchange) {
         final String[] queryParameters = getRequiredQueryParameters();
         if (queryParameters == null || queryParameters.length == 0) return true;
-        Deque<String> values = null;
+        Deque<String> values;
         for (int i = 0; i < queryParameters.length; i++) {
             values = exchange.getQueryParameters().get(queryParameters[i]);
             if (values == null || values.isEmpty()) {
@@ -115,6 +121,10 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
             }
         }
         return true;
+    }
+
+    protected HttpMarshallerFactory getHttpMarshallerFactory(final HttpServerExchange exchange) {
+        return Version.JAVA_EE_8 == getVersion(exchange) ? INTEROPERABLE_FACTORY : DEFAULT_FACTORY;
     }
 
     protected ContentType getRequiredContentType() {
@@ -133,7 +143,7 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
         try {
             exchange.setStatusCode(status);
             putResponseHeader(exchange, CONTENT_TYPE, "application/x-wf-jbmar-exception;version=1");
-            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+            final Marshaller marshaller = getHttpMarshallerFactory(exchange).createMarshaller();
             final OutputStream outputStream = exchange.getOutputStream();
             try (ByteOutput byteOutput = byteOutputOf(outputStream)) {
                 // start the marshaller

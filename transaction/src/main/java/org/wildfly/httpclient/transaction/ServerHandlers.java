@@ -124,7 +124,7 @@ final class ServerHandlers {
 
         @Override
         protected void processRequest(final HttpServerExchange exchange) throws Exception {
-            final HttpMarshallerFactory httpMarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
+            final HttpMarshallerFactory httpMarshallerFactory = getHttpMarshallerFactory(exchange);
             final Unmarshaller unmarshaller = httpMarshallerFactory.createUnmarshaller();
             final InputStream is = exchange.getInputStream();
 
@@ -168,7 +168,7 @@ final class ServerHandlers {
             final Integer timeout = Integer.parseInt(timeoutString);
             final LocalTransaction transaction = ctx.beginTransaction(timeout);
             final Xid xid = xidResolver.apply(transaction);
-            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+            final Marshaller marshaller = getHttpMarshallerFactory(exchange).createMarshaller();
             final ByteArrayOutputStream os = new ByteArrayOutputStream();
 
             try (ByteOutput out = byteOutputOf(os)) {
@@ -201,7 +201,7 @@ final class ServerHandlers {
             final int flags = Integer.parseInt(flagsString);
             final String parentName = getRequestHeader(exchange, RECOVERY_PARENT_NAME);
             final Xid[] recoveryList = ctx.getRecoveryInterface().recover(flags, parentName);
-            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller();
+            final Marshaller marshaller = getHttpMarshallerFactory(exchange).createMarshaller();
             final ByteArrayOutputStream os = new ByteArrayOutputStream();
 
             try (ByteOutput out = byteOutputOf(os)) {

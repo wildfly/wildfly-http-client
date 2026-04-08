@@ -36,8 +36,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.security.AccessController.doPrivileged;
-import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
-import static org.wildfly.httpclient.common.HttpMarshallerFactory.INTEROPERABLE_FACTORY;
 
 /**
  * Represents the current configured state of the HTTP contexts.
@@ -181,12 +179,6 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             int maxStreamsPerConnection = this.maxStreamsPerConnection > 0 ? this.maxStreamsPerConnection : 10;
 
             final HttpConnectionPoolFactory httpConnectionPoolFactory = HttpConnectionPoolFactory.getDefault();
-            final HttpMarshallerFactory httpMarshallerFactory;
-            if (EENamespaceInteroperability.EE_NAMESPACE_INTEROPERABLE_MODE && Version.JAVA_EE_8.equals(version)) {
-                httpMarshallerFactory = INTEROPERABLE_FACTORY;
-            } else {
-                httpMarshallerFactory = DEFAULT_FACTORY;
-            }
             for (int i = 0; i < this.targets.size(); ++i) {
                 HttpConfigBuilder sb = this.targets.get(i);
                 HostPool hp = new HostPool(sb.getUri());

@@ -215,7 +215,7 @@ final class ServerHandlers {
                     @Override
                     public Resolved getRequestContent(final ClassLoader classLoader) throws IOException, ClassNotFoundException {
                         final Class<?> view = Class.forName(viewName, false, classLoader);
-                        final HttpMarshallerFactory unmarshallingFactory = config.getHttpUnmarshallerFactory(exchange);
+                        final HttpMarshallerFactory unmarshallingFactory = getHttpMarshallerFactory(exchange);
                         final Unmarshaller unmarshaller = unmarshallingFactory.createUnmarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
                         final InputStream is = exchange.getInputStream();
 
@@ -238,7 +238,7 @@ final class ServerHandlers {
                                 locator = new StatelessEJBLocator<>(view, app, module, bean, distinct, Affinity.LOCAL);
                             }
 
-                            final HttpMarshallerFactory marshallerFactory = config.getHttpMarshallerFactory(exchange);
+                            final HttpMarshallerFactory marshallerFactory = getHttpMarshallerFactory(exchange);
                             final Marshaller marshaller = marshallerFactory.createMarshaller(new FilteringClassResolver(classLoader, classResolverFilter), HttpProtocolV1ObjectTable.INSTANCE);
                             final Transaction transaction;
                             if ((txnInfo.getType() == TransactionInfo.NULL_TRANSACTION) || localTransactionContext == null) { //the TX context may be null in unit tests
@@ -551,7 +551,7 @@ final class ServerHandlers {
             exchange.dispatch(executorService, () -> {
                 final TransactionInfo txnInfo;
                 try {
-                    final HttpMarshallerFactory httpUnmarshallerFactory = config.getHttpUnmarshallerFactory(exchange);
+                    final HttpMarshallerFactory httpUnmarshallerFactory = getHttpMarshallerFactory(exchange);
                     final Unmarshaller unmarshaller = httpUnmarshallerFactory.createUnmarshaller(HttpProtocolV1ObjectTable.INSTANCE);
                     final InputStream is = exchange.getInputStream();
 
@@ -699,7 +699,7 @@ final class ServerHandlers {
         protected void handleInternal(final HttpServerExchange exchange) throws Exception {
             putResponseHeader(exchange, CONTENT_TYPE, EJB_DISCOVERY_RESPONSE);
 
-            final Marshaller marshaller = config.getHttpMarshallerFactory(exchange).createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
+            final Marshaller marshaller = getHttpMarshallerFactory(exchange).createMarshaller(HttpProtocolV1ObjectTable.INSTANCE);
             final ByteArrayOutputStream os = new ByteArrayOutputStream();
 
             try (ByteOutput out = byteOutputOf(os)) {

@@ -18,7 +18,6 @@
 package org.wildfly.httpclient.common;
 
 import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
 
 import java.util.function.Function;
 
@@ -35,7 +34,7 @@ public enum HttpServiceConfig {
     /**
      * Default configuration. Used by both EE namespace interoperable and non-interoperable servers
      */
-    DEFAULT (EENamespaceInteroperability::createInteroperabilityHandler, EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
+    DEFAULT (EENamespaceInteroperability::createInteroperabilityHandler);
 
     /**
      * Returns the default configuration.
@@ -47,11 +46,9 @@ public enum HttpServiceConfig {
     }
 
     private final Function<HttpHandler, HttpHandler> handlerWrapper;
-    private final HttpMarshallerFactoryProvider marshallerFactoryProvider;
 
-    HttpServiceConfig(Function<HttpHandler, HttpHandler> handlerWrapper, HttpMarshallerFactoryProvider marshallerFactoryProvider) {
+    HttpServiceConfig(Function<HttpHandler, HttpHandler> handlerWrapper) {
         this.handlerWrapper = handlerWrapper;
-        this.marshallerFactoryProvider = marshallerFactoryProvider;
     }
 
     /**
@@ -68,25 +65,4 @@ public enum HttpServiceConfig {
         return handlerWrapper.apply(handler);
     }
 
-    /**
-     * Returns the http marshaller factory that must be used for unmarshalling the objects
-     * from service requests bytes.
-     *
-     * @param exchange the server exchange
-     * @return the HTTP marshaller factory for unmarshalling server request objects
-     */
-    public HttpMarshallerFactory getHttpUnmarshallerFactory(HttpServerExchange exchange) {
-        return marshallerFactoryProvider.getUnmarshallerFactory(exchange);
-    }
-
-    /**
-     * Returns the http marshaller factory that must be used for marshalling the service
-     * responses as bytes to be sent as a server response data.
-     *
-     * @param exchange the server exchange
-     * @return the HTTP marshaller factory for marshalling server responses
-     */
-    public HttpMarshallerFactory getHttpMarshallerFactory(HttpServerExchange exchange) {
-        return marshallerFactoryProvider.getMarshallerFactory(exchange);
-    }
 }
