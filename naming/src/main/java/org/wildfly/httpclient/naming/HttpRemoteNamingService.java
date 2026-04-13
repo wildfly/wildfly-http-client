@@ -36,15 +36,9 @@ import java.util.function.Function;
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public class HttpRemoteNamingService {
-    private final HttpServiceConfig config;
     private final ServerHandlers serverHandlers;
 
     public HttpRemoteNamingService(final Context localContext, final Function<String, Boolean> classResolverFilter) {
-        this (HttpServiceConfig.getInstance(), localContext, classResolverFilter);
-    }
-
-    private HttpRemoteNamingService(final HttpServiceConfig config, final Context localContext, final Function<String, Boolean> classResolverFilter) {
-        this.config = config;
         this.serverHandlers = ServerHandlers.newInstance(localContext, classResolverFilter);
     }
 
@@ -54,7 +48,7 @@ public class HttpRemoteNamingService {
             registerHandler(routingHandler, requestType);
         }
 
-        return config.wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
+        return HttpServiceConfig.getInstance().wrap(new BlockingHandler(new ElytronIdentityHandler(routingHandler)));
     }
 
     private void registerHandler(final RoutingHandler routingHandler, final RequestType requestType) {

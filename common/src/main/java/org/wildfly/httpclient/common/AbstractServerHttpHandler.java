@@ -63,6 +63,11 @@ public abstract class AbstractServerHttpHandler implements HttpHandler {
 
     private void handshakeVersion(final HttpServerExchange exchange) {
         final Version clientVersion = Version.readFrom(exchange);
+        if (Version.JAVA_EE_8.equals(clientVersion)) {
+            if (HttpServiceConfig.getInstance() == HttpServiceConfig.DEFAULT) {
+                throw HttpClientMessages.MESSAGES.javaeeToJakartaeeBackwardCompatibilityLayerDisabled();
+            }
+        }
         if (clientVersion.compareTo(serverVersion) < 0) {
             exchange.putAttachment(Version.KEY, clientVersion);
             clientVersion.writeTo(exchange);
