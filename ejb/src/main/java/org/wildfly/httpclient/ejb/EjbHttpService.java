@@ -37,18 +37,18 @@ import java.util.function.Function;
 public class EjbHttpService extends HttpRemoteEjbService {
     @Deprecated
     public EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
-        super(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, null);
+        super(association, executorService, localTransactionContext, null);
     }
 
     @Deprecated
     public EjbHttpService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                           Function<String, Boolean> classResolverFilter) {
-        super(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, classResolverFilter);
+        super(association, executorService, localTransactionContext, classResolverFilter);
     }
 
     @Deprecated
     public EjbHttpService(HttpServiceConfig httpServiceConfig, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                           Function<String, Boolean> classResolverFilter) {
-        super(httpServiceConfig, association, executorService, localTransactionContext, classResolverFilter);
+        super(association, executorService, localTransactionContext, classResolverFilter);
     }
 }

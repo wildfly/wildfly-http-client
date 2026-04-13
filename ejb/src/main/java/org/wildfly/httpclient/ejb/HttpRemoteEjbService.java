@@ -43,17 +43,10 @@ import java.util.function.Function;
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public class HttpRemoteEjbService {
-    private final HttpServiceConfig config;
     private final ServerHandlers serverHandlers;
 
     public HttpRemoteEjbService(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                                 Function<String, Boolean> classResolverFilter) {
-        this(HttpServiceConfig.getInstance(), association, executorService, localTransactionContext, classResolverFilter);
-    }
-
-    protected HttpRemoteEjbService(HttpServiceConfig config, Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
-                                 Function<String, Boolean> classResolverFilter) {
-        this.config = config;
         this.serverHandlers = ServerHandlers.newInstance(association, executorService, localTransactionContext, classResolverFilter);
     }
 
@@ -66,7 +59,7 @@ public class HttpRemoteEjbService {
         EncodingHandler encodingHandler = new EncodingHandler(pathHandler, new ContentEncodingRepository().addEncodingHandler(GZIP.toString(), new GzipEncodingProvider(), 1));
         RequestEncodingHandler requestEncodingHandler = new RequestEncodingHandler(encodingHandler);
         requestEncodingHandler.addEncoding(GZIP.toString(), GzipStreamSourceConduit.WRAPPER);
-        return config.wrap(requestEncodingHandler);
+        return HttpServiceConfig.getInstance().wrap(requestEncodingHandler);
     }
 
     private void registerHandler(final PathHandler pathHandler, final RequestType requestType) {
