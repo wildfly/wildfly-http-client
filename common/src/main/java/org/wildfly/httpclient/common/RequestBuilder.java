@@ -129,9 +129,9 @@ public abstract class RequestBuilder<E extends Enum<? extends RequestType>> {
      *
      * @param sb the StringBuilder to append the operation path to
      */
-    protected final void appendOperationPath(final StringBuilder sb, final String contextPath) {
+    protected final void appendOperationPath(final StringBuilder sb) {
         sb.append(getPathPrefix());
-        appendPath(sb, contextPath, false);
+        appendPath(sb, ((RequestType) getRequestType()).getContextPath(), false);
         appendPath(sb, getVersionPath(), false);
         appendPath(sb, ((RequestType) getRequestType()).getPath(), false);
     }
