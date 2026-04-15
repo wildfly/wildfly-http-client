@@ -63,6 +63,7 @@ enum RequestType implements org.wildfly.httpclient.common.RequestType {
      */
     DISCOVER(GET, "/discover");
 
+    private static final String EJB_CONTEXT = "/ejb";
     private final HttpString method;
     private final String path;
 
@@ -96,6 +97,15 @@ enum RequestType implements org.wildfly.httpclient.common.RequestType {
     @Override
     public final String getPath() {
         return path;
+    }
+
+    /**
+     * Returns the HTTP request context path of this invocation.
+     * @return this invocation HTTP request context path.
+     */
+    @Override
+    public String getContextPath() {
+        return EJB_CONTEXT;
     }
 
 }

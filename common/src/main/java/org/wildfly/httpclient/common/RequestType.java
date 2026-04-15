@@ -48,4 +48,11 @@ public interface RequestType {
      * @return the request path prefix
      */
     String getPath();
+
+    /**
+     * Returns the context path prefix for this invocation.
+     *
+     * @return the context path prefix
+     */
+    String getContextPath();
 }

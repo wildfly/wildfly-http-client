@@ -28,7 +28,6 @@ import static org.wildfly.httpclient.transaction.Constants.OPC_QUERY_PARAMETER;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_FLAGS;
 import static org.wildfly.httpclient.transaction.Constants.RECOVERY_PARENT_NAME;
 import static org.wildfly.httpclient.transaction.Constants.TIMEOUT;
-import static org.wildfly.httpclient.transaction.Constants.TXN_CONTEXT;
 import static org.wildfly.httpclient.transaction.Constants.XID;
 import static org.wildfly.httpclient.transaction.Constants.XID_LIST;
 import static org.wildfly.httpclient.transaction.RequestType.UT_BEGIN;
@@ -86,7 +85,7 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
     @Override
     protected void setRequestPath(final ClientRequest request) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, TXN_CONTEXT);
+        appendOperationPath(sb);
         if (getRequestType() == XA_COMMIT) {
             if (onePhase != null && onePhase) {
                 setQueryParameter(sb, OPC_QUERY_PARAMETER, TRUE.toString());

@@ -27,7 +27,6 @@ import static io.undertow.util.Headers.GZIP;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
 
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
-import static org.wildfly.httpclient.ejb.Constants.EJB_CONTEXT;
 import static org.wildfly.httpclient.ejb.Constants.EJB_DISCOVERY_RESPONSE;
 import static org.wildfly.httpclient.ejb.Constants.EJB_EXCEPTION;
 import static org.wildfly.httpclient.ejb.Constants.INVOCATION_ACCEPT;
@@ -115,7 +114,7 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
     @Override
     protected void setRequestPath(final ClientRequest request) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, EJB_CONTEXT);
+        appendOperationPath(sb);
         switch (getRequestType()) {
             case CANCEL: {
                 appendBeanPath(sb);

@@ -22,7 +22,6 @@ import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.naming.Constants.EXCEPTION;
-import static org.wildfly.httpclient.naming.Constants.NAMING_CONTEXT;
 import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
 
@@ -73,7 +72,7 @@ final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<
     @Override
     protected void setRequestPath(final ClientRequest request) {
         final StringBuilder sb = new StringBuilder();
-        appendOperationPath(sb, NAMING_CONTEXT);
+        appendOperationPath(sb);
         appendPath(sb, name.toString(), true);
         if (newName != null) {
             setQueryParameter(sb, NEW_QUERY_PARAMETER, newName.toString());

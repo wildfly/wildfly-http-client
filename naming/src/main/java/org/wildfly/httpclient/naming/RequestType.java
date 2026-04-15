@@ -107,6 +107,7 @@ enum RequestType implements org.wildfly.httpclient.common.RequestType {
      */
     UNBIND(DELETE, "/unbind");
 
+    private static final String NAMING_CONTEXT = "/naming";
     private final HttpString method;
     private final String path;
 
@@ -140,6 +141,15 @@ enum RequestType implements org.wildfly.httpclient.common.RequestType {
     @Override
     public final String getPath() {
         return path;
+    }
+
+    /**
+     * Returns the HTTP request context path of this invocation.
+     * @return this invocation HTTP request context path.
+     */
+    @Override
+    public String getContextPath() {
+        return NAMING_CONTEXT;
     }
 
 }

@@ -100,6 +100,7 @@ enum RequestType implements org.wildfly.httpclient.common.RequestType {
      */
     XA_ROLLBACK(POST, "/xa/rollback");
 
+    private static final String TXN_CONTEXT = "/txn";
     private final HttpString method;
     private final String path;
 
@@ -133,6 +134,15 @@ enum RequestType implements org.wildfly.httpclient.common.RequestType {
     @Override
     public final String getPath() {
         return path;
+    }
+
+    /**
+     * Returns the HTTP request context path of this invocation.
+     * @return this invocation HTTP request context path.
+     */
+    @Override
+    public String getContextPath() {
+        return TXN_CONTEXT;
     }
 
 }

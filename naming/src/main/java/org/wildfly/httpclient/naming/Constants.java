@@ -29,9 +29,6 @@ final class Constants {
     static final ContentType VALUE = new ContentType("application/x-wf-jndi-jbmar-value", 1);
     static final ContentType EXCEPTION = new ContentType("application/x-wf-jbmar-exception", 1);
 
-    // context path
-    static final String NAMING_CONTEXT = "/naming";
-
     // params
     static final String NAME_PATH_PARAMETER = "name";
     static final String NEW_QUERY_PARAMETER = "new";
