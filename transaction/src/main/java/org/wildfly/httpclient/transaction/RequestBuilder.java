@@ -42,7 +42,7 @@ import org.wildfly.httpclient.common.HttpTargetContext;
 /**
  * HTTP TXN module client request builder. Encapsulates all information needed to create HTTP TXN client requests.
  * Use setter methods (those returning {@link RequestBuilder}) to configure the builder.
- * Once configured {@link #createRequest(String)} method must be called to build HTTP client request.
+ * Once configured {@link org.wildfly.httpclient.common.RequestBuilder#createRequest()} method must be called to build HTTP client request.
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */

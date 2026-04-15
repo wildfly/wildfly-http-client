@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2025 Red Hat, Inc., and individual contributors
+ * Copyright 2026 Red Hat, Inc., and individual contributors
  * as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,6 +31,8 @@ import io.undertow.util.AttachmentKey;
 import io.undertow.util.HttpString;
 
 /**
+ * Protocol version implementation.
+ *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
 public final class Version implements Comparable<Version>{
@@ -42,9 +44,18 @@ public final class Version implements Comparable<Version>{
     private static final int MASK_SPEC     = 0b00000000_00000000_00011111_10000000;
     private static final int MASK_ENCODING = 0b00000000_00000000_11100000_00000000;
 
+    /**
+     * Java EE Specification version using version 1 path handlers.
+     */
     public static final Version JAVA_EE_8 = new Version(Handler.VERSION_1, Specification.JAVA_EE_8, Encoding.JBOSS_MARSHALLING);
+    /**
+     * Jakarta EE Specification version using version 2 path handlers.
+     */
     public static final Version JAKARTA_EE_10 = new Version(Handler.VERSION_2, Specification.JAKARTA_EE_10, Encoding.JBOSS_MARSHALLING);
-    public static final Version LATEST = JAKARTA_EE_10;
+    /**
+     * Equals to {@link #JAKARTA_EE_10} as latest available version.
+     */
+    static final Version LATEST = JAKARTA_EE_10;
 
     private final Handler handlerVersion;
     private final Specification specVersion;
@@ -58,6 +69,12 @@ public final class Version implements Comparable<Version>{
         this.version = (encodingVersion.value << 13) | (specVersion.value << 7) | (handlerVersion.value);
     }
 
+    /**
+     * Utility method for creating Version from integer representation.
+     *
+     * @param version version as integer value
+     * @return Version instance associated with given value
+     */
     static Version of(final int version) {
         // return identities for known constants
         if (version == 1) return JAVA_EE_8;
@@ -69,10 +86,43 @@ public final class Version implements Comparable<Version>{
         return new Version(handlerVersion, specVersion, encodingVersion);
     }
 
+    /**
+     * Utility method for creating Version from handler and specification version.
+     *
+     * @param handlerVersion handler version
+     * @return specVersion specification version
+     */
     static Version of(final Handler handlerVersion, final Specification specVersion) {
         if (Handler.VERSION_1.equals(handlerVersion) && Specification.JAVA_EE_8.equals(specVersion)) return JAVA_EE_8;
         if (Handler.VERSION_2.equals(handlerVersion) && Specification.JAKARTA_EE_10.equals(specVersion)) return JAKARTA_EE_10;
         return new Version(handlerVersion, specVersion, Encoding.JBOSS_MARSHALLING);
+    }
+
+    /**
+     * Returns handler version associated with current protocol version.
+     *
+     * @return handler version
+     */
+    public Handler handler() {
+        return handlerVersion;
+    }
+
+    /**
+     * Returns Java EE or Jakarta EE specification version associated with current protocol version.
+     *
+     * @return specification version
+     */
+    public Specification specitication() {
+        return specVersion;
+    }
+
+    /**
+     * Returns encoding version associated with current protocol version.
+     *
+     * @return encoding version
+     */
+    public Encoding encoding() {
+        return encodingVersion;
     }
 
     @Override
@@ -83,18 +133,6 @@ public final class Version implements Comparable<Version>{
     @Override
     public int compareTo(final Version o) {
         return Integer.compare(version, o.version);
-    }
-
-    public Handler handler() {
-        return handlerVersion;
-    }
-
-    public Specification specitication() {
-        return specVersion;
-    }
-
-    public Encoding encoding() {
-        return encodingVersion;
     }
 
     @Override
@@ -112,17 +150,34 @@ public final class Version implements Comparable<Version>{
         return Objects.hash(handlerVersion, specVersion, encodingVersion);
     }
 
-    public static Version readFrom(final HttpServerExchange exchange) {
+    /**
+     * Utility method for reading protocol version from server exchange.
+     *
+     * @param exchange server exchange
+     * @return protocol version specified in request header
+     */
+    static Version readFrom(final HttpServerExchange exchange) {
         final String versionHeader = getRequestHeader(exchange, PROTOCOL_VERSION);
         return versionHeader == null || "1".equals(versionHeader) ? JAVA_EE_8 : Version.of(decode(versionHeader));
     }
 
-    public static Version readFrom(final ClientExchange exchange) {
+    /**
+     * Utility method for reading protocol version from client exchange.
+     *
+     * @param exchange client exchange
+     * @return protocol version specified in response header
+     */
+    static Version readFrom(final ClientExchange exchange) {
         final String versionHeader = getResponseHeader(exchange.getResponse(), PROTOCOL_VERSION);
         return versionHeader == null || "1".equals(versionHeader) ? JAVA_EE_8 : Version.of(decode(versionHeader));
     }
 
-    public void writeTo(final HttpServerExchange exchange) {
+    /**
+     * Utility method for writing protocol version to server exchange.
+     *
+     * @param exchange server exchange
+     */
+    void writeTo(final HttpServerExchange exchange) {
         if (this == JAVA_EE_8) {
             putResponseHeader(exchange, PROTOCOL_VERSION, String.valueOf(1));
         } else {
@@ -130,7 +185,12 @@ public final class Version implements Comparable<Version>{
         }
     }
 
-    public void writeTo(final ClientRequest request) {
+    /**
+     * Utility method for writing protocol version to client request.
+     *
+     * @param request client request
+     */
+    void writeTo(final ClientRequest request) {
         if (this == JAVA_EE_8) {
             putRequestHeader(request, PROTOCOL_VERSION, String.valueOf(1));
         } else {
@@ -138,6 +198,9 @@ public final class Version implements Comparable<Version>{
         }
     }
 
+    /**
+     * Handler versions.
+     */
     public enum Handler {
         VERSION_1(1),
         VERSION_2(2);
@@ -156,6 +219,9 @@ public final class Version implements Comparable<Version>{
         }
     }
 
+    /**
+     * EE specification versions.
+     */
     public enum Specification {
         JAVA_EE_8(-1),
         JAKARTA_EE_10(0);
@@ -174,6 +240,9 @@ public final class Version implements Comparable<Version>{
         }
     }
 
+    /**
+     * Encoding versions.
+     */
     public enum Encoding {
         JBOSS_MARSHALLING(0);
 
