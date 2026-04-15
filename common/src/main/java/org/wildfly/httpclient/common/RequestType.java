@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2025 Red Hat, Inc., and individual contributors
+ * Copyright 2026 Red Hat, Inc., and individual contributors
  * as indicated by the @author tags.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,19 +30,22 @@ import io.undertow.util.HttpString;
 public interface RequestType {
     /**
      * Returns the name of this invocation.
-     * @return this invocation name
+     *
+     * @return the invocation name
      */
     String getName();
 
     /**
-     * Returns the HTTP request method of this invocation.
-     * @return this invocation HTTP request method
+     * Returns the HTTP method of this invocation.
+     *
+     * @return the HTTP method
      */
     HttpString getMethod();
 
     /**
-     * Returns the HTTP request prefix path of this invocation.
-     * @return this invocation HTTP request prefix path
+     * Returns the request path prefix for this invocation.
+     *
+     * @return the request path prefix
      */
     String getPath();
 }
