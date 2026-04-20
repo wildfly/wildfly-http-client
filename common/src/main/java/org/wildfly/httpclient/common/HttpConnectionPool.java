@@ -68,8 +68,9 @@ public class HttpConnectionPool implements Closeable {
 
     private final Object NULL_SSL_CONTEXT = new Object();
     private final PoolAuthenticationContext poolAuthenticationContext = new PoolAuthenticationContext();
+    private final Version version;
 
-    public HttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout) {
+    public HttpConnectionPool(int maxConnections, int maxStreamsPerConnection, XnioWorker worker, ByteBufferPool byteBufferPool, OptionMap options, HostPool hostPool, long connectionIdleTimeout, Version version) {
         this.maxConnections = maxConnections;
         this.maxStreamsPerConnection = maxStreamsPerConnection;
         this.worker = worker;
@@ -90,6 +91,7 @@ public class HttpConnectionPool implements Closeable {
             }
         }
         this.options = options;
+        this.version = version != null ? version : Version.LATEST;
     }
 
     public void getConnection(ConnectionListener connectionListener, ErrorListener errorListener, boolean ignoreConnectionLimits, SSLContext sslContext) {
@@ -109,8 +111,8 @@ public class HttpConnectionPool implements Closeable {
         return new ClientConnectionHolder(connection, uri, sslContext);
     }
 
-    int getProtocolVersion() {
-        return Protocol.LATEST;
+    Version getVersion() {
+        return version;
     }
 
     private void runPending() {

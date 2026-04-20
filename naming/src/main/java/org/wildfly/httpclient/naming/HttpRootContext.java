@@ -20,9 +20,9 @@ package org.wildfly.httpclient.naming;
 
 import static java.security.AccessController.doPrivileged;
 import static org.wildfly.httpclient.naming.ClassLoaderUtils.getContextClassLoader;
-import static org.wildfly.httpclient.naming.ClientHandlers.emptyHttpResultHandler;
-import static org.wildfly.httpclient.naming.ClientHandlers.optionalObjectHttpResultHandler;
-import static org.wildfly.httpclient.naming.ClientHandlers.objectHttpMarshaller;
+import static org.wildfly.httpclient.naming.ClientHandlers.emptyHttpBodyDecoder;
+import static org.wildfly.httpclient.naming.ClientHandlers.optionalObjectHttpBodyDecoder;
+import static org.wildfly.httpclient.naming.ClientHandlers.objectHttpBodyEncoder;
 import static org.wildfly.httpclient.naming.Constants.HTTPS_PORT;
 import static org.wildfly.httpclient.naming.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.naming.Constants.HTTP_PORT;
@@ -242,8 +242,8 @@ public class HttpRootContext extends AbstractContext {
             HttpNamingProvider.HttpPeerIdentity peerIdentity = (HttpNamingProvider.HttpPeerIdentity) httpNamingProvider.getPeerIdentityForNamingUsingRetry(contextOrNull);
             URI uri = peerIdentity.getUri();
             final HttpTargetContext targetContext = WildflyHttpContext.getCurrent().getTargetContext(uri);
-            RequestBuilder builder = new RequestBuilder().setRequestType(requestType).setName(name).setNewName(newName).setObject(object).setVersion(targetContext.getProtocolVersion());
-            final ClientRequest request = builder.createRequest(uri.getPath());
+            RequestBuilder builder = new RequestBuilder(targetContext, requestType).setName(name).setNewName(newName).setObject(object);
+            final ClientRequest request = builder.createRequest();
             if (expectedValue) {
                 return performOperation(name1, uri, targetContext, request);
             }
@@ -269,11 +269,11 @@ public class HttpRootContext extends AbstractContext {
 
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(objectResolver, result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
-                    optionalObjectHttpResultHandler(unmarshaller, result, httpNamingProvider, getContextClassLoader()),
+                    optionalObjectHttpBodyDecoder(unmarshaller, result, httpNamingProvider, getContextClassLoader()),
                     result::completeExceptionally, VALUE, null, true);
         }
         try {
@@ -320,11 +320,11 @@ public class HttpRootContext extends AbstractContext {
 
         final CompletableFuture<Object> result = new CompletableFuture<>();
         final ObjectResolver objectResolver = getObjectResolver(providerUri);
-        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+        final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
         final Marshaller marshaller = marshallerFactory.createMarshaller(objectResolver, result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                    object != null ? objectHttpMarshaller(marshaller, object) : null, emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+                    object != null ? objectHttpBodyEncoder(marshaller, object) : null, emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
         }
         try {
             result.get();

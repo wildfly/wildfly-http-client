@@ -35,6 +35,9 @@ import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
+import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
+import static org.wildfly.httpclient.common.HttpMarshallerFactory.INTEROPERABLE_FACTORY;
+import static org.xnio.IoUtils.safeClose;
 
 import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
@@ -44,6 +47,7 @@ import io.undertow.server.handlers.Cookie;
 import io.undertow.util.AbstractAttachable;
 import io.undertow.util.Cookies;
 import io.undertow.util.HeaderValues;
+import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
@@ -51,7 +55,6 @@ import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
 import org.xnio.ChannelListener;
 import org.xnio.ChannelListeners;
-import org.xnio.IoUtils;
 import org.xnio.channels.StreamSourceChannel;
 
 import javax.net.ssl.SSLContext;
@@ -99,7 +102,6 @@ public class HttpTargetContext extends AbstractAttachable {
     private final AuthenticationContext initAuthenticationContext;
 
     private final AtomicBoolean affinityRequestSent = new AtomicBoolean();
-    private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
 
     private static ClassLoader getContextClassLoader() {
         if(System.getSecurityManager() == null) {
@@ -114,12 +116,11 @@ public class HttpTargetContext extends AbstractAttachable {
         }
     }
 
-    HttpTargetContext(HttpConnectionPool connectionPool, boolean eagerlyAcquireAffinity, URI uri, HttpMarshallerFactoryProvider provider) {
+    HttpTargetContext(HttpConnectionPool connectionPool, boolean eagerlyAcquireAffinity, URI uri) {
         this.connectionPool = connectionPool;
         this.eagerlyAcquireAffinity = eagerlyAcquireAffinity;
         this.uri = uri;
         this.initAuthenticationContext = AuthenticationContext.captureCurrent();
-        this.httpMarshallerFactoryProvider = provider;
     }
 
     void init() {
@@ -132,8 +133,8 @@ public class HttpTargetContext extends AbstractAttachable {
      * Returns the protocol version to be used by this target context.
      * @return the protocol version
      */
-    public int getProtocolVersion() {
-        return connectionPool.getProtocolVersion();
+    public Version getVersion() {
+        return connectionPool.getVersion();
     }
 
     private void acquireAffinitiy(AuthenticationConfiguration authenticationConfiguration) {
@@ -162,19 +163,20 @@ public class HttpTargetContext extends AbstractAttachable {
         }, null, latch::countDown);
     }
 
-    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
-        sendRequest(request, sslContext, authenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, false);
+    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
+        sendRequest(request, sslContext, authenticationConfiguration, encoder, decoder, failureHandler, expectedResponse, completedTask, false);
     }
 
-    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
+    public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent) {
         final ClassLoader tccl = getContextClassLoader();
-        connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
+        connectionPool.getConnection(connection -> sendRequestInternal(connection, request, authenticationConfiguration, encoder, decoder, failureHandler, expectedResponse, completedTask, allowNoContent, false, sslContext, tccl), failureHandler::handleFailure, false, sslContext);
     }
 
-    private void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, final ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpMarshaller httpMarshaller, HttpResultHandler httpResultHandler, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
+    private void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, final ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
         if (sessionId != null) {
             addRequestHeader(request, COOKIE, JSESSIONID + "=" + sessionId);
         }
+        getVersion().writeTo(request);
         try {
             if (!containsRequestHeader(request, HOST)) {
                 String host;
@@ -217,10 +219,9 @@ public class HttpTargetContext extends AbstractAttachable {
                                             connectionPool.getConnection((connection) -> {
                                                 if (connection.getAuthenticationContext().prepareRequest(uri, request, finalAuthenticationConfiguration)) {
                                                     //retry the invocation
-                                                    sendRequestInternal(connection, request, finalAuthenticationConfiguration, httpMarshaller, httpResultHandler, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
+                                                    sendRequestInternal(connection, request, finalAuthenticationConfiguration, encoder, decoder, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
                                                 } else {
-                                                    failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed());
-                                                    connection.done(true);
+                                                    HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.authenticationFailed());
                                                 }
                                             }, failureHandler::handleFailure, false, finalSslContext);
 
@@ -248,39 +249,22 @@ public class HttpTargetContext extends AbstractAttachable {
                                         ok = false;
                                         isException = false;
                                     } else {
-                                        ok = expectedResponse.getType().equals(type.getType()) && expectedResponse.getVersion() >= type.getVersion();
+                                        ok = expectedResponse.equals(type);
                                         isException = false;
                                     }
                                 }
 
                                 if (!ok) {
-                                    if (response.getResponseCode() == 401 && !isLegacyAuthenticationFailedException()) {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.authenticationFailed(response));
-                                    } else if (response.getResponseCode() >= 400) {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
-                                    } else {
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseType(type));
-                                    }
-                                    //close the connection to be safe
-                                    connection.done(true);
+                                    HttpTargetContext.failed(connection, failureHandler, failureDescription(response));
                                     return;
                                 }
                                 try {
                                     handleSessionAffinity(request, response);
 
                                     if (isException) {
-                                        final Unmarshaller unmarshaller = getHttpMarshallerFactory(request).createUnmarshaller(classLoader);
-                                        try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel())) {
-                                            InputStream in = inputStream;
-                                            String encoding = getResponseHeader(response, CONTENT_ENCODING);
-                                            if (encoding != null) {
-                                                String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                if (GZIP.toString().equals(lowerEncoding)) {
-                                                    in = new GZIPInputStream(in);
-                                                } else if (!lowerEncoding.equals(IDENTITY.toString())) {
-                                                    throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
-                                                }
-                                            }
+                                        final Unmarshaller unmarshaller = getHttpMarshallerFactory().createUnmarshaller(classLoader);
+                                        try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), null)) {
+                                            final InputStream in = identityOrGzipInputStream(response, inputStream);
                                             unmarshaller.start(byteInputOf(in));
                                             Throwable exception = (Throwable) unmarshaller.readObject();
                                             Map<String, Object> attachments = readAttachments(unmarshaller);
@@ -289,97 +273,56 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 HttpClientMessages.MESSAGES.debugf("Unexpected data when reading exception from %s", response);
                                                 connection.done(true);
                                             } else {
-                                                IoUtils.safeClose(inputStream);
+                                                safeClose(inputStream);
                                                 connection.done(false);
                                             }
                                             failureHandler.handleFailure(exception);
                                         }
                                     } else if (response.getResponseCode() >= 400) {
-                                        //unknown error
-                                        failureHandler.handleFailure(HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
-                                        //close the connection to be safe
-                                        connection.done(true);
-
+                                        HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
                                     } else {
-                                        if (httpResultHandler != null) {
-                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
-                                            InputStream inputStream = in;
-                                            Closeable doneCallback = () -> {
-                                                IoUtils.safeClose(in);
-                                                if (completedTask != null) {
-                                                    completedTask.run();
-                                                }
-                                                connection.done(false);
-                                            };
+                                        if (decoder != null) {
+                                            final Closeable doneCallback = completionCallback(completedTask, connection);
+                                            final Version version = Version.readFrom(result);
+                                            if (!version.equals(HttpTargetContext.this.getVersion())) {
+                                                throw HttpClientMessages.MESSAGES.versionMismatch();
+                                            }
+                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), doneCallback);
                                             if (response.getResponseCode() == NO_CONTENT) {
-                                                IoUtils.safeClose(in);
-                                                httpResultHandler.handleResult(null, response, doneCallback);
-                                            } else {
-                                                String encoding = getResponseHeader(response, CONTENT_ENCODING);
-                                                if (encoding != null) {
-                                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                                    if (GZIP.toString().equals(lowerEncoding)) {
-                                                        inputStream = new GZIPInputStream(inputStream);
-                                                    } else if (!lowerEncoding.equals(IDENTITY.toString())) {
-                                                        throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
-                                                    }
+                                                try {
+                                                    decoder.decode(ResponseContextImpl.of(InputStream.nullInputStream(), response, version));
+                                                } finally {
+                                                    safeClose(in); // drain input
                                                 }
-                                                httpResultHandler.handleResult(inputStream, response, doneCallback);
+                                            } else {
+                                                final InputStream inputStream = identityOrGzipInputStream(response, in);
+                                                decoder.decode(ResponseContextImpl.of(inputStream, response, version)); // not wrapped with try-finally because we do not want to drain input (reason: some decoders are asynchronous)
                                             }
                                         } else {
-                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel());
-                                            IoUtils.safeClose(in);
-                                            if (completedTask != null) {
-                                                completedTask.run();
-                                            }
-                                            connection.done(false);
+                                            final Closeable doneCallback = completionCallback(completedTask, connection);
+                                            final InputStream in = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), doneCallback);
+                                            safeClose(in); // drain input
                                         }
                                     }
-
                                 } catch (Exception e) {
-                                    try {
-                                        failureHandler.handleFailure(e);
-                                    } finally {
-                                        connection.done(true);
-                                    }
+                                     HttpTargetContext.failed(connection, failureHandler, e);
                                 }
                             });
                         }
 
                         @Override
                         public void failed(IOException e) {
-                            try {
-                                failureHandler.handleFailure(e);
-                            } finally {
-                                connection.done(true);
-                            }
+                            HttpTargetContext.failed(connection, failureHandler, e);
                         }
                     });
 
-                    if (httpMarshaller != null) {
+                    if (encoder != null) {
                         //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests
                         connection.getConnection().getWorker().execute(() -> {
                             try (OutputStream outputStream = new WildflyClientOutputStream(result.getRequestChannel(), result.getConnection().getBufferPool())) {
-
-                                // marshall the locator and method params
-                                // start the marshaller
-                                boolean compress = false;
-                                String encoding = getRequestHeader(request, CONTENT_ENCODING);
-                                if (encoding != null) {
-                                    String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
-                                    if (GZIP.toString().equals(lowerEncoding)) {
-                                        compress = true;
-                                    }
-                                }
-
-                                httpMarshaller.marshall(compress ? new GZIPOutputStream(outputStream) : outputStream);
-
+                                encoder.encode(RequestContextImpl.of(identityOrGzipOutputStream(request, outputStream), request, HttpTargetContext.this.getVersion()));
                             } catch (Exception e) {
-                                try {
-                                    failureHandler.handleFailure(e);
-                                } finally {
-                                    connection.done(true);
-                                }
+                                HttpTargetContext.failed(connection, failureHandler, e);
                             }
                         });
                     }
@@ -387,20 +330,67 @@ public class HttpTargetContext extends AbstractAttachable {
 
                 @Override
                 public void failed(IOException e) {
-                    try {
-                        failureHandler.handleFailure(e);
-                    } finally {
-                        connection.done(true);
-                    }
+                    HttpTargetContext.failed(connection, failureHandler, e);
                 }
             });
         } catch (Throwable e) {
-            try {
-                failureHandler.handleFailure(e);
-            } finally {
-                connection.done(true);
+            HttpTargetContext.failed(connection, failureHandler, e);
+        }
+    }
+
+    private static Closeable completionCallback(final Runnable completedTask, final HttpConnectionPool.ConnectionHandle connection) {
+        return new Closeable() {
+            public void close() {
+                if (completedTask != null) {
+                    completedTask.run();
+                }
+                connection.done(false);
+            }
+        };
+    }
+
+    private static Throwable failureDescription(final ClientResponse response) {
+        final ContentType type = ContentType.parse(getResponseHeader(response, CONTENT_TYPE));
+        if (response.getResponseCode() == 401 && !isLegacyAuthenticationFailedException()) {
+            return HttpClientMessages.MESSAGES.authenticationFailed(response);
+        } else if (response.getResponseCode() >= 400) {
+            return HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response);
+        } else {
+            return HttpClientMessages.MESSAGES.invalidResponseType(type);
+        }
+    }
+
+    private static void failed(final HttpConnectionPool.ConnectionHandle connection, final HttpFailureHandler failureHandler, final Throwable t) {
+        try {
+            failureHandler.handleFailure(t);
+        } finally {
+            connection.done(true);
+        }
+    }
+
+    private static InputStream identityOrGzipInputStream(final ClientResponse response, final InputStream is) throws IOException {
+        final String encoding = getResponseHeader(response, CONTENT_ENCODING);
+        if (encoding != null) {
+            final String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+            if (GZIP.toString().equals(lowerEncoding)) {
+                return new GZIPInputStream(is);
+            } else if (!lowerEncoding.equals(IDENTITY.toString())) {
+                throw HttpClientMessages.MESSAGES.invalidContentEncoding(encoding);
             }
         }
+        return is;
+    }
+
+    private static OutputStream identityOrGzipOutputStream(final ClientRequest request, final OutputStream os) throws IOException {
+        final String encoding = getRequestHeader(request, CONTENT_ENCODING);
+        if (encoding != null) {
+            final String lowerEncoding = encoding.toLowerCase(Locale.ENGLISH);
+            if (GZIP.toString().equals(lowerEncoding)) {
+                return new GZIPOutputStream(os);
+            }
+            // TODO: identityOrGzipInputStream() checks for IDENTITY but this method does not. Fix this asymmetry!
+        }
+        return os;
     }
 
     private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
@@ -440,8 +430,8 @@ public class HttpTargetContext extends AbstractAttachable {
         return attachments;
     }
 
-    public HttpMarshallerFactory getHttpMarshallerFactory(ClientRequest request) {
-        return this.httpMarshallerFactoryProvider.getMarshallerFactory(request);
+    public HttpMarshallerFactory getHttpMarshallerFactory() {
+        return getVersion() == Version.JAVA_EE_8 ? INTEROPERABLE_FACTORY : DEFAULT_FACTORY;
     }
 
     public HttpConnectionPool getConnectionPool() {
@@ -485,7 +475,7 @@ public class HttpTargetContext extends AbstractAttachable {
         return sessionId;
     }
 
-    private boolean isLegacyAuthenticationFailedException() {
+    private static boolean isLegacyAuthenticationFailedException() {
         return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
             @Override
             public Boolean run() {
@@ -494,15 +484,96 @@ public class HttpTargetContext extends AbstractAttachable {
         });
     }
 
-    public interface HttpMarshaller {
-        void marshall(OutputStream output) throws Exception;
+    public interface HttpBodyEncoder {
+        void encode(RequestContext ctx) throws Exception;
     }
 
-    public interface HttpResultHandler {
-        void handleResult(InputStream result, ClientResponse response, Closeable doneCallback);
+    public interface HttpBodyDecoder {
+        void decode(ResponseContext ctx);
     }
 
     public interface HttpFailureHandler {
         void handleFailure(Throwable throwable);
     }
+
+    public interface RequestContext {
+        OutputStream getRequestBody();
+        String getRequestHeader(String headerName);
+        Version getVersion();
+    }
+
+    private static class RequestContextImpl implements RequestContext {
+        private final OutputStream os;
+        private final ClientRequest request;
+        private final Version version;
+
+        private RequestContextImpl(final OutputStream os, final ClientRequest request, final Version version) {
+            this.os = os;
+            this.request = request;
+            this.version = version;
+        }
+
+        private static RequestContext of(final OutputStream os, final ClientRequest request, final Version version) {
+            return new RequestContextImpl(os, request, version);
+        }
+
+        @Override
+        public OutputStream getRequestBody() {
+            return os;
+        }
+
+        @Override
+        public String getRequestHeader(final String headerName) {
+            return HeadersHelper.getRequestHeader(request, HttpString.tryFromString(headerName));
+        }
+
+        @Override
+        public Version getVersion() {
+            return version;
+        }
+    }
+
+    public interface ResponseContext {
+        InputStream getResponseBody();
+        String getResponseHeader(String headerName);
+        int getResponseCode();
+        Version getVersion();
+    }
+
+    private static class ResponseContextImpl implements ResponseContext {
+        private final InputStream is;
+        private final ClientResponse response;
+        private final Version version;
+
+        private ResponseContextImpl(final InputStream is, final ClientResponse response, final Version version) {
+            this.is = is;
+            this.response = response;
+            this.version = version;
+        }
+
+        private static ResponseContext of(final InputStream is, final ClientResponse response, final Version version) {
+            return new ResponseContextImpl(is, response, version);
+        }
+
+        @Override
+        public InputStream getResponseBody() {
+            return is;
+        }
+
+        @Override
+        public String getResponseHeader(final String headerName) {
+            return HeadersHelper.getResponseHeader(response, HttpString.tryFromString(headerName));
+        }
+
+        @Override
+        public int getResponseCode() {
+            return response.getResponseCode();
+        }
+
+        @Override
+        public Version getVersion() {
+            return version;
+        }
+    }
+
 }

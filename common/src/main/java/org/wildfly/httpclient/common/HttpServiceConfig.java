@@ -17,10 +17,12 @@
  */
 package org.wildfly.httpclient.common;
 
-import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
+import static org.wildfly.httpclient.common.Protocol.VERSION_ONE_PATH;
+import static org.wildfly.httpclient.common.Protocol.VERSION_TWO_PATH;
 
-import java.util.function.Function;
+import io.undertow.server.HttpHandler;
+import io.undertow.server.handlers.PathHandler;
+import org.wildfly.security.manager.WildFlySecurityManager;
 
 /**
  * Mode configuration for http services.
@@ -29,13 +31,25 @@ import java.util.function.Function;
  * simple pojos conventionally named Http*Service.
  *
  * @author Flavia Rainone
+ * @author <a href="mailto:ropalka@ibm.com">Richard Opalka</a>
  */
-public enum HttpServiceConfig {
+public final class HttpServiceConfig {
 
+    private static final boolean EE_NAMESPACE_INTEROPERABLE_MODE = Boolean.parseBoolean(
+            WildFlySecurityManager.getPropertyPrivileged("org.wildfly.ee.namespace.interop", "false"));
     /**
-     * Default configuration. Used by both EE namespace interoperable and non-interoperable servers
+     * Indicates EE namespace interoperable mode is disabled.
      */
-    DEFAULT (EENamespaceInteroperability::createInteroperabilityHandler, EENamespaceInteroperability.getHttpMarshallerFactoryProvider());
+    static final HttpServiceConfig DEFAULT = new HttpServiceConfig();
+    /**
+     * Indicates EE namespace interoperable mode is enabled.
+     */
+    static final HttpServiceConfig INTEROP = new HttpServiceConfig();
+    private static volatile HttpServiceConfig currentMode;
+
+    private HttpServiceConfig() {
+        // forbidden instantiation
+    }
 
     /**
      * Returns the default configuration.
@@ -43,15 +57,37 @@ public enum HttpServiceConfig {
      * @return the configuration for http services
      */
     public static HttpServiceConfig getInstance() {
-        return DEFAULT;
+        if (currentMode == null) {
+            synchronized (HttpServiceConfig.class) {
+                if (currentMode == null) {
+                    if (EE_NAMESPACE_INTEROPERABLE_MODE) {
+                        HttpClientMessages.MESSAGES.javaeeToJakartaeeBackwardCompatibilityLayerInstalled();
+                        currentMode = INTEROP;
+                    } else {
+                        currentMode = DEFAULT;
+                    }
+                }
+            }
+        }
+        return currentMode;
     }
 
-    private final Function<HttpHandler, HttpHandler> handlerWrapper;
-    private final HttpMarshallerFactoryProvider marshallerFactoryProvider;
-
-    HttpServiceConfig(Function<HttpHandler, HttpHandler> handlerWrapper, HttpMarshallerFactoryProvider marshallerFactoryProvider) {
-        this.handlerWrapper = handlerWrapper;
-        this.marshallerFactoryProvider = marshallerFactoryProvider;
+    /**
+     * Configures config factory.
+     *
+     * @throws IllegalStateException if factory is already configured
+     */
+    public static void initialize(final boolean interopMode) {
+        if (currentMode != null) throw new IllegalStateException();
+        synchronized (HttpServiceConfig.class) {
+            if (currentMode != null) throw new IllegalStateException();
+            if (interopMode) {
+                HttpClientMessages.MESSAGES.javaeeToJakartaeeBackwardCompatibilityLayerInstalled();
+                currentMode = INTEROP;
+            } else {
+                currentMode = DEFAULT;
+            }
+        }
     }
 
     /**
@@ -64,29 +100,11 @@ public enum HttpServiceConfig {
      *         service URI. The resulting handler is a wrapper that will add any necessary actions
      *         before invoking the inner {@code handler}.
      */
-    public HttpHandler wrap(HttpHandler handler) {
-        return handlerWrapper.apply(handler);
+    public HttpHandler wrap(final HttpHandler handler) {
+        final PathHandler versionPathHandler = new PathHandler();
+        versionPathHandler.addPrefixPath(VERSION_ONE_PATH, handler);
+        versionPathHandler.addPrefixPath(VERSION_TWO_PATH, handler);
+        return versionPathHandler;
     }
 
-    /**
-     * Returns the http marshaller factory that must be used for unmarshalling the objects
-     * from service requests bytes.
-     *
-     * @param exchange the server exchange
-     * @return the HTTP marshaller factory for unmarshalling server request objects
-     */
-    public HttpMarshallerFactory getHttpUnmarshallerFactory(HttpServerExchange exchange) {
-        return marshallerFactoryProvider.getUnmarshallerFactory(exchange);
-    }
-
-    /**
-     * Returns the http marshaller factory that must be used for marshalling the service
-     * responses as bytes to be sent as a server response data.
-     *
-     * @param exchange the server exchange
-     * @return the HTTP marshaller factory for marshalling server responses
-     */
-    public HttpMarshallerFactory getHttpMarshallerFactory(HttpServerExchange exchange) {
-        return marshallerFactoryProvider.getMarshallerFactory(exchange);
-    }
 }

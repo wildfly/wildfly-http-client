@@ -20,15 +20,20 @@ package org.wildfly.httpclient.common;
 
 /**
  * @author Stuart Douglas
+ * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-public class ContentType {
+public final class ContentType {
 
+    private static final String VERSION_PREFIX = "version=";
+    private static final String VERSION_SEPARATOR = ";";
     private final String type;
+    private final String typeAndVersion;
     private final int version;
 
-    public ContentType(String type, int version) {
+    public ContentType(final String type, final int version) {
         this.type = type;
         this.version = version;
+        this.typeAndVersion = type + VERSION_SEPARATOR + VERSION_PREFIX  + version;
     }
 
     public String getType() {
@@ -40,24 +45,37 @@ public class ContentType {
     }
 
     public String toString() {
-        return type + ";version=" + version;
+        return typeAndVersion;
     }
 
-    public static ContentType parse(String type) {
-        if(type == null) {
-            return null;
-        }
-        String[] parts = type.split(";");
-        if(parts.length == 0) {
-            return null;
-        }
+    @Override
+    public int hashCode() {
+        return typeAndVersion.hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (!(obj instanceof ContentType)) return false;
+        final ContentType other = (ContentType) obj;
+        return typeAndVersion.equals(other.typeAndVersion);
+    }
+
+    public static ContentType parse(final String type) {
+        final String[] parts = type == null ? null : type.split(VERSION_SEPARATOR);
+        if (parts == null || parts.length == 0) return null;
+        final String part0 = parts[0].trim();
+        if (part0.isEmpty()) return null;
+
         int version = -1;
-        for(int i = 1; i < parts.length; ++i) {
-            if(parts[i].startsWith("version=")) {
-                version = Integer.parseInt(parts[i].substring("version=".length()));
+        String part;
+        for (int i = 1; i < parts.length; ++i) {
+            part = parts[i].trim();
+            if (part.startsWith(VERSION_PREFIX)) {
+                version = Integer.parseInt(part.substring(VERSION_PREFIX.length()));
                 break;
             }
         }
-        return new ContentType(parts[0], version);
+        return new ContentType(part0, version);
     }
+
 }

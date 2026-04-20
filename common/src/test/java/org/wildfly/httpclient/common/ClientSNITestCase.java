@@ -56,6 +56,7 @@ public class ClientSNITestCase {
         final List<SNIServerName> result = new ArrayList<>(1);
         HTTPTestServer.registerPathHandler(path, exchange -> {
             if (path.equals(exchange.getRequestURI())) {
+                Version.LATEST.writeTo(exchange);
                 SSLSessionInfo ssl = exchange.getConnection().getSslSessionInfo();
                 if (ssl != null && ssl.getSSLSession() instanceof ExtendedSSLSession) {
                     result.addAll(((ExtendedSSLSession) ssl.getSSLSession()).getRequestedServerNames());
@@ -83,6 +84,7 @@ public class ClientSNITestCase {
         final List<SNIServerName> result = new ArrayList<>(1);
         HTTPTestServer.registerPathHandler(path, exchange -> {
             if (path.equals(exchange.getRequestURI())) {
+                Version.LATEST.writeTo(exchange);
                 SSLSessionInfo ssl = exchange.getConnection().getSslSessionInfo();
                 if (ssl != null && ssl.getSSLSession() instanceof ExtendedSSLSession) {
                     result.addAll(((ExtendedSSLSession) ssl.getSSLSession()).getRequestedServerNames());
@@ -105,7 +107,7 @@ public class ClientSNITestCase {
         final CompletableFuture<Void> future = new CompletableFuture<>();
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(uri);
         context.sendRequest(request, sslContext, AuthenticationConfiguration.empty(), null,
-                (result, response, doneCallback) -> future.complete(null),
+                (ctx) -> future.complete(null),
                 throwable -> future.completeExceptionally(throwable),
                 null, null, true);
         future.get(10, TimeUnit.SECONDS);
