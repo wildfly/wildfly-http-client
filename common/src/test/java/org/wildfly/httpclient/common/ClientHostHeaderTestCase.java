@@ -61,6 +61,7 @@ public class ClientHostHeaderTestCase {
         CountDownLatch latch = new CountDownLatch(1);
         HttpTargetContext context = WildflyHttpContext.getCurrent().getTargetContext(new URI(HTTPTestServer.getDefaultServerURL()));
         context.sendRequest(request, null, AuthenticationConfiguration.empty(), null,
+                null,
                 new HttpTargetContext.HttpBodyDecoder() {
                     @Override
                     public void decode(ResponseContext ctx) {

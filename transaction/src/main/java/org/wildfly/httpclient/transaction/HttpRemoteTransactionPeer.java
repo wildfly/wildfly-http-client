@@ -93,6 +93,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                    new HttpSubordinateTransactionHandle.SubordinateTransactionStickinessHandler(),
                     xidArrayHttpBodyDecoder(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
         }
         try {
@@ -128,6 +129,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                    new HttpRemoteTransactionHandle.RemoteTransactionStickinessHandler(),
                     xidHttpBodyDecoder(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
         }
         try {

@@ -29,6 +29,7 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
 import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
@@ -114,7 +115,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final Marshaller marshaller = marshallerFactory.createMarshaller(result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                    xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, resultFunction), result::completeExceptionally, null, null);
+                    xidHttpBodyEncoder(marshaller, id), new SubordinateTransactionStickinessHandler(), emptyHttpBodyDecoder(result, resultFunction), result::completeExceptionally, null, null);
         }
         try {
             try {
@@ -136,4 +137,13 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         }
     }
 
+    public static class SubordinateTransactionStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        @Override
+        public void prepareRequest(ClientRequest request) {
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+        }
+    }
 }

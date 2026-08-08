@@ -32,6 +32,7 @@ import static org.wildfly.httpclient.ejb.TransactionInfo.localTransaction;
 import static org.wildfly.httpclient.ejb.TransactionInfo.nullTransaction;
 import static org.wildfly.httpclient.ejb.TransactionInfo.remoteTransaction;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.util.AttachmentKey;
 import org.jboss.ejb.client.Affinity;
@@ -173,6 +174,7 @@ class HttpEJBReceiver extends EJBReceiver {
         Map<String, Object> contextData = clientInvocationContext.getContextData();
         final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpBodyEncoder(marshaller, transactionInfo, parameters, contextData),
+                new InvocationStickinessHandler(receiverContext),
                 invokeHttpBodyDecoder(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
@@ -209,6 +211,7 @@ class HttpEJBReceiver extends EJBReceiver {
         Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                 createSessionHttpBodyEncoder(marshaller, transactionInfo),
+                new SessionCreationStickinessHandler(receiverContext),
                 emptyHttpBodyDecoder(result, createSessionResponseFunction()),
                 result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
 
@@ -254,6 +257,7 @@ class HttpEJBReceiver extends EJBReceiver {
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
         ClientRequest request = builder.createRequest();
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                null,
                 emptyHttpBodyDecoder(result, cancelInvocationResponseFunction()),
                 result::completeExceptionally, null, null);
         try {
@@ -291,6 +295,37 @@ class HttpEJBReceiver extends EJBReceiver {
 
     private static class EjbContextData {
         final Set<Method> asyncMethods = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    }
 
+    private class SessionCreationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final EJBReceiverSessionCreationContext sessionCreationContext;
+
+        public SessionCreationStickinessHandler(EJBReceiverSessionCreationContext sessionCreationContext) {
+            this.sessionCreationContext = sessionCreationContext;
+        }
+
+        @Override
+        public void prepareRequest(ClientRequest request) {
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+        }
+    }
+
+    private class InvocationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final EJBReceiverInvocationContext invocationContext;
+
+        public InvocationStickinessHandler(EJBReceiverInvocationContext invocationContext) {
+            this.invocationContext = invocationContext;
+        }
+
+        @Override
+        public void prepareRequest(ClientRequest request) {
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+        }
     }
 }

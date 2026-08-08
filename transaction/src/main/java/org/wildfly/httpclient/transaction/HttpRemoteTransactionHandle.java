@@ -21,6 +21,7 @@ package org.wildfly.httpclient.transaction;
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpBodyDecoder;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpBodyEncoder;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
@@ -88,7 +89,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), new RemoteTransactionStickinessHandler(), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {
@@ -143,7 +144,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), new RemoteTransactionStickinessHandler(), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {
@@ -198,5 +199,15 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             return (T) (XidProvider) () -> id;
         }
         return null;
+    }
+
+    public static class RemoteTransactionStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        @Override
+        public void prepareRequest(ClientRequest request) {
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+        }
     }
 }
