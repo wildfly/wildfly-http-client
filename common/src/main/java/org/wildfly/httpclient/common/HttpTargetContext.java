@@ -64,12 +64,14 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.AccessController;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
@@ -161,6 +163,43 @@ public class HttpTargetContext extends AbstractAttachable {
             latch.countDown();
             HttpClientMessages.MESSAGES.failedToAcquireSession(e);
         }, null, latch::countDown);
+    }
+
+    public URI acquireBackendServer() throws Exception {
+        return acquireBackendServer(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
+    }
+
+    private URI acquireBackendServer(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        ClientRequest clientRequest = new ClientRequest();
+        clientRequest.setMethod(Methods.GET);
+        clientRequest.setPath(uri.getPath() + "/common/v1/backend");
+        AuthenticationContext context = AuthenticationContext.captureCurrent();
+        SSLContext sslContext;
+        try {
+            sslContext = AUTH_CONTEXT_CLIENT.getSSLContext(uri, context);
+        } catch (GeneralSecurityException e) {
+            HttpClientMessages.MESSAGES.failedToAcquireBackendServer(e);
+            return null;
+        }
+
+        CompletableFuture<URI> result = new CompletableFuture<>();
+        sendRequest(clientRequest, sslContext, authenticationConfiguration,
+                null,
+                (ctx) -> {
+                    String backend = ctx.getResponseHeader("Backend");
+                    if (backend == null) {
+                        result.completeExceptionally(HttpClientMessages.MESSAGES.failedToAcquireBackendServer(new Exception("Missing backend header on response")));
+                        return;
+                    }
+                    try {
+                        URI backendURI = new URI(backend);
+                        result.complete(backendURI);
+                    } catch (URISyntaxException use) {
+                        result.completeExceptionally(HttpClientMessages.MESSAGES.failedToAcquireBackendServer(use));
+                    }
+                },
+                result::completeExceptionally, null, null);
+        return result.get();
     }
 
     public void sendRequest(ClientRequest request, SSLContext sslContext, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask) {
