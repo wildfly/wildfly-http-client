@@ -20,20 +20,16 @@ package org.wildfly.httpclient.common;
 
 import static io.undertow.util.StatusCodes.NO_CONTENT;
 import static io.undertow.util.Headers.CHUNKED;
-import static io.undertow.util.Headers.COOKIE;
 import static io.undertow.util.Headers.CONTENT_ENCODING;
 import static io.undertow.util.Headers.CONTENT_TYPE;
 import static io.undertow.util.Headers.GZIP;
 import static io.undertow.util.Headers.HOST;
 import static io.undertow.util.Headers.IDENTITY;
-import static io.undertow.util.Headers.SET_COOKIE;
 import static io.undertow.util.Headers.TRANSFER_ENCODING;
 import static org.wildfly.httpclient.common.ByteInputs.byteInputOf;
-import static org.wildfly.httpclient.common.HeadersHelper.addRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.containsRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getRequestHeader;
 import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeader;
-import static org.wildfly.httpclient.common.HeadersHelper.getResponseHeaders;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.DEFAULT_FACTORY;
 import static org.wildfly.httpclient.common.HttpMarshallerFactory.INTEROPERABLE_FACTORY;
@@ -43,10 +39,7 @@ import io.undertow.client.ClientCallback;
 import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
-import io.undertow.server.handlers.Cookie;
 import io.undertow.util.AbstractAttachable;
-import io.undertow.util.Cookies;
-import io.undertow.util.HeaderValues;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import org.jboss.marshalling.Unmarshaller;
@@ -72,7 +65,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -94,16 +86,10 @@ public class HttpTargetContext extends AbstractAttachable {
 
     private static final String EXCEPTION_TYPE = "application/x-wf-jbmar-exception";
 
-    private static final String JSESSIONID = "JSESSIONID";
-
     private final HttpConnectionPool connectionPool;
     private final boolean eagerlyAcquireAffinity;
-    private volatile CountDownLatch sessionAffinityLatch = new CountDownLatch(1);
-    private volatile String sessionId;
     private final URI uri;
     private final AuthenticationContext initAuthenticationContext;
-
-    private final AtomicBoolean affinityRequestSent = new AtomicBoolean();
 
     private static ClassLoader getContextClassLoader() {
         if(System.getSecurityManager() == null) {
@@ -127,7 +113,7 @@ public class HttpTargetContext extends AbstractAttachable {
 
     void init() {
         if (eagerlyAcquireAffinity) {
-            acquireAffinitiy(AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(uri, AuthenticationContext.captureCurrent()));
+            // this is now a noop as we can't associate affinity to a single backend server with the target context
         }
     }
 
@@ -137,32 +123,6 @@ public class HttpTargetContext extends AbstractAttachable {
      */
     public Version getVersion() {
         return connectionPool.getVersion();
-    }
-
-    private void acquireAffinitiy(AuthenticationConfiguration authenticationConfiguration) {
-        if (affinityRequestSent.compareAndSet(false, true)) {
-            acquireSessionAffinity(sessionAffinityLatch, authenticationConfiguration);
-        }
-    }
-
-
-    private void acquireSessionAffinity(CountDownLatch latch, AuthenticationConfiguration authenticationConfiguration) {
-        ClientRequest request = new ClientRequest();
-        request.setMethod(Methods.GET);
-        request.setPath(uri.getPath() + "/common/v1/affinity");
-        AuthenticationContext context = AuthenticationContext.captureCurrent();
-        SSLContext sslContext;
-        try {
-            sslContext = AUTH_CONTEXT_CLIENT.getSSLContext(uri, context);
-        } catch (GeneralSecurityException e) {
-            latch.countDown();
-            HttpClientMessages.MESSAGES.failedToAcquireSession(e);
-            return;
-        }
-        sendRequest(request, sslContext, authenticationConfiguration, null, null, (e) -> {
-            latch.countDown();
-            HttpClientMessages.MESSAGES.failedToAcquireSession(e);
-        }, null, latch::countDown);
     }
 
     public URI acquireBackendServer() throws Exception {
@@ -216,9 +176,6 @@ public class HttpTargetContext extends AbstractAttachable {
     }
 
     private void sendRequestInternal(final HttpConnectionPool.ConnectionHandle connection, final ClientRequest request, AuthenticationConfiguration authenticationConfiguration, HttpBodyEncoder encoder, HttpStickinessHandler httpStickinessHandler, HttpBodyDecoder decoder, HttpFailureHandler failureHandler, ContentType expectedResponse, Runnable completedTask, boolean allowNoContent, boolean retry, SSLContext sslContext, ClassLoader classLoader) {
-        if (sessionId != null) {
-            addRequestHeader(request, COOKIE, JSESSIONID + "=" + sessionId);
-        }
         getVersion().writeTo(request);
         try {
             if (!containsRequestHeader(request, HOST)) {
@@ -252,7 +209,6 @@ public class HttpTargetContext extends AbstractAttachable {
                             connection.getConnection().getWorker().execute(() -> {
                                 ClientResponse response = result.getResponse();
                                 if (!authAdded || connection.getAuthenticationContext().isStale(result)) {
-                                    handleSessionAffinity(request, response);
                                     if (connection.getAuthenticationContext().handleResponse(response)) {
                                         URI uri = connection.getUri();
                                         connection.done(false);
@@ -302,8 +258,6 @@ public class HttpTargetContext extends AbstractAttachable {
                                     return;
                                 }
                                 try {
-                                    handleSessionAffinity(request, response);
-
                                     if (isException) {
                                         final Unmarshaller unmarshaller = getHttpMarshallerFactory().createUnmarshaller(classLoader);
                                         try (WildflyClientInputStream inputStream = new WildflyClientInputStream(result.getConnection().getBufferPool(), result.getResponseChannel(), null)) {
@@ -444,27 +398,6 @@ public class HttpTargetContext extends AbstractAttachable {
         return os;
     }
 
-    private void handleSessionAffinity(ClientRequest request, ClientResponse response) {
-        //handle session affinity
-        HeaderValues cookies = getResponseHeaders(response, SET_COOKIE);
-        if (cookies != null) {
-            for (String cookie : cookies) {
-                Cookie c = Cookies.parseSetCookieHeader(cookie);
-                if (c.getName().equals(JSESSIONID)) {
-                    HttpClientMessages.MESSAGES.debugf("%s Cookie found in Set-Cookie header in the response. cookie name = [%s], cookie value = [%s], cookie path = [%s]", JSESSIONID, c.getName(), c.getValue(), c.getPath());
-                    String path = c.getPath();
-                    if (path == null || path.isEmpty() || request.getPath().startsWith(path)) {
-                        HttpClientMessages.MESSAGES.debugf("Use sessionId %s as a request cookie for session affinity", c.getValue());
-                        setSessionId(c.getValue());
-                    }
-                }
-            }
-        }
-        if (getSessionId() != null) {
-            putRequestHeader(request, COOKIE, JSESSIONID + "=" + getSessionId());
-        }
-    }
-
     private static Map<String, Object> readAttachments(final ObjectInput input) throws IOException, ClassNotFoundException {
         final int numAttachments = input.readByte();
         if (numAttachments == 0) {
@@ -489,41 +422,8 @@ public class HttpTargetContext extends AbstractAttachable {
         return connectionPool;
     }
 
-    public String getSessionId() {
-        return sessionId;
-    }
-
-    void setSessionId(String sessionId) {
-        this.sessionId = sessionId;
-    }
-
     public URI getUri() {
         return uri;
-    }
-
-    public void clearSessionId() {
-        awaitSessionId(true, null); //to prevent a race make sure we have one before we clear it
-        synchronized (this) {
-            CountDownLatch old = sessionAffinityLatch;
-            sessionAffinityLatch = new CountDownLatch(1);
-            old.countDown();
-            this.affinityRequestSent.set(false);
-            this.sessionId = null;
-        }
-    }
-
-    public String awaitSessionId(boolean required, AuthenticationConfiguration authConfig) {
-        if (required) {
-            acquireAffinitiy(authConfig);
-        }
-        if (affinityRequestSent.get()) {
-            try {
-                sessionAffinityLatch.await();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return sessionId;
     }
 
     private static boolean isLegacyAuthenticationFailedException() {
