@@ -613,7 +613,6 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
-
             // parse request path
             String relativePath = exchange.getRelativePath();
             if(relativePath.startsWith("/")) {

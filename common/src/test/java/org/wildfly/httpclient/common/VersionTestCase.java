@@ -44,7 +44,7 @@ public class VersionTestCase {
     @Test
     public void testJakartaEE10VersionConstant() {
         final Version version = Version.JAKARTA_EE_10;
-        Assert.assertSame(Version.LATEST, version);
+        Assert.assertNotSame(Version.LATEST, version);
         Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
         Assert.assertSame(Version.Handler.VERSION_2, version.handler());
         Assert.assertSame(Version.Specification.JAKARTA_EE_10, version.specification());
@@ -74,7 +74,7 @@ public class VersionTestCase {
     @Test
     public void testJakartaEE10VersionOfMethod() {
         final Version version = Version.of(2);
-        Assert.assertSame(Version.LATEST, version);
+        Assert.assertNotSame(Version.LATEST, version);
         Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
         Assert.assertSame(Version.Handler.VERSION_2, version.handler());
         Assert.assertSame(Version.Specification.JAKARTA_EE_10, version.specification());
@@ -84,6 +84,26 @@ public class VersionTestCase {
         exchange.getRequestHeaders().putAll(exchange.getResponseHeaders());
         Version readVersion = Version.readFrom(exchange);
         Assert.assertEquals(version, readVersion);
+    }
+
+    @Test
+    public void testJakartaEE10V3VersionConstant() {
+        final Version version = Version.JAKARTA_EE_10_V3;
+        Assert.assertSame(Version.LATEST, version);
+        Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
+        Assert.assertSame(Version.Handler.VERSION_3, version.handler());
+        Assert.assertSame(Version.Specification.JAKARTA_EE_10, version.specitication());
+        Assert.assertEquals("3", version.toString());
+    }
+
+    @Test
+    public void testJakartaEE10V3VersionOfMethod() {
+        final Version version = Version.of(3);
+        Assert.assertSame(Version.LATEST, version);
+        Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
+        Assert.assertSame(Version.Handler.VERSION_3, version.handler());
+        Assert.assertSame(Version.Specification.JAKARTA_EE_10, version.specitication());
+        Assert.assertEquals("3", version.toString());
     }
 
 }

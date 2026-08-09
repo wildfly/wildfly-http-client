@@ -251,6 +251,7 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         try {
             if (first) {
                 first = false;
+                System.setProperty("jboss.node.name", ROUTE);
                 Xnio xnio = Xnio.getInstance("nio");
                 PATH_HANDLER.addPrefixPath("/wildfly-services", SERVICES_HANDLER);
                 worker = xnio.createWorker(OptionMap.create(Options.WORKER_TASK_CORE_THREADS, 20, Options.WORKER_IO_THREADS, 10));

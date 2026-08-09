@@ -80,6 +80,7 @@
     <properties>
         <test.level>DEBUG</test.level>
         <maven.compiler.release>11</maven.compiler.release>
+        <maven.compiler.proc>full</maven.compiler.proc>
         <!-- Release Info -->
         <wildfly.httpclient.scm.connection>git@github.com:wildfly/wildfly-http-client.git</wildfly.httpclient.scm.connection>
         <wildfly.httpclient.scm.url>https://github.com/wildfly/wildfly-http-client</wildfly.httpclient.scm.url>
