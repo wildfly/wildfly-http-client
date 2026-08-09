@@ -99,7 +99,7 @@ public class HttpStickinessHelper {
         Map.Entry<CharSequence, CharSequence> parsedSessionID = routingSupport.parse(encodedSessionID);
         String sessionID = parsedSessionID.getKey().toString();
 
-        HttpClientMessages.MESSAGES.infof("HttpStickinessHelper: encodedSessionID = %s, route = %s", encodedSessionID, sessionID);
+        HttpClientMessages.MESSAGES.infof("HttpStickinessHelper: encodedSessionID = %s, sessionID = %s", encodedSessionID, sessionID);
         return sessionID;
     }
 
@@ -209,9 +209,9 @@ public class HttpStickinessHelper {
         String oldSessionID = addSessionIDForNode(node2SessionIdMap, uri, route, sessionID);
 
         if (oldSessionID != null) {
-            HttpClientMessages.MESSAGES.infof("HttpStickinessHandler:updateNode2SessionIDMap uri = %s, node = %s, oldSessionID %s, sessionId %s", uri, route, oldSessionID, sessionID);
+            HttpClientMessages.MESSAGES.infof("HttpStickinessHandler:updateNode2SessionIDMap uri = %s, node = %s, oldSessionID = %s, sessionId = %s", uri, route, oldSessionID, sessionID);
         } else {
-            HttpClientMessages.MESSAGES.infof("HttpStickinessHandler:updateNode2SessionIDMap uri = %s, node = %s, sessionId %s", uri, route, sessionID);
+            HttpClientMessages.MESSAGES.infof("HttpStickinessHandler:updateNode2SessionIDMap uri = %s, node = %s, sessionId = %s", uri, route, sessionID);
         }
 
         return route;
