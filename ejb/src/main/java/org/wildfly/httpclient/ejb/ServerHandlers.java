@@ -163,6 +163,8 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(final HttpServerExchange exchange) throws Exception {
+
+            // parse request path
             String relativePath = exchange.getRelativePath();
             if(relativePath.startsWith("/")) {
                 relativePath = relativePath.substring(1);
@@ -176,14 +178,14 @@ final class ServerHandlers {
             final String module = handleDash(parts[1]);
             final String distinct = handleDash(parts[2]);
             final String bean = parts[3];
-
-
             String originalSessionId = handleDash(parts[4]);
             final byte[] sessionID = originalSessionId.isEmpty() ? null : Base64.getUrlDecoder().decode(originalSessionId);
             String viewName = parts[5];
             String method = parts[6];
             String[] parameterTypeNames = new String[parts.length - 7];
             System.arraycopy(parts, 7, parameterTypeNames, 0, parameterTypeNames.length);
+
+            // process Cookies and Headers
             Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
             final String sessionAffinity = cookie != null ? cookie.getValue() : null;
             final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
@@ -196,6 +198,7 @@ final class ServerHandlers {
                 identifier = null;
             }
 
+            // process request
             exchange.dispatch(executorService, () -> {
                 CancelHandle handle = association.receiveInvocationRequest(new InvocationRequest() {
 
@@ -472,6 +475,8 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
+
+            // parse request path
             String relativePath = exchange.getRelativePath();
             if (relativePath.startsWith("/")) {
                 relativePath = relativePath.substring(1);
@@ -487,6 +492,9 @@ final class ServerHandlers {
             final String bean = parts[3];
             String invocationId = parts[4];
             boolean cancelIdRunning = Boolean.parseBoolean(parts[5]);
+
+            // process Cookies and Headers
+            // TODO: cancellation requires that a Cookie be present
             Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
             final String sessionAffinity = cookie != null ? cookie.getValue() : null;
             final InvocationIdentifier identifier;
@@ -497,6 +505,8 @@ final class ServerHandlers {
                 EjbHttpClientMessages.MESSAGES.debugf("Exchange %s did not include both session id and invocation id in cancel request", exchange);
                 return;
             }
+
+            // process request
             CancelHandle handle = cancellationFlags.remove(identifier);
             if (handle != null) {
                 handle.cancel(cancelIdRunning);
@@ -524,6 +534,8 @@ final class ServerHandlers {
 
         @Override
         protected void handleInternal(HttpServerExchange exchange) throws Exception {
+
+            // parse request path
             String relativePath = exchange.getRelativePath();
             if(relativePath.startsWith("/")) {
                 relativePath = relativePath.substring(1);
@@ -538,6 +550,7 @@ final class ServerHandlers {
             final String distinct = handleDash(parts[2]);
             final String bean = parts[3];
 
+            // process Cookies and Headers
             Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
             String sessionAffinity = null;
             if (cookie != null) {
@@ -545,6 +558,8 @@ final class ServerHandlers {
             }
 
             final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
+
+            // process request
             exchange.dispatch(executorService, () -> {
                 final TransactionInfo txnInfo;
                 try {
