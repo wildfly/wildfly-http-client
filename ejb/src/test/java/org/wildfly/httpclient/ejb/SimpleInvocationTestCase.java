@@ -292,8 +292,8 @@ public class SimpleInvocationTestCase {
                 StatefulEJBLocator<?> ejbLocator = (StatefulEJBLocator<?>) invocation.getEJBLocator();
                 return new String(ejbLocator.getSessionId().getEncodedForm());
             });
-            StatefulEJBLocator<EchoRemote> locator = EJBClient.createSession(EchoRemote.class, APP, MODULE, BEAN, "");
-            EchoRemote proxy = EJBClient.createProxy(locator);
+            StatelessEJBLocator<EchoRemote> locator = new StatelessEJBLocator<>(EchoRemote.class, APP, MODULE, BEAN, "");
+            EchoRemote proxy = EJBClient.createSessionProxy(locator);
             final String message = "Hello World!!!";
             final String echo = proxy.echo(message);
             Assert.assertEquals("Unexpected echo message", "SFSB_ID", echo);
@@ -309,8 +309,8 @@ public class SimpleInvocationTestCase {
 
             EJBTestServer.setHandler((invocation, affinity, out, method, handle, attachments) -> new String(Base64.getDecoder().decode(invocation.getEJBLocator().asStateful().getSessionId().getEncodedForm())) + "-" + affinity);
 
-            StatefulEJBLocator<EchoRemote> locator = EJBClient.createSession(EchoRemote.class, APP, MODULE, BEAN, "");
-            EchoRemote proxy = EJBClient.createProxy(locator);
+            StatelessEJBLocator<EchoRemote> locator = new StatelessEJBLocator<>(EchoRemote.class, APP, MODULE, BEAN, "");
+            EchoRemote proxy = EJBClient.createSessionProxy(locator);
             final String message = "Hello World!!!";
             final String echo = proxy.echo(message);
             Assert.assertEquals("Unexpected echo message", "SFSB_ID-lazy-session-affinity", echo);
@@ -323,8 +323,8 @@ public class SimpleInvocationTestCase {
         for (int i = 0; i < RETRIES; ++i) {
 
             EJBTestServer.setHandler((invocation, affinity, out, method, handle, attachments) -> invocation.getParameters()[0].getClass().getName());
-            StatefulEJBLocator<EchoRemote> locator = EJBClient.createSession(EchoRemote.class, APP, MODULE, BEAN, "");
-            EchoRemote proxy = EJBClient.createProxy(locator);
+            StatelessEJBLocator<EchoRemote> locator = new StatelessEJBLocator<>(EchoRemote.class, APP, MODULE, BEAN, "");
+            EchoRemote proxy = EJBClient.createSessionProxy(locator);
             final String type = proxy.getObjectType(new IllegalStateException());
             Assert.assertEquals("Unexpected getObjectType response", IllegalStateException.class.getName(), type);
             try {

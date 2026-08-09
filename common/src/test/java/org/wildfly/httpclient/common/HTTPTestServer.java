@@ -26,10 +26,15 @@ import io.undertow.security.handlers.AuthenticationCallHandler;
 import io.undertow.security.idm.Account;
 import io.undertow.server.DefaultByteBufferPool;
 import io.undertow.server.HttpHandler;
+import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.BlockingHandler;
 import io.undertow.server.handlers.CanonicalPathHandler;
+import io.undertow.server.handlers.Cookie;
+import io.undertow.server.handlers.CookieImpl;
 import io.undertow.server.handlers.PathHandler;
 import io.undertow.server.handlers.error.SimpleErrorPageHandler;
+import io.undertow.server.session.SecureRandomSessionIdGenerator;
+import io.undertow.util.StatusCodes;
 import io.undertow.util.NetworkUtils;
 import org.junit.runner.Description;
 import org.junit.runner.Result;
@@ -103,6 +108,8 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
     public static final String CLIENT_KEY_STORE = "client.keystore";
     public static final String CLIENT_TRUST_STORE = "client.truststore";
     public static final char[] STORE_PASSWORD = "password".toCharArray();
+    public static final String JSESSIONID = "JSESSIONID";
+    public static final String ROUTE = "route";
 
     private static boolean first = true;
     private static Undertow undertow;
@@ -274,6 +281,7 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         root = new AuthenticationCallHandler(root);
         root = new SimpleErrorPageHandler(root);
         root = new CanonicalPathHandler(root);
+        root = new DummyRouteHandler(root);
         return root;
     }
 
@@ -355,6 +363,33 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
         @Override
         public Set<String> getRoles() {
             return Collections.emptySet();
+        }
+    }
+
+    private class DummyRouteHandler implements HttpHandler {
+        private volatile HttpHandler next;
+        private final RoutingSupport routingSupport = new SimpleRoutingSupport();
+        private final SecureRandomSessionIdGenerator generator = new SecureRandomSessionIdGenerator();
+
+        public DummyRouteHandler(HttpHandler next) {
+            this.next = next;
+        }
+
+        @Override
+        public void handleRequest(HttpServerExchange exchange) throws Exception {
+            exchange.addResponseCommitListener(ex -> {
+                Cookie cookie = ex.getResponseCookies().get(JSESSIONID);
+                if (cookie != null) {
+                    CharSequence encodeSessionID = routingSupport.format(cookie.getValue(), ROUTE);
+                    cookie.setValue(encodeSessionID.toString());
+                } else if (ex.getStatusCode() == StatusCodes.UNAUTHORIZED) {
+                    CharSequence encodedSessionID = routingSupport.format(generator.createSessionId(), ROUTE);
+                    cookie = new CookieImpl(JSESSIONID, encodedSessionID.toString());
+                    cookie.setPath(ex.getResolvedPath());
+                    exchange.getResponseCookies().put(JSESSIONID, cookie);
+                }
+            });
+            next.handleRequest(exchange);
         }
     }
 }
