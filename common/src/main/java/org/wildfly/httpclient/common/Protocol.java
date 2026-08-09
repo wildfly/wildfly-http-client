@@ -25,5 +25,6 @@ package org.wildfly.httpclient.common;
 public class Protocol {
     static final String VERSION_ONE_PATH = "/v1";
     static final String VERSION_TWO_PATH = "/v2";
+    static final String VERSION_THREE_PATH = "/v3";
     private Protocol() {}
 }

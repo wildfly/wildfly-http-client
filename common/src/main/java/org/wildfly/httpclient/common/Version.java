@@ -53,9 +53,13 @@ public final class Version implements Comparable<Version>{
      */
     public static final Version JAKARTA_EE_10 = new Version(Handler.VERSION_2, Specification.JAKARTA_EE_10, Encoding.JBOSS_MARSHALLING);
     /**
-     * Equals to {@link #JAKARTA_EE_10} as latest available version.
+     * Jakarta EE Specification version using version 3 path handlers (with stickiness support).
      */
-    static final Version LATEST = JAKARTA_EE_10;
+    public static final Version JAKARTA_EE_10_V3 = new Version(Handler.VERSION_3, Specification.JAKARTA_EE_10, Encoding.JBOSS_MARSHALLING);
+    /**
+     * Equals to {@link #JAKARTA_EE_10_V3} as latest available version.
+     */
+    static final Version LATEST = JAKARTA_EE_10_V3;
 
     private final Handler handlerVersion;
     private final Specification specVersion;
@@ -78,6 +82,7 @@ public final class Version implements Comparable<Version>{
     static Version of(final int version) {
         if (version == 1) return JAVA_EE_8;
         if (version == JAKARTA_EE_10.version) return JAKARTA_EE_10;
+        if (version == JAKARTA_EE_10_V3.version) return JAKARTA_EE_10_V3;
         final Handler handlerVersion = Handler.of((version & MASK_HANDLER) >>> 1);
         final Specification specVersion = Specification.of((version & MASK_SPEC) >>> 7);
         final Encoding encodingVersion = Encoding.of((version & MASK_ENCODING) >>> 13);
@@ -94,6 +99,7 @@ public final class Version implements Comparable<Version>{
     static Version of(final Handler handlerVersion, final Specification specVersion) {
         if (Handler.VERSION_1.equals(handlerVersion) && Specification.JAVA_EE_8.equals(specVersion)) return JAVA_EE_8;
         if (Handler.VERSION_2.equals(handlerVersion) && Specification.JAKARTA_EE_10.equals(specVersion)) return JAKARTA_EE_10;
+        if (Handler.VERSION_3.equals(handlerVersion) && Specification.JAKARTA_EE_10.equals(specVersion)) return JAKARTA_EE_10_V3;
         final Version decodedVersion = new Version(handlerVersion, specVersion, Encoding.JBOSS_MARSHALLING);
         throw new IllegalArgumentException("Unsupported version combination. " + decodedVersion);
     }
@@ -230,7 +236,8 @@ public final class Version implements Comparable<Version>{
      */
     public enum Handler {
         VERSION_1(1),
-        VERSION_2(2);
+        VERSION_2(2),
+        VERSION_3(3);
 
         public static final Handler LATEST = values()[values().length - 1];
 

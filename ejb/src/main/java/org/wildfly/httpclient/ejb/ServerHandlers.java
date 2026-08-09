@@ -57,6 +57,7 @@ import org.jboss.ejb.client.EJBHomeLocator;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBMethodLocator;
 import org.jboss.ejb.client.EJBModuleIdentifier;
+import org.jboss.ejb.client.NodeAffinity;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
 import org.jboss.ejb.client.StatelessEJBLocator;
@@ -74,6 +75,8 @@ import org.wildfly.httpclient.common.AbstractServerHttpHandler;
 import org.wildfly.httpclient.common.ContentType;
 import org.wildfly.httpclient.common.ElytronIdentityHandler;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
+import org.wildfly.httpclient.common.Version;
 import org.wildfly.common.annotation.NotNull;
 import org.wildfly.security.auth.server.SecurityIdentity;
 import org.wildfly.transaction.client.ImportResult;
@@ -186,8 +189,39 @@ final class ServerHandlers {
             System.arraycopy(parts, 7, parameterTypeNames, 0, parameterTypeNames.length);
 
             // process Cookies and Headers
-            Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
-            final String sessionAffinity = cookie != null ? cookie.getValue() : null;
+            Version version = getVersion(exchange);
+            String encodedHTTPSessionID = null;
+
+            if (version.handler() == Version.Handler.VERSION_3) {
+                if (HttpStickinessHelper.hasEncodedSessionID(exchange)) {
+                    encodedHTTPSessionID = HttpStickinessHelper.getEncodedSessionID(exchange);
+                }
+
+                String actualHost = System.getProperty("jboss.node.name");
+                String intendedHost = null;
+                if (HttpStickinessHelper.hasStrictStickinessHost(exchange)) {
+                    intendedHost = HttpStickinessHelper.getStrictStickinessHost(exchange);
+                }
+                if (intendedHost != null && !intendedHost.equals(actualHost)) {
+                    exchange.setStatusCode(io.undertow.util.StatusCodes.OK);
+                    HttpStickinessHelper.addStrictStickinessResult(exchange, "failed");
+                    HttpStickinessHelper.addStrictStickinessHost(exchange, intendedHost);
+                    EjbHttpClientMessages.MESSAGES.infof("Failover attempted on invocation with strict stickiness: intended node %s, actual node %s", intendedHost, actualHost);
+                    return;
+                }
+            } else {
+                Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
+                encodedHTTPSessionID = cookie != null ? cookie.getValue() : null;
+            }
+
+            String httpSessionID = null;
+            if (encodedHTTPSessionID != null) {
+                httpSessionID = (version.handler() == Version.Handler.VERSION_3)
+                        ? HttpStickinessHelper.extractSessionIDFromEncodedSessionID(encodedHTTPSessionID)
+                        : encodedHTTPSessionID;
+            }
+
+            final String sessionAffinity = httpSessionID;
             final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
 
             final String cancellationId = getRequestHeader(exchange, Constants.INVOCATION_ID);
@@ -201,6 +235,20 @@ final class ServerHandlers {
             // process request
             exchange.dispatch(executorService, () -> {
                 CancelHandle handle = association.receiveInvocationRequest(new InvocationRequest() {
+                    Affinity strongAffinity;
+                    Affinity weakAffinity;
+
+                    @Override
+                    public void updateStrongAffinity(Affinity affinity) {
+                        InvocationRequest.super.updateStrongAffinity(affinity);
+                        this.strongAffinity = affinity;
+                    }
+
+                    @Override
+                    public void updateWeakAffinity(Affinity affinity) {
+                        InvocationRequest.super.updateWeakAffinity(affinity);
+                        this.weakAffinity = affinity;
+                    }
 
                     @Override
                     public SocketAddress getPeerAddress() {
@@ -251,7 +299,7 @@ final class ServerHandlers {
                                     throw new IllegalStateException(e); //TODO: what to do here?
                                 }
                             }
-                            return new ResolvedInvocation(contextData, methodParams, locator, exchange, marshaller, sessionAffinity, transaction, identifier);
+                            return new ResolvedInvocation(contextData, methodParams, locator, exchange, marshaller, sessionAffinity, strongAffinity, weakAffinity, transaction, identifier);
                         } catch (IOException | ClassNotFoundException e) {
                             throw e;
                         } catch (Throwable e) {
@@ -363,16 +411,20 @@ final class ServerHandlers {
             private final HttpServerExchange exchange;
             private final Marshaller marshaller;
             private final String sessionAffinity;
+            private final Affinity strongAffinity;
+            private final Affinity weakAffinity;
             private final Transaction transaction;
             private final InvocationIdentifier identifier;
 
-            public ResolvedInvocation(Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Transaction transaction, final InvocationIdentifier identifier) {
+            public ResolvedInvocation(Map<String, Object> contextData, Object[] methodParams, EJBLocator<?> locator, HttpServerExchange exchange, Marshaller marshaller, String sessionAffinity, Affinity strongAffinity, Affinity weakAffinity, Transaction transaction, final InvocationIdentifier identifier) {
                 this.contextData = contextData;
                 this.methodParams = methodParams;
                 this.locator = locator;
                 this.exchange = exchange;
                 this.marshaller = marshaller;
                 this.sessionAffinity = sessionAffinity;
+                this.strongAffinity = strongAffinity;
+                this.weakAffinity = weakAffinity;
                 this.transaction = transaction;
                 this.identifier = identifier;
             }
@@ -406,20 +458,45 @@ final class ServerHandlers {
                 return sessionAffinity;
             }
 
+            public Affinity getStrongAffinity() {
+                return strongAffinity;
+            }
+
+            @Override
+            public Affinity getWeakAffinity() {
+                return weakAffinity;
+            }
+
             HttpServerExchange getExchange() {
                 return exchange;
             }
 
             @Override
             public void writeInvocationResult(final Object result) {
-                putResponseHeader(exchange, CONTENT_TYPE, Constants.EJB_RESPONSE);
-
                 if (identifier != null) cancellationFlags.remove(identifier);
 
                 try {
-    //                                    if (output.getSessionAffinity() != null) {
-    //                                        exchange.setResponseCookie(new CookieImpl("JSESSIONID", output.getSessionAffinity()).setPath(WILDFLY_SERVICES));
-    //                                    }
+                    // process Cookies and Headers
+                    Version version = getVersion(exchange);
+                    if (version.handler() == Version.Handler.VERSION_3) {
+                        final String node = System.getProperty("jboss.node.name", "localhost");
+
+                        if (hasTransaction()) {
+                            HttpStickinessHelper.addUnencodedSessionID(exchange, sessionAffinity);
+                            HttpStickinessHelper.addStrictStickinessHost(exchange, node);
+                            HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
+
+                        } else if (getEJBLocator() instanceof StatefulEJBLocator) {
+                            HttpStickinessHelper.addUnencodedSessionID(exchange, sessionAffinity);
+                            if (getStrongAffinity() instanceof NodeAffinity) {
+                                HttpStickinessHelper.addStrictStickinessHost(exchange, node);
+                                HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
+                            }
+                        }
+                    }
+
+                    putResponseHeader(exchange, CONTENT_TYPE, Constants.EJB_RESPONSE);
+
                     final OutputStream os = exchange.getOutputStream();
                     try (ByteOutput out = byteOutputOf(os)) {
                         marshaller.start(out);
@@ -519,12 +596,14 @@ final class ServerHandlers {
         private final ExecutorService executorService;
         private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
         private final LocalTransactionContext localTransactionContext;
+        private final String serverSessionID;
 
         HttpSessionOpenHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext) {
             super(executorService);
             this.association = association;
             this.executorService = executorService;
             this.localTransactionContext = localTransactionContext;
+            this.serverSessionID = sessionIdGenerator.createSessionId();
         }
 
         @Override
@@ -551,10 +630,15 @@ final class ServerHandlers {
             final String bean = parts[3];
 
             // process Cookies and Headers
-            Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
-            String sessionAffinity = null;
-            if (cookie != null) {
-                sessionAffinity = cookie.getValue();
+            Version version = getVersion(exchange);
+            if (version.handler() == Version.Handler.VERSION_3) {
+                assert !HttpStickinessHelper.hasEncodedSessionID(exchange) : "incoming session open request has unexpected Cookie";
+            } else {
+                Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
+                String sessionAffinity = null;
+                if (cookie != null) {
+                    sessionAffinity = cookie.getValue();
+                }
             }
 
             final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
@@ -589,6 +673,21 @@ final class ServerHandlers {
                 }
 
                 association.receiveSessionOpenRequest(new SessionOpenRequest() {
+                    Affinity strongAffinity;
+                    Affinity weakAffinity;
+
+                    @Override
+                    public void updateStrongAffinity(Affinity affinity) {
+                        SessionOpenRequest.super.updateStrongAffinity(affinity);
+                        this.strongAffinity = affinity;
+                    }
+
+                    @Override
+                    public void updateWeakAffinity(Affinity affinity) {
+                        SessionOpenRequest.super.updateWeakAffinity(affinity);
+                        this.weakAffinity = affinity;
+                    }
+
                     @Override
                     public boolean hasTransaction() {
                         return txnInfo != null;
@@ -663,14 +762,24 @@ final class ServerHandlers {
                     @Override
                     public void convertToStateful(@NotNull SessionID sessionId) throws IllegalArgumentException, IllegalStateException {
 
-                        Cookie sessionCookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
-                        if (sessionCookie == null) {
-                            String rootPath = exchange.getResolvedPath();
-                            int ejbIndex = rootPath.lastIndexOf("/ejb");
-                            if (ejbIndex > 0) {
-                                rootPath = rootPath.substring(0, ejbIndex);
+                        Version ver = getVersion(exchange);
+                        if (ver.handler() == Version.Handler.VERSION_3) {
+                            final String node = System.getProperty("jboss.node.name", "localhost");
+                            HttpStickinessHelper.addUnencodedSessionID(exchange, serverSessionID);
+                            if (strongAffinity instanceof NodeAffinity || hasTransaction()) {
+                                HttpStickinessHelper.addStrictStickinessHost(exchange, node);
+                                HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
                             }
-                            exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
+                        } else {
+                            Cookie sessionCookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
+                            if (sessionCookie == null) {
+                                String rootPath = exchange.getResolvedPath();
+                                int ejbIndex = rootPath.lastIndexOf("/ejb");
+                                if (ejbIndex > 0) {
+                                    rootPath = rootPath.substring(0, ejbIndex);
+                                }
+                                exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME, sessionIdGenerator.createSessionId()).setPath(rootPath));
+                            }
                         }
 
                         putResponseHeader(exchange, CONTENT_TYPE, EJB_RESPONSE_NEW_SESSION);
