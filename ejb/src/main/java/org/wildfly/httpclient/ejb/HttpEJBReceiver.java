@@ -428,32 +428,34 @@ class HttpEJBReceiver extends EJBReceiver {
             EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler().prepareRequest(), node2sessionID map: %s", node2SessionId);
 
             if (inTransaction(context)) {
-                assert weakAffinity instanceof URIAffinity;
-                String route = ((URIAffinity) weakAffinity).getUri().getHost();
-                assert route != null;
-
-                String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
-                HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
-                HttpStickinessHelper.addStrictStickinessHost(request, route);
-
+                if (weakAffinity instanceof URIAffinity) {
+                    String route = ((URIAffinity) weakAffinity).getUri().getHost();
+                    if (route != null) {
+                        String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
+                        HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+                        HttpStickinessHelper.addStrictStickinessHost(request, route);
+                    }
+                }
             } else if (locator instanceof StatefulEJBLocator) {
                 if (weakAffinity instanceof NodeAffinity) {
                     String route = ((NodeAffinity) weakAffinity).getNodeName();
-                    assert route != null;
+                    if (route != null) {
+                        EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler.prepareRequest(), node2sessionID map: %s, uri = %s, route = %s", node2SessionId, uri, route);
 
-                    EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler.prepareRequest(), node2sessionID map: %s, uri = %s, route = %s", node2SessionId, uri, route);
-
-                    String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
-                    HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
-
+                        String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
+                        if (nodeSessionID != null) {
+                            HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+                        }
+                    }
                 } else if (weakAffinity instanceof URIAffinity) {
                     String route = ((URIAffinity) weakAffinity).getUri().getHost();
-                    assert route != null;
-                    String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
-                    HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
-                    HttpStickinessHelper.addStrictStickinessHost(request, route);
-                } else {
-                    throw new Exception("InvocationStickinessHandler.prepareRequest(): bad weak affinity value!: weak affinity = " + weakAffinity.toString());
+                    if (route != null) {
+                        String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
+                        if (nodeSessionID != null) {
+                            HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+                        }
+                        HttpStickinessHelper.addStrictStickinessHost(request, route);
+                    }
                 }
             }
         }
@@ -472,21 +474,19 @@ class HttpEJBReceiver extends EJBReceiver {
             boolean isSticky = HttpStickinessHelper.getStrictStickinessResult(response);
 
             if (inTransaction(context)) {
-                if (!isSticky) {
+                if (HttpStickinessHelper.hasStrictStickinessResult(response) && !isSticky) {
                     throw new Exception("Stickiness not respected for transaction-scoped invocation");
                 }
             } else if (locator instanceof StatefulEJBLocator) {
-                boolean hasEncodedSessionID = HttpStickinessHelper.hasEncodedSessionID(response);
-                if (!hasEncodedSessionID) {
-                    throw new Exception("SFSB response is missing its route");
-                }
-                String encodedSessionID = HttpStickinessHelper.getEncodedSessionID(response);
-                String sessionID = HttpStickinessHelper.extractSessionIDFromEncodedSessionID(encodedSessionID);
-                String route = HttpStickinessHelper.extractRouteFromEncodedSessionID(encodedSessionID);
-                EjbHttpClientMessages.MESSAGES.infof("InvocationStickinessHandler.processResponse(), sessionID, sessionID = %s, route = %s", sessionID, route);
+                if (HttpStickinessHelper.hasEncodedSessionID(response)) {
+                    String encodedSessionID = HttpStickinessHelper.getEncodedSessionID(response);
+                    String sessionID = HttpStickinessHelper.extractSessionIDFromEncodedSessionID(encodedSessionID);
+                    String route = HttpStickinessHelper.extractRouteFromEncodedSessionID(encodedSessionID);
+                    EjbHttpClientMessages.MESSAGES.infof("InvocationStickinessHandler.processResponse(), sessionID = %s, route = %s", sessionID, route);
 
-                if (!isSticky) {
-                    context.setWeakAffinity(new NodeAffinity(route));
+                    if (!isSticky) {
+                        context.setWeakAffinity(new NodeAffinity(route));
+                    }
                 }
             }
         }
@@ -530,16 +530,23 @@ class HttpEJBReceiver extends EJBReceiver {
             String backendNode = map.get(uri);
             // we need to update the map for this discovered URI with a backend node
             if (backendNode == null) {
-                // acquire a randomly chosen backend node from this URI (in form http://<host>:<port>?node=<node>)
-                URI backendURI = currentContext.acquireBackendServer();
-                // debugging
-                EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Got backend server URI: %s", backendURI);
-
-                backendNode = parseURIQueryString(backendURI.getQuery());
-                map.putIfAbsent(uri, backendNode);
+                try {
+                    // acquire a randomly chosen backend node from this URI (in form http://<host>:<port>?node=<node>)
+                    URI backendURI = currentContext.acquireBackendServer();
+                    if (backendURI != null && backendURI.getQuery() != null) {
+                        EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Got backend server URI: %s", backendURI);
+                        backendNode = parseURIQueryString(backendURI.getQuery());
+                        map.putIfAbsent(uri, backendNode);
+                    } else {
+                        EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: No backend server available for URI: %s (standalone mode)", uri);
+                    }
+                } catch (Exception e) {
+                    EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Backend server discovery not available for URI: %s, proceeding without: %s", uri, e.getMessage());
+                }
             }
-            // debugging
-            EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Using backend server: %s", backendNode);
+            if (backendNode != null) {
+                EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Using backend server: %s", backendNode);
+            }
         }
         return currentContext;
     }

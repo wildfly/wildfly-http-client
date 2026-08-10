@@ -381,6 +381,8 @@ public class HTTPTestServer extends BlockJUnit4ClassRunner {
             exchange.addResponseCommitListener(ex -> {
                 Cookie cookie = ex.getResponseCookies().get(JSESSIONID);
                 if (cookie != null) {
+                    // skip encoding if a route is already present
+                    if (routingSupport.parse(cookie.getValue()).getValue() != null) return;
                     CharSequence encodeSessionID = routingSupport.format(cookie.getValue(), ROUTE);
                     cookie.setValue(encodeSessionID.toString());
                 } else if (ex.getStatusCode() == StatusCodes.UNAUTHORIZED) {

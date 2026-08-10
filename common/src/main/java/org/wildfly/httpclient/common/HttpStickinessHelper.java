@@ -105,7 +105,8 @@ public class HttpStickinessHelper {
 
     public static String extractRouteFromEncodedSessionID(String encodedSessionID) {
         Map.Entry<CharSequence, CharSequence> parsedSessionID = routingSupport.parse(encodedSessionID);
-        String route = parsedSessionID.getValue().toString();
+        CharSequence routeValue = parsedSessionID.getValue();
+        String route = routeValue != null ? routeValue.toString() : null;
 
         HttpClientMessages.MESSAGES.infof("HttpStickinessHelper: encodedSessionID = %s, route = %s", encodedSessionID, route);
         return route;
@@ -122,6 +123,11 @@ public class HttpStickinessHelper {
             return cookie.getValue();
         }
         return null;
+    }
+
+    public static void addEncodedSessionID(HttpServerExchange exchange, String sessionID, String route) {
+        CharSequence encodedSessionID = routingSupport.format(sessionID, route);
+        exchange.setResponseCookie(new CookieImpl(JSESSIONID_COOKIE_NAME.toString(), encodedSessionID.toString()));
     }
 
     public static void addUnencodedSessionID(HttpServerExchange exchange, String unencodedSessionID) {

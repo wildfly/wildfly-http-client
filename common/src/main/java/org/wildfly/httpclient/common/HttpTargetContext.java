@@ -200,6 +200,18 @@ public class HttpTargetContext extends AbstractAttachable {
                 putRequestHeader(request, TRANSFER_ENCODING, CHUNKED);
             }
             final boolean authAdded = retry || connection.getAuthenticationContext().prepareRequest(connection.getUri(), request, authenticationConfiguration);
+            if (httpStickinessHandler != null) {
+                try {
+                    httpStickinessHandler.prepareRequest(request);
+                } catch (Exception e) {
+                    try {
+                        failureHandler.handleFailure(e);
+                    } finally {
+                        connection.done(true);
+                    }
+                    return;
+                }
+            }
             connection.sendRequest(request, new ClientCallback<ClientExchange>() {
                 @Override
                 public void completed(ClientExchange result) {
@@ -324,18 +336,6 @@ public class HttpTargetContext extends AbstractAttachable {
                             HttpTargetContext.failed(connection, failureHandler, e);
                         }
                     });
-
-                    if (httpStickinessHandler != null) {
-                        try {
-                            httpStickinessHandler.prepareRequest(request);
-                        } catch (Exception e) {
-                            try {
-                                failureHandler.handleFailure(e);
-                            } finally {
-                                connection.done(true);
-                            }
-                        }
-                    }
 
                     if (encoder != null) {
                         //marshalling is blocking, we need to delegate, otherwise we may need to buffer arbitrarily large requests

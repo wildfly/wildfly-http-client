@@ -482,12 +482,16 @@ final class ServerHandlers {
                         final String node = System.getProperty("jboss.node.name", "localhost");
 
                         if (hasTransaction()) {
-                            HttpStickinessHelper.addUnencodedSessionID(exchange, sessionAffinity);
+                            if (sessionAffinity != null) {
+                                HttpStickinessHelper.addEncodedSessionID(exchange, sessionAffinity, node);
+                            }
                             HttpStickinessHelper.addStrictStickinessHost(exchange, node);
                             HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
 
                         } else if (getEJBLocator() instanceof StatefulEJBLocator) {
-                            HttpStickinessHelper.addUnencodedSessionID(exchange, sessionAffinity);
+                            if (sessionAffinity != null) {
+                                HttpStickinessHelper.addEncodedSessionID(exchange, sessionAffinity, node);
+                            }
                             if (getStrongAffinity() instanceof NodeAffinity) {
                                 HttpStickinessHelper.addStrictStickinessHost(exchange, node);
                                 HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
@@ -764,7 +768,7 @@ final class ServerHandlers {
                         Version ver = getVersion(exchange);
                         if (ver.handler() == Version.Handler.VERSION_3) {
                             final String node = System.getProperty("jboss.node.name", "localhost");
-                            HttpStickinessHelper.addUnencodedSessionID(exchange, serverSessionID);
+                            HttpStickinessHelper.addEncodedSessionID(exchange, serverSessionID, node);
                             if (strongAffinity instanceof NodeAffinity || hasTransaction()) {
                                 HttpStickinessHelper.addStrictStickinessHost(exchange, node);
                                 HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
