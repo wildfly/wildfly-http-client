@@ -490,6 +490,31 @@ class HttpEJBReceiver extends EJBReceiver {
                 }
             }
         }
+
+        @Override
+        public void processFailure(Throwable cause) {
+            EJBClientInvocationContext context = receiverInvocationContext.getClientInvocationContext();
+            Affinity weakAffinity = context.getWeakAffinity();
+            URI uri = context.getDestination();
+
+            EjbHttpClientMessages.MESSAGES.infof("InvocationStickinessHandler.processFailure(), cause: %s, weakAffinity: %s, uri: %s", cause.getMessage(), weakAffinity, uri);
+
+            String route = null;
+            if (weakAffinity instanceof NodeAffinity) {
+                route = ((NodeAffinity) weakAffinity).getNodeName();
+            } else if (weakAffinity instanceof URIAffinity) {
+                route = ((URIAffinity) weakAffinity).getUri().getHost();
+            }
+
+            if (route != null && uri != null) {
+                ConcurrentMap<String, String> map = node2SessionId.get(uri);
+                if (map != null) {
+                    map.remove(route);
+                }
+            }
+
+            context.setWeakAffinity(Affinity.NONE);
+        }
     }
 
     // -------------------------------------------------------

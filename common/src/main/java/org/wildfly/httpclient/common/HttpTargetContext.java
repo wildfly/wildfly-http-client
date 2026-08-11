@@ -285,6 +285,12 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 safeClose(inputStream);
                                                 connection.done(false);
                                             }
+                                            if (httpStickinessHandler != null) {
+                                                try {
+                                                    httpStickinessHandler.processFailure(exception);
+                                                } catch (Exception ignored) {
+                                                }
+                                            }
                                             failureHandler.handleFailure(exception);
                                         }
                                     } else if (response.getResponseCode() >= 400) {
@@ -466,6 +472,7 @@ public class HttpTargetContext extends AbstractAttachable {
     public interface HttpStickinessHandler {
         void prepareRequest(ClientRequest request) throws Exception ;
         void processResponse(ClientExchange result) throws Exception ;
+        default void processFailure(Throwable cause) {}
     }
 
     public interface RequestContext {
