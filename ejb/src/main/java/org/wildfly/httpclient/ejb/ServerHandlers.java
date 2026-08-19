@@ -148,6 +148,7 @@ final class ServerHandlers {
         private final LocalTransactionContext localTransactionContext;
         private final Map<InvocationIdentifier, CancelHandle> cancellationFlags;
         private final Function<String, Boolean> classResolverFilter;
+        private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
 
         HttpInvocationHandler(Association association, ExecutorService executorService, LocalTransactionContext localTransactionContext,
                               Map<InvocationIdentifier, CancelHandle> cancellationFlags, Function<String, Boolean> classResolverFilter) {
@@ -202,13 +203,6 @@ final class ServerHandlers {
                 if (HttpStickinessHelper.hasStrictStickinessHost(exchange)) {
                     intendedHost = HttpStickinessHelper.getStrictStickinessHost(exchange);
                 }
-                if (intendedHost != null && !intendedHost.equals(actualHost)) {
-                    exchange.setStatusCode(io.undertow.util.StatusCodes.OK);
-                    HttpStickinessHelper.addStrictStickinessResult(exchange, "failed");
-                    HttpStickinessHelper.addStrictStickinessHost(exchange, intendedHost);
-                    EjbHttpClientMessages.MESSAGES.infof("Failover attempted on invocation with strict stickiness: intended node %s, actual node %s", intendedHost, actualHost);
-                    return;
-                }
             } else {
                 Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
                 encodedHTTPSessionID = cookie != null ? cookie.getValue() : null;
@@ -222,6 +216,7 @@ final class ServerHandlers {
             }
 
             final String sessionAffinity = httpSessionID;
+
             final EJBIdentifier ejbIdentifier = new EJBIdentifier(app, module, bean, distinct);
 
             final String cancellationId = getRequestHeader(exchange, Constants.INVOCATION_ID);
@@ -484,6 +479,9 @@ final class ServerHandlers {
                         if (hasTransaction()) {
                             if (sessionAffinity != null) {
                                 HttpStickinessHelper.addEncodedSessionID(exchange, sessionAffinity, node);
+                            } else {
+                                String newSessionId = sessionIdGenerator.createSessionId();
+                                HttpStickinessHelper.addEncodedSessionID(exchange, newSessionId, node);
                             }
                             HttpStickinessHelper.addStrictStickinessHost(exchange, node);
                             HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
@@ -491,11 +489,12 @@ final class ServerHandlers {
                         } else if (getEJBLocator() instanceof StatefulEJBLocator) {
                             if (sessionAffinity != null) {
                                 HttpStickinessHelper.addEncodedSessionID(exchange, sessionAffinity, node);
+                            } else {
+                                String newSessionId = sessionIdGenerator.createSessionId();
+                                HttpStickinessHelper.addEncodedSessionID(exchange, newSessionId, node);
                             }
-                            if (getStrongAffinity() instanceof NodeAffinity) {
-                                HttpStickinessHelper.addStrictStickinessHost(exchange, node);
-                                HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
-                            }
+                            HttpStickinessHelper.addStrictStickinessHost(exchange, node);
+                            HttpStickinessHelper.addStrictStickinessResult(exchange, "success");
                         }
                     }
 

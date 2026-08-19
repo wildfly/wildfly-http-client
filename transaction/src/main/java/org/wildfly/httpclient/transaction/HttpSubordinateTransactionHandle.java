@@ -33,6 +33,7 @@ import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
@@ -115,7 +116,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final Marshaller marshaller = marshallerFactory.createMarshaller(result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                    xidHttpBodyEncoder(marshaller, id), new SubordinateTransactionStickinessHandler(), emptyHttpBodyDecoder(result, resultFunction), result::completeExceptionally, null, null);
+                    xidHttpBodyEncoder(marshaller, id), new SubordinateTransactionStickinessHandler(targetContext), emptyHttpBodyDecoder(result, resultFunction), result::completeExceptionally, null, null);
         }
         try {
             try {
@@ -138,8 +139,27 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     }
 
     public static class SubordinateTransactionStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final HttpTargetContext targetContext;
+
+        public SubordinateTransactionStickinessHandler() {
+            this.targetContext = null;
+        }
+
+        public SubordinateTransactionStickinessHandler(HttpTargetContext targetContext) {
+            this.targetContext = targetContext;
+        }
+
         @Override
         public void prepareRequest(ClientRequest request) {
+            if (targetContext == null) {
+                return;
+            }
+            String route = targetContext.getTransactionStickyRoute();
+            String sessionId = targetContext.getTransactionStickySessionId();
+            if (route != null && sessionId != null) {
+                HttpStickinessHelper.addEncodedSessionID(request, sessionId, route);
+                HttpStickinessHelper.addStrictStickinessHost(request, route);
+            }
         }
 
         @Override

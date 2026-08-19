@@ -91,6 +91,9 @@ public class HttpTargetContext extends AbstractAttachable {
     private final URI uri;
     private final AuthenticationContext initAuthenticationContext;
 
+    private volatile String transactionStickyRoute;
+    private volatile String transactionStickySessionId;
+
     private static ClassLoader getContextClassLoader() {
         if(System.getSecurityManager() == null) {
             return Thread.currentThread().getContextClassLoader();
@@ -232,7 +235,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                     //retry the invocation
                                                     sendRequestInternal(connection, request, finalAuthenticationConfiguration, encoder, httpStickinessHandler, decoder, failureHandler, expectedResponse, completedTask, allowNoContent, true, finalSslContext, classLoader);
                                                 } else {
-                                                    HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.authenticationFailed());
+                                                    HttpTargetContext.failed(connection, failureHandler, new SecurityException("Authentication failed"));
                                                 }
                                             }, failureHandler::handleFailure, false, finalSslContext);
 
@@ -266,7 +269,14 @@ public class HttpTargetContext extends AbstractAttachable {
                                 }
 
                                 if (!ok) {
-                                    HttpTargetContext.failed(connection, failureHandler, failureDescription(response));
+                                    Throwable failure = failureDescription(response);
+                                    if (httpStickinessHandler != null) {
+                                        try {
+                                            httpStickinessHandler.processFailure(failure);
+                                        } catch (Exception ignored) {
+                                        }
+                                    }
+                                    HttpTargetContext.failed(connection, failureHandler, failure);
                                     return;
                                 }
                                 try {
@@ -294,7 +304,14 @@ public class HttpTargetContext extends AbstractAttachable {
                                             failureHandler.handleFailure(exception);
                                         }
                                     } else if (response.getResponseCode() >= 400) {
-                                        HttpTargetContext.failed(connection, failureHandler, HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response));
+                                        Throwable error = HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response);
+                                        if (httpStickinessHandler != null) {
+                                            try {
+                                                httpStickinessHandler.processFailure(error);
+                                            } catch (Exception ignored) {
+                                            }
+                                        }
+                                        HttpTargetContext.failed(connection, failureHandler, error);
                                     } else {
                                         if (httpStickinessHandler != null) {
                                             try {
@@ -305,6 +322,7 @@ public class HttpTargetContext extends AbstractAttachable {
                                                 } finally {
                                                     connection.done(true);
                                                 }
+                                                return;
                                             }
                                         }
 
@@ -376,14 +394,14 @@ public class HttpTargetContext extends AbstractAttachable {
         };
     }
 
+    // FIXME: use Logger.getMessageLogger(MethodHandles.lookup(), ...) for jboss-logging 3.6.x compatibility
     private static Throwable failureDescription(final ClientResponse response) {
-        final ContentType type = ContentType.parse(getResponseHeader(response, CONTENT_TYPE));
-        if (response.getResponseCode() == 401 && !isLegacyAuthenticationFailedException()) {
-            return HttpClientMessages.MESSAGES.authenticationFailed(response);
+        if (response.getResponseCode() == 401) {
+            return new javax.naming.AuthenticationException("Authentication failed (response " + response + ")");
         } else if (response.getResponseCode() >= 400) {
-            return HttpClientMessages.MESSAGES.invalidResponseCode(response.getResponseCode(), response);
+            return new IOException("Invalid response code " + response.getResponseCode() + " (full response " + response + ")");
         } else {
-            return HttpClientMessages.MESSAGES.invalidResponseType(type);
+            return new IOException("Invalid response type for response " + response);
         }
     }
 
@@ -446,6 +464,19 @@ public class HttpTargetContext extends AbstractAttachable {
 
     public URI getUri() {
         return uri;
+    }
+
+    public void setTransactionStickiness(String route, String sessionId) {
+        this.transactionStickyRoute = route;
+        this.transactionStickySessionId = sessionId;
+    }
+
+    public String getTransactionStickyRoute() {
+        return transactionStickyRoute;
+    }
+
+    public String getTransactionStickySessionId() {
+        return transactionStickySessionId;
     }
 
     private static boolean isLegacyAuthenticationFailedException() {
