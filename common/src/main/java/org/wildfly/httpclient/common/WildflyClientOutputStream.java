@@ -94,16 +94,17 @@ class WildflyClientOutputStream extends OutputStream implements ByteOutput {
                                 return;
                             }
                         }
-                        lock.notifyAll();
-                        streamSinkChannel.suspendWrites();
-                        state &= ~FLAG_WRITING;
                         pooledBuffer.close();
                         pooledBuffer = null;
-                        if (closed) {
-                            if (streamSinkChannel.flush()) {
-                                state |= FLAG_DONE;
-                            }
+                        if (closed && !streamSinkChannel.flush()) {
+                            return;
                         }
+                        if (closed) {
+                            state |= FLAG_DONE;
+                        }
+                        streamSinkChannel.suspendWrites();
+                        state &= ~FLAG_WRITING;
+                        lock.notifyAll();
                     }
                 } catch (IOException e) {
                     if (pooledBuffer != null) {
