@@ -89,6 +89,7 @@
         <nexus.staging.tag>wildfly-http-client-${project.version}</nexus.staging.tag>
         <!-- Versions -->
         <version.io.undertow>2.3.18.Final</version.io.undertow>
+        <version.org.jboss.logging>3.4.3.Final</version.org.jboss.logging>
         <version.org.jboss.logging-tools>3.0.4.Final</version.org.jboss.logging-tools>
         <version.org.junit>4.13.2</version.org.junit>
         <version.org.assertj>3.27.3</version.org.assertj>
@@ -407,6 +408,29 @@
         </plugins>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.jboss.logging</groupId>
+                                <artifactId>jboss-logging</artifactId>
+                                <version>${version.org.jboss.logging}</version>
+                            </path>
+                            <path>
+                                <groupId>org.jboss.logging</groupId>
+                                <artifactId>jboss-logging-annotations</artifactId>
+                                <version>${version.org.jboss.logging-tools}</version>
+                            </path>
+                            <path>
+                                <groupId>org.jboss.logging</groupId>
+                                <artifactId>jboss-logging-processor</artifactId>
+                                <version>${version.org.jboss.logging-tools}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
