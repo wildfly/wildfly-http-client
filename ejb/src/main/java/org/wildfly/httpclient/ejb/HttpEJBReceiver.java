@@ -106,6 +106,12 @@ class HttpEJBReceiver extends EJBReceiver {
     private final org.jboss.ejb.client.AttachmentKey<String> INVOCATION_ID = new org.jboss.ejb.client.AttachmentKey<>();
     private final RemoteTransactionContext transactionContext;
     private final org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> TXN_STRICT_STICKINESS_MAP = new org.jboss.ejb.client.AttachmentKey<>();
+    // Per-transaction map (URI -> node) holding the node that the FIRST invocation response of the transaction
+    // actually came from. Unlike TXN_STRICT_STICKINESS_MAP (which may hold a pre-acquired, not-yet-confirmed
+    // guess from acquireBackendServer()), entries here are only ever written from an actual response, so they
+    // are safe to enforce against. Being a transaction resource, it is discarded when the transaction ends,
+    // which prevents stickiness from leaking across independent transaction cycles.
+    private final org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> TXN_CONFIRMED_STICKINESS_MAP = new org.jboss.ejb.client.AttachmentKey<>();
     private static final AtomicLong invocationIdGenerator = new AtomicLong();
     protected final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionID = new ConcurrentHashMap<>();
 
@@ -431,14 +437,25 @@ class HttpEJBReceiver extends EJBReceiver {
             EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler().prepareRequest(), node2sessionID map: %s", node2SessionId);
 
             if (inTransaction(context)) {
-                if (weakAffinity instanceof URIAffinity) {
-                    String route = ((URIAffinity) weakAffinity).getUri().getHost();
+                // The node this transaction is pinned to is stored in a per-transaction resource map, NOT in the
+                // proxy-scoped weak affinity (which is unreliable for SLSBs and leaks across transaction cycles).
+                ConcurrentMap<URI, String> pinMap = getOrCreateTransactionURIMap(context.getTransaction(), TXN_CONFIRMED_STICKINESS_MAP);
+                String route = pinMap.get(uri);
+                // On the first call of the transaction there is no confirmed pin yet. Fall back to the weak affinity
+                // (e.g. a node established during SFSB session creation) so that first call still lands on the
+                // session's node; this is best-effort only and is never enforced.
+                if (route == null && weakAffinity instanceof URIAffinity) {
+                    route = ((URIAffinity) weakAffinity).getUri().getHost();
+                }
+                if (route != null) {
                     String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
-                    if (route != null) {
+                    if (nodeSessionID != null) {
                         HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
                         HttpStickinessHelper.addStrictStickinessHost(request, route);
                     }
                 }
+                // route == null: first call and no session yet -> send nothing and let the load balancer route
+                // freely; we pin to whichever node answers in processResponse().
             } else if (locator instanceof StatefulEJBLocator) {
                 if (weakAffinity instanceof NodeAffinity) {
                     String route = ((NodeAffinity) weakAffinity).getNodeName();
@@ -470,7 +487,6 @@ class HttpEJBReceiver extends EJBReceiver {
             EJBClientInvocationContext context = receiverInvocationContext.getClientInvocationContext();
             EJBLocator locator = context.getLocator();
             URI uri = context.getDestination();
-            Affinity weakAffinity = context.getWeakAffinity();
 
             ClientResponse response = result.getResponse();
 
@@ -482,17 +498,26 @@ class HttpEJBReceiver extends EJBReceiver {
                 if (hasStrictnessResult && !isSticky) {
                     throw new Exception("Stickiness not respected for transaction-scoped invocation");
                 }
-                if (weakAffinity instanceof URIAffinity && HttpStickinessHelper.hasStrictStickinessHost(response)) {
-                    String expectedNode = ((URIAffinity) weakAffinity).getUri().getHost();
-                    String actualNode = HttpStickinessHelper.getStrictStickinessHost(response);
-                    if (!expectedNode.equals(actualNode)) {
-                        throw new Exception("Transaction affinity violated: expected node " + expectedNode + " but response came from " + actualNode);
+                // Enforce affinity against the node the transaction was pinned to, sourced from the per-transaction
+                // resource map (not the leaky proxy-scoped weak affinity). The first response of the transaction
+                // establishes the pin; only subsequent responses are enforced.
+                ConcurrentMap<URI, String> pinMap = getOrCreateTransactionURIMap(context.getTransaction(), TXN_CONFIRMED_STICKINESS_MAP);
+                String actualNode = HttpStickinessHelper.hasStrictStickinessHost(response)
+                        ? HttpStickinessHelper.getStrictStickinessHost(response) : null;
+                if (actualNode != null) {
+                    String pinnedNode = pinMap.putIfAbsent(uri, actualNode);
+                    if (pinnedNode != null && !pinnedNode.equals(actualNode)) {
+                        throw new Exception("Transaction affinity violated: expected node " + pinnedNode + " but response came from " + actualNode);
                     }
                 }
                 if (hasSetCookie) {
                     String route = HttpStickinessHelper.updateNode2SessionIDMap(node2SessionId, uri, response);
                     String sessionId = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
                     targetContext.setTransactionStickiness(route, sessionId);
+                    // If the server did not send a StrictStickinessHost header, fall back to pinning on the cookie route.
+                    if (actualNode == null && route != null) {
+                        pinMap.putIfAbsent(uri, route);
+                    }
                     URIAffinity newAffinity = new URIAffinity(HttpStickinessHelper.createURIAffinityValue(route));
                     context.setWeakAffinity(newAffinity);
                 }
@@ -604,11 +629,15 @@ class HttpEJBReceiver extends EJBReceiver {
      * a fixed backend node.
      */
     private ConcurrentMap<URI, String> getOrCreateTransactionURIMap(AbstractTransaction transaction) throws Exception {
-        Object resource = transaction.getResource(TXN_STRICT_STICKINESS_MAP);
+        return getOrCreateTransactionURIMap(transaction, TXN_STRICT_STICKINESS_MAP);
+    }
+
+    private ConcurrentMap<URI, String> getOrCreateTransactionURIMap(AbstractTransaction transaction, org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> key) throws Exception {
+        Object resource = transaction.getResource(key);
         ConcurrentMap<URI, String> map = null;
         if (resource == null) {
             map = new ConcurrentHashMap<>();
-            resource = transaction.putResourceIfAbsent(TXN_STRICT_STICKINESS_MAP, map);
+            resource = transaction.putResourceIfAbsent(key, map);
         }
         return resource == null ? map : ConcurrentMap.class.cast(resource);
     }
