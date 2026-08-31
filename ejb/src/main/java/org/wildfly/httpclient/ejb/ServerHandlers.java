@@ -203,6 +203,13 @@ final class ServerHandlers {
                 if (HttpStickinessHelper.hasStrictStickinessHost(exchange)) {
                     intendedHost = HttpStickinessHelper.getStrictStickinessHost(exchange);
                 }
+                if (intendedHost != null && !intendedHost.equals(actualHost)) {
+                    exchange.setStatusCode(io.undertow.util.StatusCodes.OK);
+                    HttpStickinessHelper.addStrictStickinessResult(exchange, "failed");
+                    HttpStickinessHelper.addStrictStickinessHost(exchange, intendedHost);
+                    EjbHttpClientMessages.MESSAGES.infof("Failover attempted on invocation with strict stickiness: intended node %s, actual node %s", intendedHost, actualHost);
+                    return;
+                }
             } else {
                 Cookie cookie = exchange.getRequestCookie(JSESSIONID_COOKIE_NAME);
                 encodedHTTPSessionID = cookie != null ? cookie.getValue() : null;
