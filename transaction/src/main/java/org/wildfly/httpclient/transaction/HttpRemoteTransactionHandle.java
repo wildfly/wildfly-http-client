@@ -25,6 +25,7 @@ import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SimpleTransactionControl;
@@ -70,6 +71,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
         if (oldVal != Status.STATUS_ACTIVE && oldVal != Status.STATUS_MARKED_ROLLBACK) {
             throw HttpRemoteTransactionMessages.MESSAGES.invalidTxnState();
         }
+        try {
         synchronized (statusRef) {
             oldVal = statusRef.get();
             if (oldVal == Status.STATUS_MARKED_ROLLBACK) {
@@ -119,6 +121,9 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
                 }
             }
         }
+        } finally {
+            targetContext.clearTransactionStickiness(HttpStickinessHelper.stickinessKey(id.getFormatId(), id.getGlobalTransactionId()));
+        }
     }
 
     public void rollback() throws SecurityException, SystemException {
@@ -127,6 +132,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
         if (oldVal != Status.STATUS_ACTIVE && oldVal != Status.STATUS_MARKED_ROLLBACK) {
             throw HttpRemoteTransactionMessages.MESSAGES.invalidTxnState();
         }
+        try {
         synchronized (statusRef) {
             oldVal = statusRef.get();
             if (oldVal != Status.STATUS_ACTIVE && oldVal != Status.STATUS_MARKED_ROLLBACK) {
@@ -170,6 +176,9 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
                     throw ex;
                 }
             }
+        }
+        } finally {
+            targetContext.clearTransactionStickiness(HttpStickinessHelper.stickinessKey(id.getFormatId(), id.getGlobalTransactionId()));
         }
     }
 

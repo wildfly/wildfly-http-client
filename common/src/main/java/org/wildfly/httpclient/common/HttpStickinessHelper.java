@@ -31,6 +31,7 @@ import io.undertow.util.HttpString;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -50,6 +51,31 @@ public class HttpStickinessHelper {
 
     private HttpStickinessHelper() {
 
+    }
+
+    // Transaction stickiness key
+
+    /**
+     * Derives a stable stickiness key that identifies a transaction by its format id and global
+     * transaction id. Callers pass the global transaction id only (never the branch qualifier), so
+     * all branches of the same global transaction resolve to the same key. This lets the EJB
+     * invocation path and the XA completion path (prepare/commit/rollback) of the same transaction
+     * agree on the pinned node.
+     * <p>
+     * This method intentionally takes the transaction identity as primitives rather than a
+     * {@code javax.transaction.xa.Xid} so that the common module carries no dependency on the XA
+     * API (which is a distinct JBoss Modules dependency at runtime); the XA-aware callers in the ejb
+     * and transaction modules extract the components from their {@code Xid}.
+     *
+     * @param formatId the transaction format id
+     * @param globalTransactionId the global transaction id, may be {@code null}
+     * @return the stickiness key, or {@code null} if {@code globalTransactionId} is {@code null}
+     */
+    public static String stickinessKey(int formatId, byte[] globalTransactionId) {
+        if (globalTransactionId == null) {
+            return null;
+        }
+        return formatId + ":" + Base64.getEncoder().encodeToString(globalTransactionId);
     }
 
     // Affinity helper methods

@@ -188,8 +188,10 @@ class HttpEJBReceiver extends EJBReceiver {
         Object[] parameters = clientInvocationContext.getParameters();
         Map<String, Object> contextData = clientInvocationContext.getContextData();
         final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
+        final String txStickinessKey = transactionInfo.getXid() == null ? null
+                : HttpStickinessHelper.stickinessKey(transactionInfo.getXid().getFormatId(), transactionInfo.getXid().getGlobalTransactionId());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpBodyEncoder(marshaller, transactionInfo, parameters, contextData),
-                new InvocationStickinessHandler(receiverContext, node2SessionID, targetContext),
+                new InvocationStickinessHandler(receiverContext, node2SessionID, targetContext, txStickinessKey),
                 invokeHttpBodyDecoder(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
@@ -418,11 +420,13 @@ class HttpEJBReceiver extends EJBReceiver {
         private final EJBReceiverInvocationContext receiverInvocationContext;
         private final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId;
         private final HttpTargetContext targetContext;
+        private final String txStickinessKey;
 
-        public InvocationStickinessHandler(EJBReceiverInvocationContext receiverInvocationContext, ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId, HttpTargetContext targetContext) {
+        public InvocationStickinessHandler(EJBReceiverInvocationContext receiverInvocationContext, ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId, HttpTargetContext targetContext, String txStickinessKey) {
             this.receiverInvocationContext = receiverInvocationContext;
             this.node2SessionId = node2SessionId;
             this.targetContext = targetContext;
+            this.txStickinessKey = txStickinessKey;
         }
 
         @Override
@@ -513,7 +517,7 @@ class HttpEJBReceiver extends EJBReceiver {
                 if (hasSetCookie) {
                     String route = HttpStickinessHelper.updateNode2SessionIDMap(node2SessionId, uri, response);
                     String sessionId = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
-                    targetContext.setTransactionStickiness(route, sessionId);
+                    targetContext.setTransactionStickiness(txStickinessKey, route, sessionId);
                     // If the server did not send a StrictStickinessHost header, fall back to pinning on the cookie route.
                     if (actualNode == null && route != null) {
                         pinMap.putIfAbsent(uri, route);

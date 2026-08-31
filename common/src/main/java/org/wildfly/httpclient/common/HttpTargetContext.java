@@ -65,6 +65,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -91,8 +93,11 @@ public class HttpTargetContext extends AbstractAttachable {
     private final URI uri;
     private final AuthenticationContext initAuthenticationContext;
 
-    private volatile String transactionStickyRoute;
-    private volatile String transactionStickySessionId;
+    // Per-transaction stickiness, keyed by a transaction-identity string (see HttpStickinessHelper.stickinessKey).
+    // Holds the route/sessionId a transaction is pinned to, so the XA completion path (prepare/commit/rollback)
+    // targets the same node as the transaction's EJB invocations. Keyed per transaction so concurrent transactions
+    // against this same target URI cannot overwrite each other's pinned node.
+    private final ConcurrentMap<String, TransactionStickiness> transactionStickiness = new ConcurrentHashMap<>();
 
     private static ClassLoader getContextClassLoader() {
         if(System.getSecurityManager() == null) {
@@ -466,17 +471,43 @@ public class HttpTargetContext extends AbstractAttachable {
         return uri;
     }
 
-    public void setTransactionStickiness(String route, String sessionId) {
-        this.transactionStickyRoute = route;
-        this.transactionStickySessionId = sessionId;
+    public void setTransactionStickiness(String txId, String route, String sessionId) {
+        if (txId == null) {
+            return;
+        }
+        transactionStickiness.put(txId, new TransactionStickiness(route, sessionId));
     }
 
-    public String getTransactionStickyRoute() {
-        return transactionStickyRoute;
+    public String getTransactionStickyRoute(String txId) {
+        if (txId == null) {
+            return null;
+        }
+        TransactionStickiness info = transactionStickiness.get(txId);
+        return info == null ? null : info.route;
     }
 
-    public String getTransactionStickySessionId() {
-        return transactionStickySessionId;
+    public String getTransactionStickySessionId(String txId) {
+        if (txId == null) {
+            return null;
+        }
+        TransactionStickiness info = transactionStickiness.get(txId);
+        return info == null ? null : info.sessionId;
+    }
+
+    public void clearTransactionStickiness(String txId) {
+        if (txId != null) {
+            transactionStickiness.remove(txId);
+        }
+    }
+
+    private static final class TransactionStickiness {
+        private final String route;
+        private final String sessionId;
+
+        TransactionStickiness(final String route, final String sessionId) {
+            this.route = route;
+            this.sessionId = sessionId;
+        }
     }
 
     private static boolean isLegacyAuthenticationFailedException() {
