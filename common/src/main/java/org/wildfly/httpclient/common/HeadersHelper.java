@@ -50,6 +50,16 @@ public final class HeadersHelper {
         return response.getResponseHeaders().getFirst(headerName);
     }
 
+    public static void addResponseHeader(final ClientResponse response, final HttpString headerName, final String headerValue) {
+        if (response == null || headerName == null) throw new IllegalArgumentException();
+        response.getResponseHeaders().add(headerName, headerValue);
+    }
+
+    public static void putResponseHeader(final ClientResponse response, final HttpString headerName, final String headerValue) {
+        if (response == null || headerName == null) throw new IllegalArgumentException();
+        response.getResponseHeaders().put(headerName, headerValue);
+    }
+
     public static HeaderValues getResponseHeaders(final ClientResponse response, final HttpString headerName) {
         if (response == null || headerName == null) throw new IllegalArgumentException();
         return response.getResponseHeaders().get(headerName);
