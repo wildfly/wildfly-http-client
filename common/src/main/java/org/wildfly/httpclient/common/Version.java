@@ -205,6 +205,8 @@ public final class Version implements Comparable<Version>{
         VERSION_1(1),
         VERSION_2(2);
 
+        public static final Handler LATEST = values()[values().length - 1];
+
         private final int value;
 
         Handler(final int value) {
@@ -226,6 +228,8 @@ public final class Version implements Comparable<Version>{
         JAVA_EE_8(-1),
         JAKARTA_EE_10(0);
 
+        public static final Specification LATEST = values()[values().length - 1];
+
         private final int value;
 
         Specification(final int value) {
@@ -245,6 +249,8 @@ public final class Version implements Comparable<Version>{
      */
     public enum Encoding {
         JBOSS_MARSHALLING(0);
+
+        public static final Encoding LATEST = values()[values().length - 1];
 
         private final int value;
 
