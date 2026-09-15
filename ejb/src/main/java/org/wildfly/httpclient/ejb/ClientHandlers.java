@@ -265,7 +265,7 @@ final class ClientHandlers {
     private static final class CreateSessionResponseFunction implements Function<ResponseContext, SessionID> {
         @Override
         public SessionID apply(final ResponseContext ctx) {
-            final String sessionId = ctx.getResponseHeader(EJB_SESSION_ID.toString());
+            final String sessionId = ctx.getResponseHeader(EJB_SESSION_ID);
             if (sessionId != null) {
                 return SessionID.createSessionID(Base64.getUrlDecoder().decode(sessionId));
             }

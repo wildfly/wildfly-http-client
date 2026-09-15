@@ -91,7 +91,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
     @Override
     public int prepare() throws XAException {
         boolean readOnly = processOperation(XA_PREPARE, (result) -> {
-            String header = result.getResponseHeader(READ_ONLY.toString());
+            String header = result.getResponseHeader(READ_ONLY);
             return parseBoolean(header);
         }, null);
         return readOnly ? XAResource.XA_RDONLY : XAResource.XA_OK;

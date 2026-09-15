@@ -498,9 +498,10 @@ public class HttpTargetContext extends AbstractAttachable {
 
     public interface RequestContext {
         OutputStream getRequestBody();
-        String getRequestHeader(String headerName);
-        void addRequestHeader(String headerName, String headerValue);
-        void putRequestHeader(String headerName, String headerValue);
+        String getRequestHeader(HttpString headerName);
+        HeaderValues getRequestHeaders(HttpString headerName);
+        void addRequestHeader(HttpString headerName, String headerValue);
+        void putRequestHeader(HttpString headerName, String headerValue);
         Version getVersion();
     }
 
@@ -525,18 +526,23 @@ public class HttpTargetContext extends AbstractAttachable {
         }
 
         @Override
-        public String getRequestHeader(final String headerName) {
-            return HeadersHelper.getRequestHeader(request, HttpString.tryFromString(headerName));
+        public String getRequestHeader(final HttpString headerName) {
+            return HeadersHelper.getRequestHeader(request, headerName);
         }
 
         @Override
-        public void addRequestHeader(final String headerName, final String headerValue) {
-            HeadersHelper.addRequestHeader(request, HttpString.tryFromString(headerName), headerValue);
+        public HeaderValues getRequestHeaders(final HttpString headerName) {
+            return HeadersHelper.getRequestHeaders(request, headerName);
         }
 
         @Override
-        public void putRequestHeader(final String headerName, final String headerValue) {
-            HeadersHelper.putRequestHeader(request, HttpString.tryFromString(headerName), headerValue);
+        public void addRequestHeader(final HttpString headerName, final String headerValue) {
+            HeadersHelper.addRequestHeader(request, headerName, headerValue);
+        }
+
+        @Override
+        public void putRequestHeader(final HttpString headerName, final String headerValue) {
+            HeadersHelper.putRequestHeader(request, headerName, headerValue);
         }
 
         @Override
@@ -547,9 +553,10 @@ public class HttpTargetContext extends AbstractAttachable {
 
     public interface ResponseContext {
         InputStream getResponseBody();
-        String getResponseHeader(String headerName);
-        void addResponseHeader(String headerName, String headerValue);
-        void putResponseHeader(String headerName, String headerValue);
+        String getResponseHeader(HttpString headerName);
+        HeaderValues getResponseHeaders(HttpString headerName);
+        void addResponseHeader(HttpString headerName, String headerValue);
+        void putResponseHeader(HttpString headerName, String headerValue);
         int getResponseCode();
         Version getVersion();
     }
@@ -575,18 +582,23 @@ public class HttpTargetContext extends AbstractAttachable {
         }
 
         @Override
-        public String getResponseHeader(final String headerName) {
-            return HeadersHelper.getResponseHeader(response, HttpString.tryFromString(headerName));
+        public String getResponseHeader(final HttpString headerName) {
+            return HeadersHelper.getResponseHeader(response, headerName);
         }
 
         @Override
-        public void addResponseHeader(final String headerName, final String headerValue) {
-            HeadersHelper.addResponseHeader(response, HttpString.tryFromString(headerName), headerValue);
+        public HeaderValues getResponseHeaders(final HttpString headerName) {
+            return HeadersHelper.getResponseHeaders(response, headerName);
         }
 
         @Override
-        public void putResponseHeader(final String headerName, final String headerValue) {
-            HeadersHelper.putResponseHeader(response, HttpString.tryFromString(headerName), headerValue);
+        public void addResponseHeader(final HttpString headerName, final String headerValue) {
+            HeadersHelper.addResponseHeader(response, headerName, headerValue);
+        }
+
+        @Override
+        public void putResponseHeader(final HttpString headerName, final String headerValue) {
+            HeadersHelper.putResponseHeader(response, headerName, headerValue);
         }
 
         @Override

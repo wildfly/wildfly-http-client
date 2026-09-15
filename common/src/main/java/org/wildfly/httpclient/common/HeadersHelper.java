@@ -45,6 +45,11 @@ public final class HeadersHelper {
         return request.getRequestHeaders().getFirst(headerName);
     }
 
+    public static HeaderValues getRequestHeaders(final ClientRequest request, final HttpString headerName) {
+        if (request == null || headerName == null) throw new IllegalArgumentException();
+        return request.getRequestHeaders().get(headerName);
+    }
+
     public static String getResponseHeader(final ClientResponse response, final HttpString headerName) {
         if (response == null || headerName == null) throw new IllegalArgumentException();
         return response.getResponseHeaders().getFirst(headerName);
