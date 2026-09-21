@@ -44,7 +44,7 @@ import java.util.Deque;
  */
 public abstract class AbstractServerHttpHandler implements HttpHandler {
 
-    private final Version serverVersion = Version.LATEST;
+    private static final Version serverVersion = Version.LATEST;
 
     protected AbstractServerHttpHandler() {
     }

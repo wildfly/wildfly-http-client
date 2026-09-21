@@ -76,14 +76,13 @@ public final class Version implements Comparable<Version>{
      * @return Version instance associated with given value
      */
     static Version of(final int version) {
-        // return identities for known constants
         if (version == 1) return JAVA_EE_8;
         if (version == JAKARTA_EE_10.version) return JAKARTA_EE_10;
-        // create new instances for unknown contants
         final Handler handlerVersion = Handler.of((version & MASK_HANDLER) >>> 1);
         final Specification specVersion = Specification.of((version & MASK_SPEC) >>> 7);
         final Encoding encodingVersion = Encoding.of((version & MASK_ENCODING) >>> 13);
-        return new Version(handlerVersion, specVersion, encodingVersion);
+        final Version decodedVersion = new Version(handlerVersion, specVersion, encodingVersion);
+        throw new IllegalArgumentException("Unsupported version combination. " + decodedVersion);
     }
 
     /**
@@ -95,7 +94,8 @@ public final class Version implements Comparable<Version>{
     static Version of(final Handler handlerVersion, final Specification specVersion) {
         if (Handler.VERSION_1.equals(handlerVersion) && Specification.JAVA_EE_8.equals(specVersion)) return JAVA_EE_8;
         if (Handler.VERSION_2.equals(handlerVersion) && Specification.JAKARTA_EE_10.equals(specVersion)) return JAKARTA_EE_10;
-        return new Version(handlerVersion, specVersion, Encoding.JBOSS_MARSHALLING);
+        final Version decodedVersion = new Version(handlerVersion, specVersion, Encoding.JBOSS_MARSHALLING);
+        throw new IllegalArgumentException("Unsupported version combination. " + decodedVersion);
     }
 
     /**
@@ -127,7 +127,7 @@ public final class Version implements Comparable<Version>{
 
     @Override
     public String toString() {
-        return String.valueOf(this == JAVA_EE_8 ? 1 : version);
+        return handlerVersion + " , " + specVersion;
     }
 
     @Override
@@ -217,7 +217,13 @@ public final class Version implements Comparable<Version>{
             for (Handler handler : values()) {
                 if (value == handler.value) return handler;
             }
-            throw new IllegalArgumentException("Unsupported Handler Version");
+            throw new IllegalArgumentException("Unsupported handler version: " + value);
+        }
+
+
+        @Override
+        public String toString() {
+            return "Handler version: " + value;
         }
     }
 
@@ -240,7 +246,12 @@ public final class Version implements Comparable<Version>{
             for (Specification spec : values()) {
                 if (value == spec.value) return spec;
             }
-            throw new IllegalArgumentException("Unsupported Specification Version");
+            throw new IllegalArgumentException("Unsupported specification version: " + (value + 10));
+        }
+
+        @Override
+        public String toString() {
+            return "Specification version: " + (value == -1 ? 8 : (value + 10));
         }
     }
 
@@ -262,7 +273,12 @@ public final class Version implements Comparable<Version>{
             for (Encoding encoding : values()) {
                 if (value == encoding.value) return encoding;
             }
-            throw new IllegalArgumentException("Unsupported Encoding Version");
+            throw new IllegalArgumentException("Unsupported encoding version: " + value);
+        }
+
+        @Override
+        public String toString() {
+            return "Encoding version: " + value;
         }
     }
 

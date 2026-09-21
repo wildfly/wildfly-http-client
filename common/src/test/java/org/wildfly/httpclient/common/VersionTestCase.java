@@ -17,6 +17,7 @@
  */
 package org.wildfly.httpclient.common;
 
+import io.undertow.server.HttpServerExchange;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -26,13 +27,18 @@ import org.junit.Test;
 public class VersionTestCase {
 
     @Test
-    public void testJakartaEE8VersionConstant() {
+    public void testJavaEE8VersionConstant() {
         final Version version = Version.JAVA_EE_8;
         Assert.assertNotSame(Version.LATEST, version);
         Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
         Assert.assertSame(Version.Handler.VERSION_1, version.handler());
         Assert.assertSame(Version.Specification.JAVA_EE_8, version.specification());
-        Assert.assertEquals("1", version.toString());
+        Assert.assertEquals("Handler version: 1 , Specification version: 8", version.toString());
+        HttpServerExchange exchange = new HttpServerExchange(null);
+        version.writeTo(exchange);
+        exchange.getRequestHeaders().putAll(exchange.getResponseHeaders());
+        Version readVersion = Version.readFrom(exchange);
+        Assert.assertEquals(version, readVersion);
     }
 
     @Test
@@ -42,17 +48,27 @@ public class VersionTestCase {
         Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
         Assert.assertSame(Version.Handler.VERSION_2, version.handler());
         Assert.assertSame(Version.Specification.JAKARTA_EE_10, version.specification());
-        Assert.assertEquals("2", version.toString());
+        Assert.assertEquals("Handler version: 2 , Specification version: 10", version.toString());
+        HttpServerExchange exchange = new HttpServerExchange(null);
+        version.writeTo(exchange);
+        exchange.getRequestHeaders().putAll(exchange.getResponseHeaders());
+        Version readVersion = Version.readFrom(exchange);
+        Assert.assertEquals(version, readVersion);
     }
 
     @Test
-    public void testJakartaEE8VersionOfMethod() {
+    public void testJavaEE8VersionOfMethod() {
         final Version version = Version.of(1);
         Assert.assertNotSame(Version.LATEST, version);
         Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
         Assert.assertSame(Version.Handler.VERSION_1, version.handler());
         Assert.assertSame(Version.Specification.JAVA_EE_8, version.specification());
-        Assert.assertEquals("1", version.toString());
+        Assert.assertEquals("Handler version: 1 , Specification version: 8", version.toString());
+        HttpServerExchange exchange = new HttpServerExchange(null);
+        version.writeTo(exchange);
+        exchange.getRequestHeaders().putAll(exchange.getResponseHeaders());
+        Version readVersion = Version.readFrom(exchange);
+        Assert.assertEquals(version, readVersion);
     }
 
     @Test
@@ -62,7 +78,12 @@ public class VersionTestCase {
         Assert.assertSame(Version.Encoding.JBOSS_MARSHALLING, version.encoding());
         Assert.assertSame(Version.Handler.VERSION_2, version.handler());
         Assert.assertSame(Version.Specification.JAKARTA_EE_10, version.specification());
-        Assert.assertEquals("2", version.toString());
+        Assert.assertEquals("Handler version: 2 , Specification version: 10", version.toString());
+        HttpServerExchange exchange = new HttpServerExchange(null);
+        version.writeTo(exchange);
+        exchange.getRequestHeaders().putAll(exchange.getResponseHeaders());
+        Version readVersion = Version.readFrom(exchange);
+        Assert.assertEquals(version, readVersion);
     }
 
 }
