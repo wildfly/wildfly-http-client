@@ -347,6 +347,8 @@ final class EENamespaceInteroperability {
 
         @Override
         public void handleRequest(HttpServerExchange exchange) throws Exception {
+            // respond that this end supports version two
+            addResponseHeader(exchange, PROTOCOL_VERSION, LATEST_VERSION);
             // no transformation required whatsoever, just make sure we have a factory set
             // or else we will see a NPE when trying to use those attachments
             exchange.putAttachment(HTTP_UNMARSHALLER_FACTORY_KEY, DEFAULT_FACTORY);
