@@ -70,9 +70,9 @@ final class EENamespaceInteroperability {
             WildFlySecurityManager.getPropertyPrivileged("org.wildfly.ee.namespace.interop", "false"));
 
     // header indicating the protocol version mode that is being used by the request/response sender
-    private static final HttpString PROTOCOL_VERSION = new HttpString("x-wf-version");
+    static final HttpString PROTOCOL_VERSION = new HttpString("x-wf-version");
     // value for PROTOCOL_VERSION header: used to handshake a higher version, only when both ends use EE jakarta namespace
-    private static final String LATEST_VERSION = String.valueOf(Protocol.LATEST);
+    static final String LATEST_VERSION = String.valueOf(Protocol.LATEST);
     // key used to attach http marshaller factory to a client request / server exchange
     private static final AttachmentKey<HttpMarshallerFactory> HTTP_MARSHALLER_FACTORY_KEY = AttachmentKey.create(HttpMarshallerFactory.class);
     // key used to attach an http unmarshaller factory to a server exchange
@@ -117,12 +117,14 @@ final class EENamespaceInteroperability {
         return new HttpMarshallerFactoryProvider() {
             @Override
             public HttpMarshallerFactory getMarshallerFactory(AbstractAttachable attachable) {
-                return attachable.getAttachment(HTTP_MARSHALLER_FACTORY_KEY);
+                final HttpMarshallerFactory marshallerFactory = attachable.getAttachment(HTTP_MARSHALLER_FACTORY_KEY);
+                return marshallerFactory != null ? marshallerFactory : INTEROPERABLE_MARSHALLER_FACTORY;
             }
 
             @Override
             public HttpMarshallerFactory getUnmarshallerFactory(AbstractAttachable attachable) {
-                return attachable.getAttachment(HTTP_UNMARSHALLER_FACTORY_KEY);
+                final HttpMarshallerFactory unmarshallerFactory = attachable.getAttachment(HTTP_UNMARSHALLER_FACTORY_KEY);
+                return unmarshallerFactory != null ? unmarshallerFactory : INTEROPERABLE_MARSHALLER_FACTORY;
             }
         };
     }
