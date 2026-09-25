@@ -72,12 +72,11 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
     private final boolean enableHttp2;
     private final boolean tcpNoDelay;
     private final HttpConnectionPoolFactory httpConnectionPoolFactory;
-    private final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
+    private final Version version;
 
     WildflyHttpContext(ConfigSection[] targets, int maxConnections, int maxStreamsPerConnection, long idleTimeout,
                        boolean eagerlyAcquireAffinity, XnioWorker worker, ByteBufferPool pool, boolean enableHttp2,
-                       boolean tcpNoDelay, HttpConnectionPoolFactory httpConnectionPoolFactory,
-                       HttpMarshallerFactoryProvider httpMarshallerFactoryProvider) {
+                       boolean tcpNoDelay, HttpConnectionPoolFactory httpConnectionPoolFactory, Version version) {
         this.targets = targets;
         this.maxConnections = maxConnections;
         this.maxStreamsPerConnection = maxStreamsPerConnection;
@@ -88,7 +87,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
         this.enableHttp2 = enableHttp2;
         this.tcpNoDelay = tcpNoDelay;
         this.httpConnectionPoolFactory = httpConnectionPoolFactory;
-        this.httpMarshallerFactoryProvider = httpMarshallerFactoryProvider;
+        this.version = version;
     }
 
     public static WildflyHttpContext getCurrent() {
@@ -125,8 +124,8 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             HttpConnectionPool pool = httpConnectionPoolFactory.createHttpConnectionPool(
                     maxConnections, maxStreamsPerConnection, worker, this.pool,
                 OptionMap.create(UndertowOptions.ENABLE_HTTP2, enableHttp2,
-                    Options.TCP_NODELAY, tcpNoDelay), new HostPool(uri), idleTimeout);
-            uriConnectionPools.put(uri, context = new HttpTargetContext(pool, eagerlyAcquireAffinity, uri, httpMarshallerFactoryProvider));
+                    Options.TCP_NODELAY, tcpNoDelay), new HostPool(uri), idleTimeout, version);
+            uriConnectionPools.put(uri, context = new HttpTargetContext(pool, eagerlyAcquireAffinity, uri));
             context.init();
             return context;
         }
@@ -152,6 +151,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
 
     static class Builder {
         private InetSocketAddress defaultBindAddress;
+        private Version version;
         private long idleTimeout = 50000; //the server defaults to an idle timeout of 60 seconds, we default ours to 50 to prevent possible races
         private int maxConnections;
         private int maxStreamsPerConnection;
@@ -178,15 +178,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
             int maxConnections = this.maxConnections > 0 ? this.maxConnections : 10;
             int maxStreamsPerConnection = this.maxStreamsPerConnection > 0 ? this.maxStreamsPerConnection : 10;
 
-            final HttpConnectionPoolFactory httpConnectionPoolFactory;
-            final HttpMarshallerFactoryProvider httpMarshallerFactoryProvider;
-            if (EENamespaceInteroperability.EE_NAMESPACE_INTEROPERABLE_MODE) {
-                httpConnectionPoolFactory = EENamespaceInteroperability.getHttpConnectionPoolFactory();
-                httpMarshallerFactoryProvider = EENamespaceInteroperability.getHttpMarshallerFactoryProvider();
-            } else {
-                httpConnectionPoolFactory = HttpConnectionPoolFactory.getDefault();
-                httpMarshallerFactoryProvider = HttpMarshallerFactoryProvider.getDefaultHttpMarshallerFactoryProvider();
-            }
+            final HttpConnectionPoolFactory httpConnectionPoolFactory = HttpConnectionPoolFactory.getDefault();
             for (int i = 0; i < this.targets.size(); ++i) {
                 HttpConfigBuilder sb = this.targets.get(i);
                 HostPool hp = new HostPool(sb.getUri());
@@ -203,14 +195,14 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
                         OptionMap.create(
                             UndertowOptions.ENABLE_HTTP2, http2,
                             Options.TCP_NODELAY, tcpNoDelay),
-                        hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout), eager, sb.getUri(), httpMarshallerFactoryProvider),
+                        hp, sb.getIdleTimeout() > 0 ? sb.getIdleTimeout() : idleTimout, sb.getVersion() != null ? sb.getVersion() : version), eager, sb.getUri()),
                     sb.getUri());
                 connections[i] = connection;
             }
             return new WildflyHttpContext(connections, maxConnections, maxStreamsPerConnection, idleTimeout,
                     eagerlyAcquireSession == null ? false : eagerlyAcquireSession, worker, pool,
                     enableHttp2 == null ? true : enableHttp2, tcpNoDelay,
-                    httpConnectionPoolFactory, httpMarshallerFactoryProvider);
+                    httpConnectionPoolFactory, version);
         }
 
         void setDefaultBindAddress(InetSocketAddress defaultBindAddress) {
@@ -219,6 +211,14 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
 
         InetSocketAddress getDefaultBindAddress() {
             return defaultBindAddress;
+        }
+
+        void setVersion(Version version) {
+            this.version = version;
+        }
+
+        Version getVersion() {
+            return version;
         }
 
         HttpConfigBuilder addConfig(URI uri) {
@@ -292,6 +292,7 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
         class HttpConfigBuilder {
             final URI uri;
             private InetSocketAddress bindAddress;
+            private Version version;
             private long idleTimeout;
             private int maxConnections;
             private int maxStreamsPerConnection;
@@ -313,6 +314,14 @@ public class WildflyHttpContext implements Contextual<WildflyHttpContext> {
 
             InetSocketAddress getBindAddress() {
                 return bindAddress;
+            }
+
+            void setVersion(Version version) {
+                this.version = version;
+            }
+
+            Version getVersion() {
+                return version;
             }
 
             long getIdleTimeout() {

@@ -18,8 +18,8 @@
 
 package org.wildfly.httpclient.transaction;
 
-import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpResultHandler;
-import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpMarshaller;
+import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpBodyDecoder;
+import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpBodyEncoder;
 
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
@@ -80,15 +80,15 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             }
             statusRef.set(Status.STATUS_COMMITTING);
 
-            final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_COMMIT).setVersion(targetContext.getProtocolVersion());
-            final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+            final RequestBuilder builder = new RequestBuilder(targetContext, RequestType.UT_COMMIT);
+            final ClientRequest request = builder.createRequest();
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
-            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {
@@ -135,15 +135,15 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
 
             statusRef.set(Status.STATUS_COMMITTING);
 
-            final RequestBuilder builder = new RequestBuilder().setRequestType(RequestType.UT_ROLLBACK).setVersion(targetContext.getProtocolVersion());
-            final ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+            final RequestBuilder builder = new RequestBuilder(targetContext, RequestType.UT_ROLLBACK);
+            final ClientRequest request = builder.createRequest();
 
             final CompletableFuture<Void> result = new CompletableFuture<>();
-            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory(request);
+            final HttpMarshallerFactory marshallerFactory = targetContext.getHttpMarshallerFactory();
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpMarshaller(marshaller, id), emptyHttpResultHandler(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {

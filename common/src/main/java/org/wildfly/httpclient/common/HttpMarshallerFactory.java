@@ -32,6 +32,8 @@ import org.wildfly.common.annotation.NotNull;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
+import static org.jboss.marshalling.ClassNameTransformer.JAVAEE_TO_JAKARTAEE;
+
 /**
  * Creates {@link Marshaller} objects for reading and writing requests and responses objects as bytes.
  *
@@ -39,16 +41,13 @@ import java.util.concurrent.CompletableFuture;
  * @author Flavia Rainone
  */
 public final class HttpMarshallerFactory {
-    /**
-     * The default HTTP Marshaller factory, creates Marshallers using a simple {@link MarshallingConfiguration}
-     * with {@link MarshallingConfiguration#setVersion(int) version} {@code 2}.
-     */
+    // The default HTTP marshaller factory
     static final HttpMarshallerFactory DEFAULT_FACTORY = new HttpMarshallerFactory(null);
-
+    // The interoperable HTTP marshaller factory enforcing Javax<->Jakarta transformation when needed
+    static final HttpMarshallerFactory INTEROPERABLE_FACTORY = new HttpMarshallerFactory(JAVAEE_TO_JAKARTAEE);
     // internal river marshaller factory
     private static final MarshallerFactory RIVER_MARSHALLER_FACTORY = new RiverMarshallerFactory();
-    // default marshalling configuration: prevents the creation of empty configurations at every
-    // request
+    // default marshalling configuration: prevents the creation of empty configurations at every request
     private final MarshallingConfiguration defaultConfiguration;
     // class name transformer to be used by this factory
     private final ClassNameTransformer classNameTransformer;

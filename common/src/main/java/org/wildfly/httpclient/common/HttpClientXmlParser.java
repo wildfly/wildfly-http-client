@@ -37,12 +37,15 @@ import org.wildfly.client.config.ConfigurationXMLStreamReader;
 final class HttpClientXmlParser {
     private static final String NS_EJB_HTTP_CLIENT_1_0 = "urn:wildfly-http-client:1.0";
     private static final String NS_EJB_HTTP_CLIENT_1_1 = "urn:wildfly-http-client:1.1";
+    private static final String NS_EJB_HTTP_CLIENT_1_2 = "urn:wildfly-http-client:1.2";
 
     private static final String ATTR_ADDRESS = "address";
     private static final String ATTR_BUFFER_SIZE = "buffer-size";
     private static final String ATTR_DIRECT = "direct";
+    private static final String ATTR_HANDLER_VERSION = "handler";
     private static final String ATTR_MAX_SIZE = "max-size";
     private static final String ATTR_PORT = "port";
+    private static final String ATTR_SPECIFICATION_VERSION = "specification";
     private static final String ATTR_THREAD_LOCAL_SIZE = "thread-local-size";
     private static final String ATTR_URI = "uri";
     private static final String ATTR_VALUE = "value";
@@ -59,12 +62,13 @@ final class HttpClientXmlParser {
     private static final String ELEM_MAX_STREAMS_PER_CONNECTION = "max-streams-per-connection";
     private static final String ELEM_TCP_NO_DELAY = "tcp-no-delay";
     private static final String ELEM_HTTP_CLIENT = "http-client";
+    private static final String ELEM_VERSION = "version";
 
     static WildflyHttpContext parseHttpContext() throws ConfigXMLParseException, IOException {
         final ClientConfiguration clientConfiguration = ClientConfiguration.getInstance();
         final WildflyHttpContext.Builder builder = new WildflyHttpContext.Builder();
         if (clientConfiguration != null) {
-            try (final ConfigurationXMLStreamReader streamReader = clientConfiguration.readConfiguration(Set.of(NS_EJB_HTTP_CLIENT_1_0, NS_EJB_HTTP_CLIENT_1_1))) {
+            try (final ConfigurationXMLStreamReader streamReader = clientConfiguration.readConfiguration(Set.of(NS_EJB_HTTP_CLIENT_1_0, NS_EJB_HTTP_CLIENT_1_1, NS_EJB_HTTP_CLIENT_1_2))) {
                 parseDocument(streamReader, builder);
             }
         }
@@ -74,7 +78,7 @@ final class HttpClientXmlParser {
     //for testing
     static WildflyHttpContext.Builder parseConfig(URI uri) throws ConfigXMLParseException {
         final WildflyHttpContext.Builder builder = new WildflyHttpContext.Builder();
-        try (final ConfigurationXMLStreamReader streamReader = ClientConfiguration.getInstance(uri).readConfiguration(Set.of(NS_EJB_HTTP_CLIENT_1_0, NS_EJB_HTTP_CLIENT_1_1))) {
+        try (final ConfigurationXMLStreamReader streamReader = ClientConfiguration.getInstance(uri).readConfiguration(Set.of(NS_EJB_HTTP_CLIENT_1_0, NS_EJB_HTTP_CLIENT_1_1, NS_EJB_HTTP_CLIENT_1_2))) {
             parseDocument(streamReader, builder);
             return builder;
         }
@@ -87,6 +91,7 @@ final class HttpClientXmlParser {
                     switch (reader.getNamespaceURI()) {
                         case NS_EJB_HTTP_CLIENT_1_0:
                         case NS_EJB_HTTP_CLIENT_1_1:
+                        case NS_EJB_HTTP_CLIENT_1_2:
                             break;
                         default:
                             throw reader.unexpectedElement();
@@ -124,6 +129,7 @@ final class HttpClientXmlParser {
                     switch (reader.getNamespaceURI()) {
                         case NS_EJB_HTTP_CLIENT_1_0:
                         case NS_EJB_HTTP_CLIENT_1_1:
+                        case NS_EJB_HTTP_CLIENT_1_2:
                             break;
                         default:
                             throw reader.unexpectedElement();
@@ -178,6 +184,53 @@ final class HttpClientXmlParser {
         switch (reader.nextTag()) {
             case END_ELEMENT: {
                 return bindAddress;
+            }
+            default: {
+                throw reader.unexpectedElement();
+            }
+        }
+    }
+
+    private static Version parseVersion(final ConfigurationXMLStreamReader reader) throws ConfigXMLParseException {
+        final int attributeCount = reader.getAttributeCount();
+        Version.Handler handler = null;
+        Version.Specification specification = null;
+        for (int i = 0; i < attributeCount; i++) {
+            switch (reader.getAttributeLocalName(i)) {
+                case ATTR_HANDLER_VERSION: {
+                    int handlerId = reader.getIntAttributeValueResolved(i);
+                    if (1 <= handlerId && handlerId <= 127) {
+                        handler = Version.Handler.of(reader.getIntAttributeValueResolved(i));
+                    } else {
+                        throw reader.unexpectedContent();
+                    }
+                    break;
+                }
+                case ATTR_SPECIFICATION_VERSION: {
+                    int specId = reader.getIntAttributeValueResolved(i);
+                    if (specId == 8) {
+                        specification = Version.Specification.JAVA_EE_8;
+                    } else if (10 <= specId && specId <= 41) {
+                        specification = Version.Specification.of(specId - 10);
+                    } else {
+                        throw reader.unexpectedContent();
+                    }
+                    break;
+                }
+                default: {
+                    throw reader.unexpectedAttribute(i);
+                }
+            }
+        }
+        if (handler == null) {
+            throw reader.missingRequiredAttribute(null, ATTR_HANDLER_VERSION);
+        }
+        if (specification == null) {
+            throw reader.missingRequiredAttribute(null, ATTR_SPECIFICATION_VERSION);
+        }
+        switch (reader.nextTag()) {
+            case END_ELEMENT: {
+                return Version.of(handler, specification);
             }
             default: {
                 throw reader.unexpectedElement();
@@ -277,6 +330,7 @@ final class HttpClientXmlParser {
                     switch (reader.getNamespaceURI()) {
                         case NS_EJB_HTTP_CLIENT_1_0:
                         case NS_EJB_HTTP_CLIENT_1_1:
+                        case NS_EJB_HTTP_CLIENT_1_2:
                             break;
                         default:
                             throw reader.unexpectedElement();
@@ -313,6 +367,9 @@ final class HttpClientXmlParser {
                         case NS_EJB_HTTP_CLIENT_1_1:
                             version = HttpClientSchemaVersion.V1_1;
                             break;
+                        case NS_EJB_HTTP_CLIENT_1_2:
+                            version = HttpClientSchemaVersion.V1_2;
+                            break;
                         default:
                             throw reader.unexpectedElement();
                     }
@@ -321,6 +378,10 @@ final class HttpClientXmlParser {
                     switch (localName) {
                         case ELEM_BIND_ADDRESS: {
                             builder.setDefaultBindAddress(parseBind(reader));
+                            break;
+                        }
+                        case ELEM_VERSION: {
+                            builder.setVersion(parseVersion(reader));
                             break;
                         }
                         case ELEM_IDLE_TIMEOUT: {
@@ -446,6 +507,9 @@ final class HttpClientXmlParser {
                         case NS_EJB_HTTP_CLIENT_1_1:
                             version = HttpClientSchemaVersion.V1_1;
                             break;
+                        case NS_EJB_HTTP_CLIENT_1_2:
+                            version = HttpClientSchemaVersion.V1_2;
+                            break;
                         default:
                             throw reader.unexpectedElement();
                     }
@@ -476,6 +540,10 @@ final class HttpClientXmlParser {
                             targetBuilder.setBindAddress(parseBind(reader));
                             break;
                         }
+                        case ELEM_VERSION: {
+                            targetBuilder.setVersion(parseVersion(reader));
+                            break;
+                        }
                         case ELEM_TCP_NO_DELAY: {
                             targetBuilder.setTcpNoDelay(parseBooleanElement(reader));
                             break;
@@ -504,8 +572,13 @@ final class HttpClientXmlParser {
                 ELEM_BIND_ADDRESS, ELEM_BUFFER_POOL, ELEM_CONFIG, ELEM_CONFIGS, ELEM_DEFAULTS,
                 ELEM_EAGERLY_ACQUIRE_SESSION, ELEM_ENABLE_HTTP2, ELEM_IDLE_TIMEOUT, ELEM_MAX_CONNECTIONS,
                 ELEM_MAX_STREAMS_PER_CONNECTION, ELEM_TCP_NO_DELAY
+            )),
+        V1_2(NS_EJB_HTTP_CLIENT_1_2,
+            List.of(
+                ELEM_BIND_ADDRESS, ELEM_VERSION, ELEM_BUFFER_POOL, ELEM_CONFIG, ELEM_CONFIGS, ELEM_DEFAULTS,
+                ELEM_EAGERLY_ACQUIRE_SESSION, ELEM_ENABLE_HTTP2, ELEM_IDLE_TIMEOUT, ELEM_MAX_CONNECTIONS,
+                ELEM_MAX_STREAMS_PER_CONNECTION, ELEM_TCP_NO_DELAY
             ));
-
         private final String namespace;
         private final List<String> elements;
 

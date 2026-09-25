@@ -23,18 +23,17 @@ import static org.wildfly.httpclient.transaction.Serializer.deserializeXid;
 import static org.wildfly.httpclient.transaction.Serializer.deserializeXidArray;
 import static org.wildfly.httpclient.transaction.Serializer.serializeXid;
 
-import io.undertow.client.ClientResponse;
 import org.jboss.marshalling.ByteInput;
 import org.jboss.marshalling.ByteOutput;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
-import org.wildfly.httpclient.common.HttpTargetContext;
-import org.xnio.IoUtils;
+import org.wildfly.httpclient.common.HttpTargetContext.RequestContext;
+import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyDecoder;
+import org.wildfly.httpclient.common.HttpTargetContext.HttpBodyEncoder;
 
 import javax.transaction.xa.Xid;
-import java.io.Closeable;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -49,34 +48,34 @@ final class ClientHandlers {
         // forbidden instantiation
     }
 
-    static HttpTargetContext.HttpMarshaller xidHttpMarshaller(final Marshaller marshaller, final Xid xid) {
-        return new XidHttpMarshaller(marshaller, xid);
+    static HttpBodyEncoder xidHttpBodyEncoder(final Marshaller marshaller, final Xid xid) {
+        return new XidHttpBodyEncoder(marshaller, xid);
     }
 
-    static <T> HttpTargetContext.HttpResultHandler emptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
-        return new EmptyHttpResultHandler<T>(result, function);
+    static <T> HttpBodyDecoder emptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ResponseContext, T> function) {
+        return new EmptyHttpBodyDecoder<T>(result, function);
     }
 
-    static HttpTargetContext.HttpResultHandler xidHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
-        return new XidHttpResultHandler(unmarshaller, result);
+    static HttpBodyDecoder xidHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
+        return new XidHttpBodyDecoder(unmarshaller, result);
     }
 
-    static HttpTargetContext.HttpResultHandler xidArrayHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
-        return new XidArrayHttpResultHandler(unmarshaller, result);
+    static HttpBodyDecoder xidArrayHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
+        return new XidArrayHttpBodyDecoder(unmarshaller, result);
     }
 
-    private static final class XidHttpMarshaller implements HttpTargetContext.HttpMarshaller {
+    private static final class XidHttpBodyEncoder implements HttpBodyEncoder {
         private final Marshaller marshaller;
         private final Xid xid;
 
-        private XidHttpMarshaller(final Marshaller marshaller, final Xid xid) {
+        private XidHttpBodyEncoder(final Marshaller marshaller, final Xid xid) {
             this.marshaller = marshaller;
             this.xid = xid;
         }
 
         @Override
-        public void marshall(final OutputStream os) throws Exception {
-            try (ByteOutput out = byteOutputOf(os)) {
+        public void encode(final RequestContext ctx) throws Exception {
+            try (ByteOutput out = byteOutputOf(ctx.getRequestBody())) {
                 marshaller.start(out);
                 serializeXid(marshaller, xid);
                 marshaller.finish();
@@ -84,69 +83,66 @@ final class ClientHandlers {
         }
     }
 
-    private static final class EmptyHttpResultHandler<T> implements HttpTargetContext.HttpResultHandler {
+    private static final class EmptyHttpBodyDecoder<T> implements HttpBodyDecoder {
         private final CompletableFuture<T> result;
-        private final Function<ClientResponse, T> function;
+        private final Function<ResponseContext, T> function;
 
-        private EmptyHttpResultHandler(final CompletableFuture<T> result, final Function<ClientResponse, T> function) {
+        private EmptyHttpBodyDecoder(final CompletableFuture<T> result, final Function<ResponseContext, T> function) {
             this.result = result;
             this.function = function;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
-            try {
-                result.complete(function != null ? function.apply(response) : null);
-            } finally {
-                IoUtils.safeClose(doneCallback);
+        public void decode(final ResponseContext ctx) {
+            final InputStream is = ctx.getResponseBody();
+            try (is) {
+                result.complete(function != null ? function.apply(ctx) : null);
+            } catch (Exception e) {
+                result.completeExceptionally(e);
             }
         }
     }
 
-    private static final class XidHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class XidHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<Xid> result;
 
-        private XidHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
+        private XidHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid> result) {
             this.unmarshaller = unmarshaller;
             this.result = result;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
-            try (ByteInput in = byteInputOf(is)) {
+        public void decode(final ResponseContext ctx) {
+            try (ByteInput in = byteInputOf(ctx.getResponseBody())) {
                 unmarshaller.start(in);
                 Xid xid = deserializeXid(unmarshaller);
                 unmarshaller.finish();
                 result.complete(xid);
             } catch (Exception e) {
                 result.completeExceptionally(e);
-            } finally {
-                IoUtils.safeClose(doneCallback);
             }
         }
     }
 
-    private static final class XidArrayHttpResultHandler implements HttpTargetContext.HttpResultHandler {
+    private static final class XidArrayHttpBodyDecoder implements HttpBodyDecoder {
         private final Unmarshaller unmarshaller;
         private final CompletableFuture<Xid[]> result;
 
-        private XidArrayHttpResultHandler(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
+        private XidArrayHttpBodyDecoder(final Unmarshaller unmarshaller, final CompletableFuture<Xid[]> result) {
             this.unmarshaller = unmarshaller;
             this.result = result;
         }
 
         @Override
-        public void handleResult(final InputStream is, final ClientResponse response, final Closeable doneCallback) {
-            try (ByteInput in = byteInputOf(is)) {
+        public void decode(final ResponseContext ctx) {
+            try (ByteInput in = byteInputOf(ctx.getResponseBody())) {
                 unmarshaller.start(in);
                 Xid[] ret = deserializeXidArray(unmarshaller);
                 unmarshaller.finish();
                 result.complete(ret);
             } catch (Exception e) {
                 result.completeExceptionally(e);
-            } finally {
-                IoUtils.safeClose(doneCallback);
             }
         }
     }

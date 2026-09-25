@@ -20,41 +20,37 @@ package org.wildfly.httpclient.naming;
 
 import static io.undertow.util.Headers.ACCEPT;
 import static io.undertow.util.Headers.CONTENT_TYPE;
-import static java.net.URLEncoder.encode;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.wildfly.httpclient.common.HeadersHelper.putRequestHeader;
-import static org.wildfly.httpclient.common.Protocol.VERSION_PATH;
 import static org.wildfly.httpclient.naming.Constants.EXCEPTION;
-import static org.wildfly.httpclient.naming.Constants.NAMING_CONTEXT;
 import static org.wildfly.httpclient.naming.Constants.NEW_QUERY_PARAMETER;
 import static org.wildfly.httpclient.naming.Constants.VALUE;
 
 import io.undertow.client.ClientRequest;
-import org.wildfly.httpclient.common.Protocol;
+
+import org.wildfly.httpclient.common.HttpTargetContext;
 
 import javax.naming.Name;
 
 /**
  * HTTP JNDI module client request builder. Encapsulates all information needed to create HTTP JNDI client requests.
  * Use setter methods (those returning {@link RequestBuilder}) to configure the builder.
- * Once configured {@link #createRequest(String)} method must be called to build HTTP client request.
+ * Once configured {@link org.wildfly.httpclient.common.RequestBuilder#createRequest()} method must be called to build HTTP client request.
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-final class RequestBuilder {
+final class RequestBuilder extends org.wildfly.httpclient.common.RequestBuilder<RequestType> {
 
-    private RequestType requestType;
     private Name name;
     private Name newName;
     private Object object;
-    private int version = Protocol.LATEST;
+
+    // constructor
+
+    RequestBuilder(final HttpTargetContext targetContext, final RequestType requestType) {
+        super(targetContext, requestType);
+    }
 
     // setters
-
-    RequestBuilder setRequestType(final RequestType requestType) {
-        this.requestType = requestType;
-        return this;
-    }
 
     RequestBuilder setName(final Name name) {
         this.name = name;
@@ -71,53 +67,25 @@ final class RequestBuilder {
         return this;
     }
 
-    RequestBuilder setVersion(final int version) {
-        this.version = version;
-        return this;
-    }
+    // implementation
 
-    // helper methods
-
-    ClientRequest createRequest(final String prefix) {
-        final ClientRequest request = new ClientRequest();
-        setRequestMethod(request);
-        setRequestPath(request, prefix);
-        setRequestHeaders(request);
-        return request;
-    }
-
-    private void setRequestMethod(final ClientRequest request) {
-        request.setMethod(requestType.getMethod());
-    }
-
-    private void setRequestPath(final ClientRequest request, final String prefix) {
+    @Override
+    protected void setRequestPath(final ClientRequest request) {
         final StringBuilder sb = new StringBuilder();
-        if (prefix != null) {
-            sb.append(prefix);
-        }
-        appendPath(sb, NAMING_CONTEXT, false);
-        appendPath(sb, VERSION_PATH + version, false);
-        appendPath(sb, requestType.getPath(), false);
+        appendOperationPath(sb);
         appendPath(sb, name.toString(), true);
         if (newName != null) {
-            sb.append("?" + NEW_QUERY_PARAMETER + "=");
-            sb.append(encode(newName.toString(), UTF_8));
+            setQueryParameter(sb, NEW_QUERY_PARAMETER, newName.toString());
         }
         request.setPath(sb.toString());
     }
 
-    private void setRequestHeaders(final ClientRequest request) {
+    @Override
+    protected void setRequestHeaders(final ClientRequest request) {
         putRequestHeader(request, ACCEPT, VALUE + "," + EXCEPTION);
         if (object != null) {
             putRequestHeader(request, CONTENT_TYPE, VALUE);
         }
-    }
-
-    private static void appendPath(final StringBuilder sb, final String path, final boolean encode) {
-        if (!path.startsWith("/") || encode) {
-            sb.append("/");
-        }
-        sb.append(encode ? encode(path, UTF_8) : path);
     }
 
 }

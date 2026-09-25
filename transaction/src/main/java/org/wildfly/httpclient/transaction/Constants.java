@@ -39,9 +39,6 @@ final class Constants {
     // response headers
     static final HttpString READ_ONLY = new HttpString("x-wf-txn-read-only");
 
-    // context path
-    static final String TXN_CONTEXT = "/txn";
-
     // params
     static final String OPC_QUERY_PARAMETER = "opc";
 

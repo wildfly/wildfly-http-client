@@ -20,11 +20,11 @@ package org.wildfly.httpclient.ejb;
 
 import static java.security.AccessController.doPrivileged;
 import static org.wildfly.httpclient.ejb.ClientHandlers.cancelInvocationResponseFunction;
-import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpResultHandler;
+import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpBodyDecoder;
 import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionResponseFunction;
-import static org.wildfly.httpclient.ejb.ClientHandlers.emptyHttpResultHandler;
-import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpMarshaller;
-import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionHttpMarshaller;
+import static org.wildfly.httpclient.ejb.ClientHandlers.emptyHttpBodyDecoder;
+import static org.wildfly.httpclient.ejb.ClientHandlers.invokeHttpBodyEncoder;
+import static org.wildfly.httpclient.ejb.ClientHandlers.createSessionHttpBodyEncoder;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_PORT;
 import static org.wildfly.httpclient.ejb.Constants.HTTPS_SCHEME;
 import static org.wildfly.httpclient.ejb.Constants.HTTP_PORT;
@@ -135,14 +135,12 @@ class HttpEJBReceiver extends EJBReceiver {
         EjbContextData ejbData = targetContext.getAttachment(EJB_CONTEXT_DATA);
         boolean compressResponse = receiverContext.getClientInvocationContext().isCompressResponse();
         boolean compressRequest = receiverContext.getClientInvocationContext().isCompressRequest();
-        RequestBuilder builder = new RequestBuilder()
+        RequestBuilder builder = new RequestBuilder(targetContext, RequestType.INVOKE)
                 .setCompressRequest(compressRequest)
                 .setCompressResponse(compressResponse)
-                .setRequestType(RequestType.INVOKE)
                 .setLocator(locator)
                 .setMethod(clientInvocationContext.getInvokedMethod())
-                .setView(clientInvocationContext.getViewClass().getName())
-                .setVersion(targetContext.getProtocolVersion());
+                .setView(clientInvocationContext.getViewClass().getName());
         if (locator instanceof StatefulEJBLocator) {
             builder.setBeanId(Base64.getUrlEncoder().encodeToString(locator.asStateful().getSessionId().getEncodedForm()));
         }
@@ -163,19 +161,19 @@ class HttpEJBReceiver extends EJBReceiver {
                 receiverContext.proceedAsynchronously();
             }
         }
-        ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        ClientRequest request = builder.createRequest();
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
-        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         TransactionInfo transactionInfo = getTransactionInfo(clientInvocationContext.getTransaction(), targetContext.getUri());
         Object[] parameters = clientInvocationContext.getParameters();
         Map<String, Object> contextData = clientInvocationContext.getContextData();
-        final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
-        targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpMarshaller(marshaller, transactionInfo, parameters, contextData),
-                invokeHttpResultHandler(unmarshaller, receiverContext, clientInvocationContext),
+        final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
+        targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpBodyEncoder(marshaller, transactionInfo, parameters, contextData),
+                invokeHttpBodyDecoder(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
 
@@ -205,17 +203,13 @@ class HttpEJBReceiver extends EJBReceiver {
         targetContext.awaitSessionId(true, authenticationConfiguration);
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
-        RequestBuilder builder = new RequestBuilder()
-                .setRequestType(RequestType.CREATE_SESSION)
-                .setLocator(locator)
-                .setView(locator.getViewType().getName())
-                .setVersion(targetContext.getProtocolVersion());
-        ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        RequestBuilder builder = new RequestBuilder(targetContext, RequestType.CREATE_SESSION).setLocator(locator).setView(locator.getViewType().getName());
+        ClientRequest request = builder.createRequest();
         TransactionInfo transactionInfo = getTransactionInfo(ContextTransactionManager.getInstance().getTransaction(), targetContext.getUri());
-        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory(request));
+        Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                createSessionHttpMarshaller(marshaller, transactionInfo),
-                emptyHttpResultHandler(result, createSessionResponseFunction()),
+                createSessionHttpBodyEncoder(marshaller, transactionInfo),
+                emptyHttpBodyDecoder(result, createSessionResponseFunction()),
                 result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
 
         return result.get();
@@ -253,16 +247,14 @@ class HttpEJBReceiver extends EJBReceiver {
             }
         }
         targetContext.awaitSessionId(false, authenticationConfiguration);
-        RequestBuilder builder = new RequestBuilder()
-                .setRequestType(RequestType.CANCEL)
+        RequestBuilder builder = new RequestBuilder(targetContext, RequestType.CANCEL)
                 .setLocator(locator)
                 .setCancelIfRunning(cancelIfRunning)
-                .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID))
-                .setVersion(targetContext.getProtocolVersion());
+                .setInvocationId(receiverContext.getClientInvocationContext().getAttachment(INVOCATION_ID));
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
-        ClientRequest request = builder.createRequest(targetContext.getUri().getPath());
+        ClientRequest request = builder.createRequest();
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
-                emptyHttpResultHandler(result, cancelInvocationResponseFunction()),
+                emptyHttpBodyDecoder(result, cancelInvocationResponseFunction()),
                 result::completeExceptionally, null, null);
         try {
             return result.get();

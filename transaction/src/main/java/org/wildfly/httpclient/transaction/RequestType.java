@@ -58,7 +58,7 @@ import io.undertow.util.HttpString;
  *
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
  */
-enum RequestType {
+enum RequestType implements org.wildfly.httpclient.common.RequestType {
 
     /**
      * {@code UT_BEGIN} invocation type: used to establish a remote user-controlled transaction via HTTP protocol.
@@ -100,6 +100,7 @@ enum RequestType {
      */
     XA_ROLLBACK(POST, "/xa/rollback");
 
+    private static final String TXN_CONTEXT = "/txn";
     private final HttpString method;
     private final String path;
 
@@ -110,26 +111,38 @@ enum RequestType {
 
     /**
      * Returns the name of this invocation.
-     * @return this invocation {@linkplain #name()}.
+     * @return this invocation name
      */
-    final String getName() {
+    @Override
+    public final String getName() {
         return name();
     }
 
     /**
-     * Returns the HTTP request method used by this invocation.
+     * Returns the HTTP request method of this invocation.
      * @return this invocation HTTP request method.
      */
-    final HttpString getMethod() {
+    @Override
+    public final HttpString getMethod() {
         return method;
     }
 
     /**
-     * Returns the HTTP request subpath used by this invocation.
-     * @return this invocation HTTP request subpath.
+     * Returns the HTTP request prefix path of this invocation.
+     * @return this invocation HTTP request prefix path.
      */
-    final String getPath() {
+    @Override
+    public final String getPath() {
         return path;
+    }
+
+    /**
+     * Returns the HTTP request context path of this invocation.
+     * @return this invocation HTTP request context path.
+     */
+    @Override
+    public String getContextPath() {
+        return TXN_CONTEXT;
     }
 
 }
