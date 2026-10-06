@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        jdk-distribution: [temurin, adopt-openj9]
+        jdk-distribution: [temurin, semeru]
         jdk-version: [11, 17, 21]
     steps:
     - name: Configure runner - Linux 
