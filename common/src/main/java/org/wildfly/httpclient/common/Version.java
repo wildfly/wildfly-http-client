@@ -131,33 +131,6 @@ public final class Version implements Comparable<Version>{
         return encodingVersion;
     }
 
-    /**
-     * Returns handler version associated with current protocol version.
-     *
-     * @return handler version
-     */
-    public Handler handler() {
-        return handlerVersion;
-    }
-
-    /**
-     * Returns Java EE or Jakarta EE specification version associated with current protocol version.
-     *
-     * @return specification version
-     */
-    public Specification specitication() {
-        return specVersion;
-    }
-
-    /**
-     * Returns encoding version associated with current protocol version.
-     *
-     * @return encoding version
-     */
-    public Encoding encoding() {
-        return encodingVersion;
-    }
-
     @Override
     public String toString() {
         return handlerVersion + " , " + specVersion;

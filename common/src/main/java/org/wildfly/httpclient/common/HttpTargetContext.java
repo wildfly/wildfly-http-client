@@ -40,6 +40,7 @@ import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import io.undertow.client.ClientResponse;
 import io.undertow.util.AbstractAttachable;
+import io.undertow.util.HeaderValues;
 import io.undertow.util.HttpString;
 import io.undertow.util.Methods;
 import org.jboss.marshalling.Unmarshaller;
@@ -154,7 +155,7 @@ public class HttpTargetContext extends AbstractAttachable {
         sendRequest(clientRequest, sslContext, authenticationConfiguration,
                 null,
                 (ctx) -> {
-                    String backend = ctx.getResponseHeader("Backend");
+                    String backend = ctx.getResponseHeader(new HttpString("Backend"));
                     if (backend == null) {
                         result.completeExceptionally(HttpClientMessages.MESSAGES.failedToAcquireBackendServer(new Exception("Missing backend header on response")));
                         return;
