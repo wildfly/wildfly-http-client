@@ -79,7 +79,7 @@
 
     <properties>
         <test.level>DEBUG</test.level>
-        <maven.compiler.release>11</maven.compiler.release>
+        <maven.compiler.release>17</maven.compiler.release>
         <!-- Release Info -->
         <wildfly.httpclient.scm.connection>git@github.com:wildfly/wildfly-http-client.git</wildfly.httpclient.scm.connection>
         <wildfly.httpclient.scm.url>https://github.com/wildfly/wildfly-http-client</wildfly.httpclient.scm.url>
@@ -482,6 +482,26 @@
             <modules>
                 <module>docs</module>
             </modules>
+        </profile>
+        <profile>
+            <id>jdk23</id>
+            <activation>
+                <jdk>[23,)</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <compilerArgs combine.children="append">
+                                <!-- SE 23+ requires explicit config to turn on annotation processing -->
+                                <arg>-proc:full</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>
