@@ -161,6 +161,7 @@ public final class HttpEJBDiscoveryProvider implements DiscoveryProvider {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                    null,
                     discoveryHttpBodyDecoder(unmarshaller, result),
                     result::completeExceptionally, Constants.EJB_DISCOVERY_RESPONSE, null);
         }

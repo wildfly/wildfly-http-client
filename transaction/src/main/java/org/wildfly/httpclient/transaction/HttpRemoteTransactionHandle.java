@@ -21,9 +21,11 @@ package org.wildfly.httpclient.transaction;
 import static org.wildfly.httpclient.transaction.ClientHandlers.emptyHttpBodyDecoder;
 import static org.wildfly.httpclient.transaction.ClientHandlers.xidHttpBodyEncoder;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.transaction.client.spi.SimpleTransactionControl;
@@ -69,6 +71,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
         if (oldVal != Status.STATUS_ACTIVE && oldVal != Status.STATUS_MARKED_ROLLBACK) {
             throw HttpRemoteTransactionMessages.MESSAGES.invalidTxnState();
         }
+        try {
         synchronized (statusRef) {
             oldVal = statusRef.get();
             if (oldVal == Status.STATUS_MARKED_ROLLBACK) {
@@ -88,7 +91,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), new RemoteTransactionStickinessHandler(), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {
@@ -118,6 +121,9 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
                 }
             }
         }
+        } finally {
+            targetContext.clearTransactionStickiness(HttpStickinessHelper.stickinessKey(id.getFormatId(), id.getGlobalTransactionId()));
+        }
     }
 
     public void rollback() throws SecurityException, SystemException {
@@ -126,6 +132,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
         if (oldVal != Status.STATUS_ACTIVE && oldVal != Status.STATUS_MARKED_ROLLBACK) {
             throw HttpRemoteTransactionMessages.MESSAGES.invalidTxnState();
         }
+        try {
         synchronized (statusRef) {
             oldVal = statusRef.get();
             if (oldVal != Status.STATUS_ACTIVE && oldVal != Status.STATUS_MARKED_ROLLBACK) {
@@ -143,7 +150,7 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             final Marshaller marshaller = marshallerFactory.createMarshaller(result);
             if (marshaller != null) {
                 targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                        xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
+                        xidHttpBodyEncoder(marshaller, id), new RemoteTransactionStickinessHandler(), emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
             }
 
             try {
@@ -169,6 +176,9 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
                     throw ex;
                 }
             }
+        }
+        } finally {
+            targetContext.clearTransactionStickiness(HttpStickinessHelper.stickinessKey(id.getFormatId(), id.getGlobalTransactionId()));
         }
     }
 
@@ -198,5 +208,15 @@ class HttpRemoteTransactionHandle implements SimpleTransactionControl {
             return (T) (XidProvider) () -> id;
         }
         return null;
+    }
+
+    public static class RemoteTransactionStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        @Override
+        public void prepareRequest(ClientRequest request) {
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+        }
     }
 }

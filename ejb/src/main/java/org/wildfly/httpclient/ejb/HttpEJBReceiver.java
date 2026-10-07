@@ -32,25 +32,35 @@ import static org.wildfly.httpclient.ejb.TransactionInfo.localTransaction;
 import static org.wildfly.httpclient.ejb.TransactionInfo.nullTransaction;
 import static org.wildfly.httpclient.ejb.TransactionInfo.remoteTransaction;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
+import io.undertow.client.ClientResponse;
+import io.undertow.server.session.SecureRandomSessionIdGenerator;
+import io.undertow.server.session.SessionIdGenerator;
 import io.undertow.util.AttachmentKey;
+import org.jboss.ejb.client.AbstractInvocationContext;
 import org.jboss.ejb.client.Affinity;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBReceiver;
 import org.jboss.ejb.client.EJBReceiverInvocationContext;
 import org.jboss.ejb.client.EJBReceiverSessionCreationContext;
+import org.jboss.ejb.client.EJBSessionCreationInvocationContext;
+import org.jboss.ejb.client.NodeAffinity;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
+import org.jboss.ejb.client.URIAffinity;
 import org.jboss.marshalling.Marshaller;
 import org.jboss.marshalling.Unmarshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.WildflyHttpContext;
 import org.wildfly.httpclient.transaction.XidProvider;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.client.AuthenticationContextConfigurationClient;
+import org.wildfly.transaction.client.AbstractTransaction;
 import org.wildfly.transaction.client.ContextTransactionManager;
 import org.wildfly.transaction.client.LocalTransaction;
 import org.wildfly.transaction.client.RemoteTransaction;
@@ -74,6 +84,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
@@ -94,8 +105,15 @@ class HttpEJBReceiver extends EJBReceiver {
     private final AttachmentKey<EjbContextData> EJB_CONTEXT_DATA = AttachmentKey.create(EjbContextData.class);
     private final org.jboss.ejb.client.AttachmentKey<String> INVOCATION_ID = new org.jboss.ejb.client.AttachmentKey<>();
     private final RemoteTransactionContext transactionContext;
-
+    private final org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> TXN_STRICT_STICKINESS_MAP = new org.jboss.ejb.client.AttachmentKey<>();
+    // Per-transaction map (URI -> node) holding the node that the FIRST invocation response of the transaction
+    // actually came from. Unlike TXN_STRICT_STICKINESS_MAP (which may hold a pre-acquired, not-yet-confirmed
+    // guess from acquireBackendServer()), entries here are only ever written from an actual response, so they
+    // are safe to enforce against. Being a transaction resource, it is discarded when the transaction ends,
+    // which prevents stickiness from leaking across independent transaction cycles.
+    private final org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> TXN_CONFIRMED_STICKINESS_MAP = new org.jboss.ejb.client.AttachmentKey<>();
     private static final AtomicLong invocationIdGenerator = new AtomicLong();
+    protected final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionID = new ConcurrentHashMap<>();
 
     HttpEJBReceiver() {
         if(System.getSecurityManager() == null) {
@@ -113,12 +131,11 @@ class HttpEJBReceiver extends EJBReceiver {
     @Override
     protected void processInvocation(EJBReceiverInvocationContext receiverContext) throws Exception {
 
-        EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
+        final EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
         EJBLocator<?> locator = clientInvocationContext.getLocator();
 
-        URI uri = clientInvocationContext.getDestination();
-        WildflyHttpContext current = WildflyHttpContext.getCurrent();
-        HttpTargetContext targetContext = current.getTargetContext(uri);
+        final URI uri = clientInvocationContext.getDestination();
+        final HttpTargetContext targetContext = resolveTargetContext(clientInvocationContext, uri);
         if (targetContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
@@ -129,8 +146,6 @@ class HttpEJBReceiver extends EJBReceiver {
                 }
             }
         }
-        targetContext.awaitSessionId(false, AUTH_CONTEXT_CLIENT.getAuthenticationConfiguration(targetContext.getUri(), receiverContext.getAuthenticationContext()));
-
 
         EjbContextData ejbData = targetContext.getAttachment(EJB_CONTEXT_DATA);
         boolean compressResponse = receiverContext.getClientInvocationContext().isCompressResponse();
@@ -147,13 +162,14 @@ class HttpEJBReceiver extends EJBReceiver {
 
         if (clientInvocationContext.getInvokedMethod().getReturnType() == Future.class) {
             receiverContext.proceedAsynchronously();
-            //cancellation is only supported if we have affinity
-            if (targetContext.getSessionId() != null) {
+            // cancellation is only supported if we have affinity (InvocationIdentifier = invocationID + SessionAffinity)
+            // TODO: check this logic, why only if affinity?
+//            if (targetContext.getSessionId() != null) {
                 long invocationId = invocationIdGenerator.incrementAndGet();
                 String invocationIdString = Long.toString(invocationId);
                 builder.setInvocationId(invocationIdString);
                 clientInvocationContext.putAttachment(INVOCATION_ID, invocationIdString);
-            }
+//            }
         } else if (clientInvocationContext.getInvokedMethod().getReturnType() == void.class) {
             if (clientInvocationContext.getInvokedMethod().isAnnotationPresent(Asynchronous.class)) {
                 receiverContext.proceedAsynchronously();
@@ -172,7 +188,10 @@ class HttpEJBReceiver extends EJBReceiver {
         Object[] parameters = clientInvocationContext.getParameters();
         Map<String, Object> contextData = clientInvocationContext.getContextData();
         final Unmarshaller unmarshaller = createUnmarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
+        final String txStickinessKey = transactionInfo.getXid() == null ? null
+                : HttpStickinessHelper.stickinessKey(transactionInfo.getXid().getFormatId(), transactionInfo.getXid().getGlobalTransactionId());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, invokeHttpBodyEncoder(marshaller, transactionInfo, parameters, contextData),
+                new InvocationStickinessHandler(receiverContext, node2SessionID, targetContext, txStickinessKey),
                 invokeHttpBodyDecoder(unmarshaller, receiverContext, clientInvocationContext),
                 (e) -> receiverContext.requestFailed(e instanceof Exception ? (Exception) e : new RuntimeException(e)), Constants.EJB_RESPONSE, null);
     }
@@ -180,15 +199,17 @@ class HttpEJBReceiver extends EJBReceiver {
     private static final AuthenticationContextConfigurationClient CLIENT = doPrivileged(AuthenticationContextConfigurationClient.ACTION);
 
     protected SessionID createSession(final EJBReceiverSessionCreationContext receiverContext) throws Exception {
+        final EJBSessionCreationInvocationContext sessionCreationInvocationContext = receiverContext.getClientInvocationContext();
         final EJBLocator<?> locator = receiverContext.getClientInvocationContext().getLocator();
-        URI uri = receiverContext.getClientInvocationContext().getDestination();
+        final URI uri = sessionCreationInvocationContext.getDestination();
+
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
         final AuthenticationConfiguration authenticationConfiguration = client.getAuthenticationConfiguration(uri, context, defaultPort, "jndi", "jboss");
         final SSLContext sslContext = client.getSSLContext(uri, context, "jndi", "jboss");
-        WildflyHttpContext current = WildflyHttpContext.getCurrent();
-        HttpTargetContext targetContext = current.getTargetContext(uri);
+
+        final HttpTargetContext targetContext = resolveTargetContext(sessionCreationInvocationContext, uri);
         if (targetContext == null) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
@@ -200,7 +221,6 @@ class HttpEJBReceiver extends EJBReceiver {
             }
         }
 
-        targetContext.awaitSessionId(true, authenticationConfiguration);
         CompletableFuture<SessionID> result = new CompletableFuture<>();
 
         RequestBuilder builder = new RequestBuilder(targetContext, RequestType.CREATE_SESSION).setLocator(locator).setView(locator.getViewType().getName());
@@ -209,6 +229,7 @@ class HttpEJBReceiver extends EJBReceiver {
         Marshaller marshaller = createMarshaller(targetContext.getUri(), targetContext.getHttpMarshallerFactory());
         targetContext.sendRequest(request, sslContext, authenticationConfiguration,
                 createSessionHttpBodyEncoder(marshaller, transactionInfo),
+                new SessionCreationStickinessHandler(receiverContext, node2SessionID),
                 emptyHttpBodyDecoder(result, createSessionResponseFunction()),
                 result::completeExceptionally, Constants.EJB_RESPONSE_NEW_SESSION, null);
 
@@ -218,11 +239,10 @@ class HttpEJBReceiver extends EJBReceiver {
     @Override
     protected boolean cancelInvocation(EJBReceiverInvocationContext receiverContext, boolean cancelIfRunning) {
 
-        EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
-        EJBLocator<?> locator = clientInvocationContext.getLocator();
+        final EJBClientInvocationContext clientInvocationContext = receiverContext.getClientInvocationContext();
+        final EJBLocator<?> locator = clientInvocationContext.getLocator();
 
-        Affinity affinity = locator.getAffinity();
-        URI uri = clientInvocationContext.getDestination();
+        final URI uri = clientInvocationContext.getDestination();
         final AuthenticationContext context = receiverContext.getAuthenticationContext();
         final AuthenticationContextConfigurationClient client = CLIENT;
         final int defaultPort = uri.getScheme().equals(HTTPS_SCHEME) ? HTTPS_PORT : HTTP_PORT;
@@ -234,11 +254,17 @@ class HttpEJBReceiver extends EJBReceiver {
             // ¯\_(ツ)_/¯
             return false;
         }
-        WildflyHttpContext current = WildflyHttpContext.getCurrent();
-        HttpTargetContext targetContext = current.getTargetContext(uri);
-        if (targetContext == null) {
+
+        final HttpTargetContext targetContext;
+        try {
+            targetContext = resolveTargetContext(clientInvocationContext, uri);
+            if (targetContext == null) {
+                throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
+            }
+        } catch (Exception e) {
             throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(locator);
         }
+
         if (targetContext.getAttachment(EJB_CONTEXT_DATA) == null) {
             synchronized (this) {
                 if (targetContext.getAttachment(EJB_CONTEXT_DATA) == null) {
@@ -246,7 +272,6 @@ class HttpEJBReceiver extends EJBReceiver {
                 }
             }
         }
-        targetContext.awaitSessionId(false, authenticationConfiguration);
         RequestBuilder builder = new RequestBuilder(targetContext, RequestType.CANCEL)
                 .setLocator(locator)
                 .setCancelIfRunning(cancelIfRunning)
@@ -254,6 +279,7 @@ class HttpEJBReceiver extends EJBReceiver {
         final CompletableFuture<Boolean> result = new CompletableFuture<>();
         ClientRequest request = builder.createRequest();
         targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                null,
                 emptyHttpBodyDecoder(result, cancelInvocationResponseFunction()),
                 result::completeExceptionally, null, null);
         try {
@@ -283,6 +309,7 @@ class HttpEJBReceiver extends EJBReceiver {
         } else if (transaction instanceof LocalTransaction) {
             final LocalTransaction localTransaction = (LocalTransaction) transaction;
             final XAOutflowHandle outflowHandle = transactionContext.outflowTransaction(uri, localTransaction);
+            outflowHandle.verifyEnlistment();
             return localTransaction(outflowHandle.getXid(), outflowHandle.getRemainingTime());
         } else {
             throw EjbHttpClientMessages.MESSAGES.cannotEnlistTx();
@@ -291,6 +318,340 @@ class HttpEJBReceiver extends EJBReceiver {
 
     private static class EjbContextData {
         final Set<Method> asyncMethods = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
     }
+
+    /*
+     * This class manages the relationship between the proxy's strong and weak affinity and
+     * the stickiness requirements of session beans resulting from session creation.
+     *
+     * Remember that for session creation operations:
+     * - requests start off with SLSB locators identifying a bean for which the session is to be created
+     * - responses are used to convert the SLSB locator into a SFSB locator with a SessionID
+     *
+     */
+    private class SessionCreationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final EJBReceiverSessionCreationContext receiverSessionCreationContext;
+        private final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId;
+
+        private final SessionIdGenerator sessionIdGenerator = new SecureRandomSessionIdGenerator();
+        private final String clientSessionID = sessionIdGenerator.createSessionId();
+
+        public SessionCreationStickinessHandler(EJBReceiverSessionCreationContext receiverSessionCreationContext, ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId) {
+            this.receiverSessionCreationContext = receiverSessionCreationContext;
+            this.node2SessionId = node2SessionId;
+        }
+
+        @Override
+        public void prepareRequest(ClientRequest request) throws Exception {
+            EjbHttpClientMessages.MESSAGES.infof("Calling SessionCreationStickinessHandler.prepareRequest for request %s", request);
+            EJBSessionCreationInvocationContext context = receiverSessionCreationContext.getClientInvocationContext();
+
+            if (inTransaction(context)) {
+                ConcurrentMap<URI, String> map = getOrCreateTransactionURIMap(context.getTransaction());
+                String route = map.get(context.getDestination());
+                if (route == null) {
+                    throw EjbHttpClientMessages.MESSAGES.couldNotResolveRouteForTransactionScopedInvocation(context.getTransaction().toString());
+                }
+
+                HttpStickinessHelper.addEncodedSessionID(request, clientSessionID, route);
+                HttpStickinessHelper.addStrictStickinessHost(request, route);
+            }
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) throws Exception {
+            EjbHttpClientMessages.MESSAGES.infof("Calling SessionCreationStickinessHandler.processResponse for response %s", result.getResponse());
+
+            EJBSessionCreationInvocationContext clientInvocationContext = receiverSessionCreationContext.getClientInvocationContext();
+            EJBLocator locator = clientInvocationContext.getLocator();
+            URI uri = clientInvocationContext.getDestination();
+
+            EjbHttpClientMessages.MESSAGES.infof("Calling SessionCreationStickinessHandler.processResponse for locator %s", locator);
+
+            ClientResponse response = result.getResponse();
+
+            if (!HttpStickinessHelper.hasEncodedSessionID(response)) {
+                throw new Exception("SessionCreationStickinessHandler.processResponse(), SFSB session creation response is missing JSESSIONID Cookie");
+            }
+
+            String route = HttpStickinessHelper.updateNode2SessionIDMap(node2SessionId, uri, response);
+            EjbHttpClientMessages.MESSAGES.infof("SessionCreationStickinessHandler.processResponse(), route = %s", route);
+
+            boolean isSticky = false;
+
+            if (HttpStickinessHelper.hasStrictStickinessResult(response)) {
+                if (!HttpStickinessHelper.getStrictStickinessResult(response)) {
+                    String host = HttpStickinessHelper.getStrictStickinessHost(response);
+                    assert !host.equals(route);
+                    throw new Exception("SessionCreationStickinessHandler.processResponse(): route and host do not match!: route = " + route + ",host = " + host);
+                }
+                isSticky = true;
+            }
+
+            Affinity weakAffinity = null;
+            if (!inTransaction(clientInvocationContext)) {
+                if (!isSticky) {
+                    weakAffinity = new NodeAffinity(route);
+                } else {
+                    weakAffinity = new URIAffinity(HttpStickinessHelper.createURIAffinityValue(route));
+                }
+            } else {
+                if (!isSticky) {
+                    throw new Exception("Session creation response has no strict stickiness header");
+                }
+                weakAffinity = new URIAffinity(HttpStickinessHelper.createURIAffinityValue(route));
+            }
+
+            if (inTransaction(clientInvocationContext)) {
+                EjbHttpClientMessages.MESSAGES.infof("SessionCreationStickinessHandler.processResponse() [txn] updating weak affinity to %s", weakAffinity);
+            } else {
+                EjbHttpClientMessages.MESSAGES.infof("SessionCreationStickinessHandler.processResponse() [non-txn] updating weak affinity to %s", weakAffinity);
+            }
+
+            clientInvocationContext.setWeakAffinity(weakAffinity);
+        }
+    }
+
+    /*
+     * This class manages the relationship between the proxy's strong and weak affinity and
+     * the stickiness requirements of session beans resulting from invocation.
+     */
+    private class InvocationStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final EJBReceiverInvocationContext receiverInvocationContext;
+        private final ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId;
+        private final HttpTargetContext targetContext;
+        private final String txStickinessKey;
+
+        public InvocationStickinessHandler(EJBReceiverInvocationContext receiverInvocationContext, ConcurrentMap<URI, ConcurrentMap<String, String>> node2SessionId, HttpTargetContext targetContext, String txStickinessKey) {
+            this.receiverInvocationContext = receiverInvocationContext;
+            this.node2SessionId = node2SessionId;
+            this.targetContext = targetContext;
+            this.txStickinessKey = txStickinessKey;
+        }
+
+        @Override
+        public void prepareRequest(ClientRequest request) throws Exception {
+            EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler.prepareRequest for request %s", request);
+
+            EJBClientInvocationContext context = receiverInvocationContext.getClientInvocationContext();
+            EJBLocator locator = context.getLocator();
+            URI uri = context.getDestination();
+            Affinity weakAffinity = context.getWeakAffinity();
+
+            EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler().prepareRequest(), node2sessionID map: %s", node2SessionId);
+
+            if (inTransaction(context)) {
+                // The node this transaction is pinned to is stored in a per-transaction resource map, NOT in the
+                // proxy-scoped weak affinity (which is unreliable for SLSBs and leaks across transaction cycles).
+                ConcurrentMap<URI, String> pinMap = getOrCreateTransactionURIMap(context.getTransaction(), TXN_CONFIRMED_STICKINESS_MAP);
+                String route = pinMap.get(uri);
+                // On the first call of the transaction there is no confirmed pin yet. Fall back to the weak affinity
+                // (e.g. a node established during SFSB session creation) so that first call still lands on the
+                // session's node; this is best-effort only and is never enforced.
+                if (route == null && weakAffinity instanceof URIAffinity) {
+                    route = ((URIAffinity) weakAffinity).getUri().getHost();
+                }
+                if (route != null) {
+                    String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
+                    if (nodeSessionID != null) {
+                        HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+                        HttpStickinessHelper.addStrictStickinessHost(request, route);
+                    }
+                }
+                // route == null: first call and no session yet -> send nothing and let the load balancer route
+                // freely; we pin to whichever node answers in processResponse().
+            } else if (locator instanceof StatefulEJBLocator) {
+                if (weakAffinity instanceof NodeAffinity) {
+                    String route = ((NodeAffinity) weakAffinity).getNodeName();
+                    if (route != null) {
+                        EjbHttpClientMessages.MESSAGES.infof("Calling InvocationStickinessHandler.prepareRequest(), node2sessionID map: %s, uri = %s, route = %s", node2SessionId, uri, route);
+
+                        String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
+                        if (nodeSessionID != null) {
+                            HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+                        }
+                    }
+                } else if (weakAffinity instanceof URIAffinity) {
+                    String route = ((URIAffinity) weakAffinity).getUri().getHost();
+                    if (route != null) {
+                        String nodeSessionID = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
+                        if (nodeSessionID != null) {
+                            HttpStickinessHelper.addEncodedSessionID(request, nodeSessionID, route);
+                            HttpStickinessHelper.addStrictStickinessHost(request, route);
+                        }
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) throws Exception {
+            EjbHttpClientMessages.MESSAGES.infof("InvocationStickinessHandler.processResponse for response %s", result.getResponse());
+
+            EJBClientInvocationContext context = receiverInvocationContext.getClientInvocationContext();
+            EJBLocator locator = context.getLocator();
+            URI uri = context.getDestination();
+
+            ClientResponse response = result.getResponse();
+
+            boolean hasSetCookie = HttpStickinessHelper.hasEncodedSessionID(response);
+            boolean hasStrictnessResult = HttpStickinessHelper.hasStrictStickinessResult(response);
+            boolean isSticky = HttpStickinessHelper.getStrictStickinessResult(response);
+
+            if (inTransaction(context)) {
+                if (hasStrictnessResult && !isSticky) {
+                    throw new Exception("Stickiness not respected for transaction-scoped invocation");
+                }
+                // Enforce affinity against the node the transaction was pinned to, sourced from the per-transaction
+                // resource map (not the leaky proxy-scoped weak affinity). The first response of the transaction
+                // establishes the pin; only subsequent responses are enforced.
+                ConcurrentMap<URI, String> pinMap = getOrCreateTransactionURIMap(context.getTransaction(), TXN_CONFIRMED_STICKINESS_MAP);
+                String actualNode = HttpStickinessHelper.hasStrictStickinessHost(response)
+                        ? HttpStickinessHelper.getStrictStickinessHost(response) : null;
+                if (actualNode != null) {
+                    String pinnedNode = pinMap.putIfAbsent(uri, actualNode);
+                    if (pinnedNode != null && !pinnedNode.equals(actualNode)) {
+                        throw new Exception("Transaction affinity violated: expected node " + pinnedNode + " but response came from " + actualNode);
+                    }
+                }
+                if (hasSetCookie) {
+                    String route = HttpStickinessHelper.updateNode2SessionIDMap(node2SessionId, uri, response);
+                    String sessionId = HttpStickinessHelper.getSessionIDForNode(node2SessionId, uri, route);
+                    targetContext.setTransactionStickiness(txStickinessKey, route, sessionId);
+                    // If the server did not send a StrictStickinessHost header, fall back to pinning on the cookie route.
+                    if (actualNode == null && route != null) {
+                        pinMap.putIfAbsent(uri, route);
+                    }
+                    URIAffinity newAffinity = new URIAffinity(HttpStickinessHelper.createURIAffinityValue(route));
+                    context.setWeakAffinity(newAffinity);
+                }
+            } else if (locator instanceof StatefulEJBLocator) {
+                if (hasSetCookie) {
+                    String route = HttpStickinessHelper.updateNode2SessionIDMap(node2SessionId, uri, response);
+                    if (isSticky) {
+                        URIAffinity newAffinity = new URIAffinity(HttpStickinessHelper.createURIAffinityValue(route));
+                        context.setWeakAffinity(newAffinity);
+                    } else {
+                        context.setWeakAffinity(new NodeAffinity(route));
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void processFailure(Throwable cause) {
+            EJBClientInvocationContext context = receiverInvocationContext.getClientInvocationContext();
+            Affinity weakAffinity = context.getWeakAffinity();
+            URI uri = context.getDestination();
+
+            EjbHttpClientMessages.MESSAGES.infof("InvocationStickinessHandler.processFailure(), cause: %s, weakAffinity: %s, uri: %s", cause.getMessage(), weakAffinity, uri);
+
+            if (inTransaction(context)) {
+                return;
+            }
+
+            String route = null;
+            if (weakAffinity instanceof NodeAffinity) {
+                route = ((NodeAffinity) weakAffinity).getNodeName();
+            } else if (weakAffinity instanceof URIAffinity) {
+                route = ((URIAffinity) weakAffinity).getUri().getHost();
+            }
+
+            if (route != null && uri != null) {
+                ConcurrentMap<String, String> map = node2SessionId.get(uri);
+                if (map != null) {
+                    map.remove(route);
+                }
+            }
+
+            context.setWeakAffinity(Affinity.NONE);
+        }
+    }
+
+    // -------------------------------------------------------
+
+    private boolean inTransaction(AbstractInvocationContext context) {
+        return context.getTransaction() != null;
+    }
+
+    private boolean inRemoteTransaction(AbstractInvocationContext context) {
+        return context.getTransaction() != null && context.getTransaction() instanceof RemoteTransaction;
+    }
+
+    private boolean inLocalTransaction(AbstractInvocationContext context) {
+        return context.getTransaction() != null && context.getTransaction() instanceof LocalTransaction;
+    }
+
+    /*
+     * For a given URI, resolves the required HttpTargetContext used as a transport between client and server.
+     * In addition to obtaining a valid HttpTargetContext, if the operation is in transaction scope,
+     * this method will ensure that a randomly chosen backend server (if the target is a load balancer) will be
+     * selected for this transaction and all operations in the scope of this transaction will be directed to that
+     * backend node.
+     */
+    private HttpTargetContext resolveTargetContext(final AbstractInvocationContext context, final URI uri) throws Exception {
+        HttpTargetContext currentContext = null;
+
+        // get the HttpTargetContext for the discovered URI
+        final WildflyHttpContext current = WildflyHttpContext.getCurrent();
+        currentContext = current.getTargetContext(uri);
+        if (currentContext == null) {
+            throw EjbHttpClientMessages.MESSAGES.couldNotResolveTargetForLocator(context.getLocator());
+        }
+
+        // if we are in a transaction, get a reference to the transaction's URI map and make sure that a backend
+        // node has been assigned for this transaction
+        if (inTransaction(context)) {
+            ConcurrentMap<URI, String> map = getOrCreateTransactionURIMap(context.getTransaction());
+            String backendNode = map.get(uri);
+            // we need to update the map for this discovered URI with a backend node
+            if (backendNode == null) {
+                try {
+                    // acquire a randomly chosen backend node from this URI (in form http://<host>:<port>?node=<node>)
+                    URI backendURI = currentContext.acquireBackendServer();
+                    if (backendURI != null && backendURI.getQuery() != null) {
+                        EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Got backend server URI: %s", backendURI);
+                        backendNode = parseURIQueryString(backendURI.getQuery());
+                        map.putIfAbsent(uri, backendNode);
+                    } else {
+                        EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: No backend server available for URI: %s (standalone mode)", uri);
+                    }
+                } catch (Exception e) {
+                    EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Backend server discovery not available for URI: %s, proceeding without: %s", uri, e.getMessage());
+                }
+            }
+            if (backendNode != null) {
+                EjbHttpClientMessages.MESSAGES.infof("HttpEJBReceiver: Using backend server: %s", backendNode);
+            }
+        }
+        return currentContext;
+    }
+
+    /*
+     * For a given transaction, returns the mapping of URIs which is used for the purpose of maintaining
+     * strict stickiness semantics in transactions. Each URI (representing a load balancer) is mapped to
+     * a fixed backend node.
+     */
+    private ConcurrentMap<URI, String> getOrCreateTransactionURIMap(AbstractTransaction transaction) throws Exception {
+        return getOrCreateTransactionURIMap(transaction, TXN_STRICT_STICKINESS_MAP);
+    }
+
+    private ConcurrentMap<URI, String> getOrCreateTransactionURIMap(AbstractTransaction transaction, org.jboss.ejb.client.AttachmentKey<ConcurrentMap<URI, String>> key) throws Exception {
+        Object resource = transaction.getResource(key);
+        ConcurrentMap<URI, String> map = null;
+        if (resource == null) {
+            map = new ConcurrentHashMap<>();
+            resource = transaction.putResourceIfAbsent(key, map);
+        }
+        return resource == null ? map : ConcurrentMap.class.cast(resource);
+    }
+
+    /*
+     * Parse the node name out of the string http://<host>:<port>?node=<node>
+     */
+    private String parseURIQueryString(String queryString) {
+        return queryString.substring("node=".length());
+    }
+
+    // -------------------------------------------------------
 }

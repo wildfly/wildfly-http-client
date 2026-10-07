@@ -77,4 +77,7 @@ interface EjbHttpClientMessages extends BasicLogger {
 
     @Message(id = 14, value = "Exception resolving class %s for unmarshalling; it has either been blocklisted or not allowlisted")
     InvalidClassException cannotResolveFilteredClass(String clazz);
+
+    @Message(id = 15, value = "Could not resolve route for transaction %s")
+    IllegalStateException couldNotResolveRouteForTransactionScopedInvocation(String transaction);
 }

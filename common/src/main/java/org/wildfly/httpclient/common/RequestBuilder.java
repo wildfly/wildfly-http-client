@@ -144,6 +144,7 @@ public abstract class RequestBuilder<E extends Enum<? extends RequestType>> {
         final Version.Handler handlerVersion = getVersion().handler();
         if (handlerVersion == Version.Handler.VERSION_1) return Protocol.VERSION_ONE_PATH;
         if (handlerVersion == Version.Handler.VERSION_2) return Protocol.VERSION_TWO_PATH;
+        if (handlerVersion == Version.Handler.VERSION_3) return Protocol.VERSION_THREE_PATH;
         throw new IllegalStateException();
     }
 

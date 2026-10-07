@@ -273,6 +273,7 @@ public class HttpRootContext extends AbstractContext {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(objectResolver, result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                    null,
                     optionalObjectHttpBodyDecoder(unmarshaller, result, httpNamingProvider, getContextClassLoader()),
                     result::completeExceptionally, VALUE, null, true);
         }
@@ -324,7 +325,7 @@ public class HttpRootContext extends AbstractContext {
         final Marshaller marshaller = marshallerFactory.createMarshaller(objectResolver, result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                    object != null ? objectHttpBodyEncoder(marshaller, object) : null, emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
+                    object != null ? objectHttpBodyEncoder(marshaller, object) : null, null, emptyHttpBodyDecoder(result, null), result::completeExceptionally, null, null);
         }
         try {
             result.get();

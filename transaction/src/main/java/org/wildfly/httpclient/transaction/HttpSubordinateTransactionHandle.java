@@ -29,9 +29,11 @@ import static org.wildfly.httpclient.transaction.RequestType.XA_FORGET;
 import static org.wildfly.httpclient.transaction.RequestType.XA_PREPARE;
 import static org.wildfly.httpclient.transaction.RequestType.XA_ROLLBACK;
 
+import io.undertow.client.ClientExchange;
 import io.undertow.client.ClientRequest;
 import org.jboss.marshalling.Marshaller;
 import org.wildfly.httpclient.common.HttpMarshallerFactory;
+import org.wildfly.httpclient.common.HttpStickinessHelper;
 import org.wildfly.httpclient.common.HttpTargetContext;
 import org.wildfly.httpclient.common.HttpTargetContext.ResponseContext;
 import org.wildfly.security.auth.client.AuthenticationConfiguration;
@@ -70,12 +72,20 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void commit(boolean onePhase) throws XAException {
-        processOperation(XA_COMMIT, null, onePhase ? TRUE : null);
+        try {
+            processOperation(XA_COMMIT, null, onePhase ? TRUE : null);
+        } finally {
+            clearStickiness();
+        }
     }
 
     @Override
     public void rollback() throws XAException {
-        processOperation(XA_ROLLBACK);
+        try {
+            processOperation(XA_ROLLBACK);
+        } finally {
+            clearStickiness();
+        }
     }
 
     @Override
@@ -99,7 +109,15 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
 
     @Override
     public void forget() throws XAException {
-        processOperation(XA_FORGET);
+        try {
+            processOperation(XA_FORGET);
+        } finally {
+            clearStickiness();
+        }
+    }
+
+    private void clearStickiness() {
+        targetContext.clearTransactionStickiness(HttpStickinessHelper.stickinessKey(id.getFormatId(), id.getGlobalTransactionId()));
     }
 
     private void processOperation(RequestType requestType) throws XAException {
@@ -114,7 +132,7 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         final Marshaller marshaller = marshallerFactory.createMarshaller(result);
         if (marshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration,
-                    xidHttpBodyEncoder(marshaller, id), emptyHttpBodyDecoder(result, resultFunction), result::completeExceptionally, null, null);
+                    xidHttpBodyEncoder(marshaller, id), new SubordinateTransactionStickinessHandler(targetContext, id), emptyHttpBodyDecoder(result, resultFunction), result::completeExceptionally, null, null);
         }
         try {
             try {
@@ -136,4 +154,36 @@ class HttpSubordinateTransactionHandle implements SubordinateTransactionControl 
         }
     }
 
+    public static class SubordinateTransactionStickinessHandler implements HttpTargetContext.HttpStickinessHandler {
+        private final HttpTargetContext targetContext;
+        private final Xid xid;
+
+        public SubordinateTransactionStickinessHandler() {
+            this.targetContext = null;
+            this.xid = null;
+        }
+
+        public SubordinateTransactionStickinessHandler(HttpTargetContext targetContext, Xid xid) {
+            this.targetContext = targetContext;
+            this.xid = xid;
+        }
+
+        @Override
+        public void prepareRequest(ClientRequest request) {
+            if (targetContext == null) {
+                return;
+            }
+            String key = HttpStickinessHelper.stickinessKey(xid.getFormatId(), xid.getGlobalTransactionId());
+            String route = targetContext.getTransactionStickyRoute(key);
+            String sessionId = targetContext.getTransactionStickySessionId(key);
+            if (route != null && sessionId != null) {
+                HttpStickinessHelper.addEncodedSessionID(request, sessionId, route);
+                HttpStickinessHelper.addStrictStickinessHost(request, route);
+            }
+        }
+
+        @Override
+        public void processResponse(ClientExchange result) {
+        }
+    }
 }

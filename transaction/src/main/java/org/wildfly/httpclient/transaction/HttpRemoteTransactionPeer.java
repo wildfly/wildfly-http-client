@@ -64,7 +64,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
     @Override
     public SubordinateTransactionControl lookupXid(Xid xid) throws XAException {
         try {
-            return new HttpSubordinateTransactionHandle(xid, targetContext, getSslContext(targetContext.getUri()), authenticationConfiguration);
+            return new HttpSubordinateTransactionHandle(xid, targetContext, getSslContext(targetContext.getUri()), getAuthenticationConfiguration(targetContext.getUri()));
         } catch (GeneralSecurityException e) {
             XAException xaException = new XAException(XAException.XAER_RMFAIL);
             xaException.initCause(e);
@@ -93,6 +93,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                    new HttpSubordinateTransactionHandle.SubordinateTransactionStickinessHandler(),
                     xidArrayHttpBodyDecoder(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
         }
         try {
@@ -128,6 +129,7 @@ public class HttpRemoteTransactionPeer implements RemoteTransactionPeer {
         final Unmarshaller unmarshaller = marshallerFactory.createUnmarshaller(result);
         if (unmarshaller != null) {
             targetContext.sendRequest(request, sslContext, authenticationConfiguration, null,
+                    new HttpRemoteTransactionHandle.RemoteTransactionStickinessHandler(),
                     xidHttpBodyDecoder(unmarshaller, result), result::completeExceptionally, NEW_TRANSACTION, null);
         }
         try {
